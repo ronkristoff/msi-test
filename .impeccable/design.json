@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-24T00:00:00Z",
+  "title": "Design System: MSITest",
+  "extensions": {
+    "colorMeta": {
+      "anchor-blue": {
+        "role": "primary",
+        "displayName": "Anchor Blue",
+        "canonical": "oklch(46% 0.16 260)",
+        "tonalRamp": [
+          "oklch(15% 0.06 260)",
+          "oklch(22% 0.08 260)",
+          "oklch(30% 0.10 260)",
+          "oklch(38% 0.13 260)",
+          "oklch(46% 0.16 260)",
+          "oklch(54% 0.14 260)",
+          "oklch(62% 0.10 260)",
+          "oklch(70% 0.06 260)",
+          "oklch(80% 0.03 260)",
+          "oklch(92% 0.01 260)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(18% 0.02 260)",
+        "tonalRamp": [
+          "oklch(10% 0.01 260)",
+          "oklch(14% 0.015 260)",
+          "oklch(18% 0.02 260)",
+          "oklch(25% 0.015 260)",
+          "oklch(35% 0.01 260)",
+          "oklch(45% 0.008 260)",
+          "oklch(55% 0.006 260)",
+          "oklch(70% 0.004 260)",
+          "oklch(85% 0.003 260)",
+          "oklch(97% 0.002 260)"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Forest Green",
+        "canonical": "oklch(32% 0.12 145)",
+        "tonalRamp": [
+          "oklch(10% 0.05 145)",
+          "oklch(15% 0.07 145)",
+          "oklch(20% 0.09 145)",
+          "oklch(26% 0.10 145)",
+          "oklch(32% 0.12 145)",
+          "oklch(40% 0.11 145)",
+          "oklch(50% 0.09 145)",
+          "oklch(62% 0.06 145)",
+          "oklch(78% 0.04 145)",
+          "oklch(94% 0.02 145)"
+        ]
+      },
+      "warn": {
+        "role": "semantic",
+        "displayName": "Amber",
+        "canonical": "oklch(75% 0.15 85)",
+        "tonalRamp": [
+          "oklch(20% 0.06 85)",
+          "oklch(30% 0.08 85)",
+          "oklch(40% 0.10 85)",
+          "oklch(50% 0.12 85)",
+          "oklch(60% 0.14 85)",
+          "oklch(75% 0.15 85)",
+          "oklch(82% 0.12 85)",
+          "oklch(88% 0.08 85)",
+          "oklch(94% 0.04 85)",
+          "oklch(97% 0.02 85)"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Signal Red",
+        "canonical": "oklch(50% 0.20 25)",
+        "tonalRamp": [
+          "oklch(15% 0.06 25)",
+          "oklch(22% 0.09 25)",
+          "oklch(30% 0.12 25)",
+          "oklch(40% 0.16 25)",
+          "oklch(50% 0.20 25)",
+          "oklch(58% 0.18 25)",
+          "oklch(66% 0.14 25)",
+          "oklch(76% 0.08 25)",
+          "oklch(88% 0.04 25)",
+          "oklch(96% 0.02 25)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles in the topbar. One per surface. Weight 700."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Paragraphs, descriptions, form text. Weight 400, 16px, line-height 1.35."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "All technical content: test names, IDs, durations, code, console output, status labels, metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "raised",
+        "value": "0 0 1px rgba(0,0,0,0.32), 0 0 2px rgba(0,0,0,0.08), 0 1px 3px rgba(45,127,249,0.28), inset 0 0 0 0.5px rgba(0,0,0,0.06)",
+        "purpose": "Settings sections, onboarding cards. Blue-tinted elevation for floating containers."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Default easing for all state transitions. Fast start, gentle stop."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "Button hover, input focus, list item highlight."
+      },
+      {
+        "name": "duration-base",
+        "value": "200ms",
+        "purpose": "Background transitions, sidebar item state changes."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "600px" },
+      { "name": "md", "value": "900px" },
+      { "name": "lg", "value": "1200px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary CTA. Anchor Blue background, white text. Presses in 1px on active.",
+      "html": "<button class=\"ds-btn-primary\">\n  <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><polygon points=\"5 3 19 12 5 21 5 3\"/></svg>\n  Run Tests\n</button>",
+      "css": ".ds-btn-primary {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  padding: 9px 16px;\n  border-radius: 12px;\n  border: 1px solid #1b61c9;\n  background: #1b61c9;\n  color: #ffffff;\n  font-size: 14px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: background 150ms cubic-bezier(0.2, 0, 0, 1), transform 150ms cubic-bezier(0.2, 0, 0, 1);\n}\n.ds-btn-primary:hover {\n  background: #254fad;\n}\n.ds-btn-primary:active {\n  transform: translateY(1px);\n}\n.ds-btn-primary:focus-visible {\n  box-shadow: 0 0 0 3px color-mix(in oklab, #1b61c9, transparent 70%);\n  outline: none;\n}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary action. Transparent with border. Hover fills border-soft.",
+      "html": "<button class=\"ds-btn-secondary\">\n  <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>\n  Export\n</button>",
+      "css": ".ds-btn-secondary {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  padding: 9px 16px;\n  border-radius: 12px;\n  border: 1px solid #e0e2e6;\n  background: transparent;\n  color: #181d26;\n  font-size: 14px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: border-color 150ms cubic-bezier(0.2, 0, 0, 1), background 150ms cubic-bezier(0.2, 0, 0, 1);\n}\n.ds-btn-secondary:hover {\n  border-color: #181d26;\n  background: #eef0f3;\n}\n.ds-btn-secondary:focus-visible {\n  box-shadow: 0 0 0 3px color-mix(in oklab, #1b61c9, transparent 70%);\n  outline: none;\n}"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill-success",
+      "description": "Inline status indicator with dot. Variants: success, danger, warn, neutral.",
+      "html": "<span class=\"ds-pill ds-pill-success\"><span class=\"ds-pill-dot\"></span>Passed</span>\n<span class=\"ds-pill ds-pill-danger\"><span class=\"ds-pill-dot\"></span>Failed</span>\n<span class=\"ds-pill ds-pill-warn\"><span class=\"ds-pill-dot\"></span>Flaky</span>",
+      "css": ".ds-pill {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  padding: 3px 8px;\n  border-radius: 9999px;\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.02em;\n}\n.ds-pill-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: currentColor;\n}\n.ds-pill-success {\n  background: rgba(0, 100, 0, 0.12);\n  color: #006400;\n}\n.ds-pill-danger {\n  background: rgba(220, 38, 38, 0.10);\n  color: #a10d3d;\n}\n.ds-pill-warn {\n  background: rgba(234, 179, 8, 0.12);\n  color: #8a6500;\n}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Fixed 240px sidebar. Anchor Blue background. Sectioned with uppercase labels.",
+      "html": "<nav class=\"ds-sidebar\">\n  <div class=\"ds-sidebar-logo\">MSITest</div>\n  <div class=\"ds-sidebar-section\">\n    <div class=\"ds-sidebar-label\">Workspace</div>\n    <a class=\"ds-sidebar-item ds-sidebar-item-active\">\n      <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>\n      Dashboard\n    </a>\n    <a class=\"ds-sidebar-item\">\n      <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 3\"/></svg>\n      Test Runs\n      <span class=\"ds-sidebar-count\">847</span>\n    </a>\n  </div>\n</nav>",
+      "css": ".ds-sidebar {\n  background: #1b61c9;\n  color: #ffffff;\n  padding: 16px;\n  width: 240px;\n  position: sticky;\n  top: 0;\n  height: 100vh;\n  overflow-y: auto;\n}\n.ds-sidebar-logo {\n  font-family: Haas, -apple-system, system-ui, Segoe UI, Roboto, sans-serif;\n  font-size: 18px;\n  font-weight: 700;\n  letter-spacing: -0.01em;\n  padding: 8px 8px 24px;\n  border-bottom: 1px solid rgba(255,255,255,0.15);\n  margin-bottom: 16px;\n}\n.ds-sidebar-section {\n  margin-bottom: 24px;\n}\n.ds-sidebar-label {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 11px;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  color: rgba(255,255,255,0.5);\n  margin-bottom: 8px;\n  padding: 0 8px;\n}\n.ds-sidebar-item {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 8px 8px;\n  border-radius: 12px;\n  font-size: 14px;\n  color: rgba(255,255,255,0.75);\n  text-decoration: none;\n  cursor: pointer;\n  transition: background 200ms cubic-bezier(0.2, 0, 0, 1), color 200ms cubic-bezier(0.2, 0, 0, 1);\n}\n.ds-sidebar-item:hover {\n  background: rgba(255,255,255,0.1);\n  color: #ffffff;\n}\n.ds-sidebar-item-active {\n  background: rgba(27, 97, 201, 0.25);\n  color: #ffffff;\n}\n.ds-sidebar-count {\n  margin-left: auto;\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 11px;\n  background: rgba(255,255,255,0.15);\n  padding: 2px 6px;\n  border-radius: 8px;\n}"
+    },
+    {
+      "name": "Form Input",
+      "kind": "input",
+      "refersTo": "form-input",
+      "description": "Standard text input with monospace label and focus ring.",
+      "html": "<div class=\"ds-field\">\n  <label class=\"ds-field-label\">Provider Endpoint</label>\n  <input class=\"ds-field-input\" type=\"url\" value=\"https://api.openai.com/v1\" />\n  <div class=\"ds-field-hint\">OpenAI-compatible endpoint URL.</div>\n</div>",
+      "css": ".ds-field {\n  margin-bottom: 20px;\n}\n.ds-field-label {\n  display: block;\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 11px;\n  text-transform: uppercase;\n  letter-spacing: 0.05em;\n  color: rgba(4, 14, 32, 0.69);\n  margin-bottom: 8px;\n}\n.ds-field-input {\n  width: 100%;\n  padding: 9px 12px;\n  border: 1px solid #e0e2e6;\n  border-radius: 12px;\n  font-size: 14px;\n  color: #181d26;\n  background: #ffffff;\n  outline: none;\n  transition: border-color 150ms cubic-bezier(0.2, 0, 0, 1), box-shadow 150ms cubic-bezier(0.2, 0, 0, 1);\n}\n.ds-field-input::placeholder {\n  color: rgba(4, 14, 32, 0.69);\n}\n.ds-field-input:focus {\n  border-color: #1b61c9;\n  box-shadow: 0 0 0 3px color-mix(in oklab, #1b61c9, transparent 70%);\n}\n.ds-field-hint {\n  font-size: 12px;\n  color: rgba(4, 14, 32, 0.69);\n  margin-top: 8px;\n}"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Dashboard metric card with mono label, large value, and trend indicator.",
+      "html": "<div class=\"ds-stat-card\">\n  <div class=\"ds-stat-label\">Pass Rate</div>\n  <div class=\"ds-stat-value\">97.3<span class=\"ds-stat-unit\">%</span></div>\n  <div class=\"ds-stat-sub\"><span class=\"ds-stat-trend ds-stat-trend-up\">&#8593; 0.4%</span> vs last run</div>\n</div>",
+      "css": ".ds-stat-card {\n  background: #ffffff;\n  border: 1px solid #eef0f3;\n  border-radius: 16px;\n  padding: 16px;\n}\n.ds-stat-label {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 12px;\n  color: rgba(4, 14, 32, 0.69);\n  letter-spacing: 0.04em;\n  text-transform: uppercase;\n  margin-bottom: 8px;\n}\n.ds-stat-value {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 32px;\n  font-weight: 700;\n  letter-spacing: -0.02em;\n  color: #181d26;\n  line-height: 1;\n}\n.ds-stat-unit {\n  font-size: 0.5em;\n  opacity: 0.5;\n}\n.ds-stat-sub {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 12px;\n  color: rgba(4, 14, 32, 0.69);\n  margin-top: 8px;\n}\n.ds-stat-trend-up {\n  color: #006400;\n}\n.ds-stat-trend-down {\n  color: #dc2626;\n}"
+    },
+    {
+      "name": "AI Insight Card",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "AI-generated root cause analysis. Subtle purple-tinted background. Reads like a code review comment.",
+      "html": "<div class=\"ds-ai-insight\">\n  <div class=\"ds-ai-insight-header\">\n    <span class=\"ds-ai-badge\">\n      <svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 8v4l3 3\"/><path d=\"M18 2l4 4-4 4\"/></svg>\n      AI Root Cause\n    </span>\n  </div>\n  <div class=\"ds-ai-insight-body\">\n    The <code>iframe</code> for 3DS verification returns <code>result=timeout</code> after 30s. <strong>Fix: add <code>waitForFrameFunction</code> with 45s timeout.</strong>\n  </div>\n</div>",
+      "css": ".ds-ai-insight {\n  background: linear-gradient(135deg, rgba(74, 20, 75, 0.04), rgba(74, 20, 75, 0.08));\n  border: 1px solid rgba(74, 20, 75, 0.15);\n  border-radius: 16px;\n  padding: 16px;\n}\n.ds-ai-insight-header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  margin-bottom: 12px;\n}\n.ds-ai-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: #1b61c9;\n  color: #ffffff;\n  font-size: 11px;\n  font-weight: 700;\n  padding: 3px 8px;\n  border-radius: 9999px;\n}\n.ds-ai-insight-body {\n  font-size: 14px;\n  line-height: 1.6;\n  color: #181d26;\n}\n.ds-ai-insight-body strong {\n  color: #1b61c9;\n}\n.ds-ai-insight-body code {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 12px;\n  background: rgba(74, 20, 75, 0.08);\n  padding: 1px 5px;\n  border-radius: 3px;\n}"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Full-width data table with mono headers, heavy header border, hover rows.",
+      "html": "<table class=\"ds-table\">\n  <thead>\n    <tr>\n      <th>Run</th>\n      <th>Branch</th>\n      <th class=\"ds-table-num\">Passed</th>\n      <th class=\"ds-table-num\">Failed</th>\n      <th class=\"ds-table-num\">Duration</th>\n      <th>Status</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td class=\"ds-table-name ds-table-clickable\">#2847 &#8212; staging / pr-4821</td>\n      <td class=\"ds-table-mono\">main</td>\n      <td class=\"ds-table-num\" style=\"color: #006400;\">1,901</td>\n      <td class=\"ds-table-num\" style=\"color: #dc2626;\">4</td>\n      <td class=\"ds-table-num\">3m 12s</td>\n      <td><span class=\"ds-pill ds-pill-warn\"><span class=\"ds-pill-dot\"></span>Running</span></td>\n    </tr>\n  </tbody>\n</table>",
+      "css": ".ds-table {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 14px;\n}\n.ds-table th {\n  text-align: left;\n  padding: 10px 12px;\n  border-bottom: 2px solid #181d26;\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 12px;\n  font-weight: 600;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n  color: rgba(4, 14, 32, 0.69);\n}\n.ds-table td {\n  padding: 12px 12px;\n  border-bottom: 1px solid #eef0f3;\n  vertical-align: middle;\n}\n.ds-table tbody tr:hover {\n  background: #ffffff;\n}\n.ds-table-num {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-variant-numeric: tabular-nums;\n  text-align: right;\n}\n.ds-table-name {\n  font-weight: 600;\n}\n.ds-table-mono {\n  font-family: ui-monospace, SF Mono, JetBrains Mono, Menlo, Monaco, Consolas, monospace;\n  font-size: 12px;\n  color: rgba(4, 14, 32, 0.69);\n}\n.ds-table-clickable {\n  cursor: pointer;\n}\n.ds-table-clickable:hover {\n  color: #1b61c9;\n}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Flight Deck",
+    "overview": "MSITest is a flight deck for test operations. Every instrument reads clearly at a glance. Status lights tell the story before you read a word. The layout is dense where it needs to be (run tables, step timelines, console output) and breathes where density would hurt (section separators, card interiors, settings forms). Nothing is decorative. Everything is reachable.\n\nThe system draws from Airtable's visual language: a single saturated blue as the structural accent, generous border radii that soften without rounding into playfulness, and a strict division between the system font stack (body, labels, headings) and monospace (all technical content). The sidebar is the flight deck's instrument panel: always present, always blue, carrying navigation and status counts.\n\nThis system explicitly rejects AI-adjacent visual cliches. No sparkle icons, no gradient text, no purple or violet accents, no chatbot-style response cards. When AI analysis appears, it reads like a senior engineer's comment in a pull request: plain text, inline code snippets, a confidence percentage. The AI is infrastructure, not identity.",
+    "keyCharacteristics": [
+      "Restrained color: one saturated blue (Anchor Blue) carries navigation, primary actions, and active states",
+      "Generous radii (12/16px) on all interactive elements and containers",
+      "Monospace for all technical content: test names, IDs, durations, file paths, code, status labels",
+      "Status is always visible via color-coded pills with dot indicators",
+      "Flat surfaces by default with blue-tinted elevation on raised elements"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Anchor Blue is the only saturated color used for UI chrome. Semantic colors (success, warn, danger) appear exclusively in status indicators and trend arrows. No other hue family enters the interface.",
+        "section": "colors"
+      },
+      {
+        "name": "The Blue-Tint Shadow Rule",
+        "body": "All elevation shadows carry a blue component (rgba(45, 127, 249, 0.28)). Neutral-gray shadows look dead. The blue tint ties raised elements to the accent system.",
+        "section": "colors"
+      },
+      {
+        "name": "The Code Boundary Rule",
+        "body": "If the user might select it, copy it, or grep for it, it must be monospace. Test names, file paths, durations, status labels, console output, code snippets. Body text is for prose. Mono is for data.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat. Elevation is earned, not assumed. If a card or section does not need to float above its context, it should not have a shadow. Border color alone separates most elements.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use monospace for any content a developer might copy, grep, or reference in a terminal: test names, file paths, IDs, durations, console output, code snippets, status labels.",
+      "Do surface status immediately with color-coded pills and dot indicators. Pass/fail/flaky/running should read without scanning.",
+      "Do use Anchor Blue for exactly three things: navigation chrome (sidebar), primary actions (buttons), and active/focus states.",
+      "Do use the blue-tinted raised shadow for settings sections and onboarding cards.",
+      "Do keep section separators generous (24-32px).",
+      "Do give every interactive element a focus-visible state: the 3px blue ring at 70% transparency."
+    ],
+    "donts": [
+      "Don't use sparkle icons, magic wand imagery, gradient text, chatbot-style response cards, or any visual language that signals \"AI tool.\"",
+      "Don't introduce a second saturated accent color. One accent (Anchor Blue) owns the interface.",
+      "Don't use pure black (#000) for text. Ink (#181d26) carries a blue undertone.",
+      "Don't add shadows to table rows, stat cards, filter bars, or list items. Flat with borders.",
+      "Don't use display fonts in UI labels, buttons, data cells, or status indicators.",
+      "Don't animate layout properties. Transitions on background-color, border-color, box-shadow, opacity, transform only. 150-200ms.",
+      "Don't make the interface feel playful, whimsical, or personality-forward."
+    ]
+  }
+}
