@@ -105,10 +105,10 @@ MSITest is an autonomous AI testing platform. Users provide their app URL, a PRD
 ### Suites Management
 
 60. As a developer, I want to see a list of all test suites in a project, so that I can manage test organization
-61. As a developer, I want to see the number of tests and last run status for each suite, so that I can assess suite health at a glance
-62. As a developer, I want to create a new suite, so that I can group related tests
-63. As a developer, I want to run an entire suite with one click, so that I can validate a feature area
-64. As a developer, I want to delete or archive a suite, so that I can clean up obsolete tests
+61. As a developer, I want to see the number of tests for each suite, so that I can assess suite size at a glance
+62. As a developer, I want to create a new suite with one click, so that I can group related tests without filling out a form
+63. As a developer, I want to rename a suite inline, so that I can keep suite names meaningful
+64. As a developer, I want to delete a suite and all its tests, so that I can clean up obsolete tests
 
 ### Environments
 
@@ -266,8 +266,8 @@ Slack webhook integration. Accepts alert rules (trigger event type, optional thr
 
 - **workspaces** — id, name, owner_id, ai_config (endpoint_url, api_key, model_name), created_at
 - **projects** — id, workspace_id, name, app_url, prd_text, prd_file_id, created_at
-- **suites** — id, project_id, name, description, source_type (url_exploration | prd | natural_language), created_at
-- **tests** — id, suite_id, name, description, playwright_code (string), source_type (url_exploration | prd | natural_language), status (draft | approved), created_at
+- **suites** — id, workspace_id, project_id, name, description, source_type (url_exploration | prd | natural_language | manual), created_at
+- **tests** — id, workspace_id, suite_id, name, description, playwright_code (string), source_type (url_exploration | prd | natural_language), status (draft | approved), created_at
 - **runs** — id, suite_id (nullable), rerun_of_run_id (nullable), rerun_of_test_id (nullable), project_id, trigger_type (manual | ci | scheduled | rerun), branch, commit, environment, status (running | passed | failed | flaky), runner_id, last_heartbeat_at, started_at, finished_at, duration_ms
 - **run_results** — id, run_id, test_id, status (passed | failed | skipped), duration_ms, retries, console_logs (array of {level, text, timestamp}), trace_file_id, video_file_id
 - **steps** — id, run_result_id, step_number, command, locator, status (passed | failed | skipped), error_message, screenshot_file_id, duration_ms
@@ -280,13 +280,13 @@ Slack webhook integration. Accepts alert rules (trigger event type, optional thr
 
 **Queries**: `getDashboardStats`, `getRuns` (paginated, filtered, sorted), `getRunDetail`, `getSteps`, `getFlakinessMap`, `getTests`, `getSuites`, `getProjects`, `getAIInsights`, `getEnvironments`, `getIntegrations`, `getPendingWork` (used by Runner subscription)
 
-**Mutations**: `createProject`, `updateProject`, `createSuite`, `updateSuite`, `deleteSuite`, `approveTest`, `updateTestCode`, `deleteTest`, `triggerRun`, `rerunTest`, `saveAIConfig`, `createEnvironment`, `updateEnvironment`, `saveIntegration`, `saveAlertRule`, `updateRunHeartbeat`, `writeStepResult`, `writeRunResult`
+**Mutations**: `createProject`, `updateProject`, `createSuite`, `updateSuite`, `deleteSuite`, `updateTestStatus` (draft↔approved toggle), `updateTestCode`, `deleteTest`, `triggerRun`, `rerunTest`, `saveAIConfig`, `createEnvironment`, `updateEnvironment`, `saveIntegration`, `saveAlertRule`, `updateRunHeartbeat`, `writeStepResult`, `writeRunResult`
 
 **Actions**: `exploreApp` (async, real-time progress), `generateTests` (from PRD, prompt, or exploration selection), `analyzeFailure` (AI root cause for a specific failure), `sendTestNotification` (Slack webhook dispatch)
 
 **Cron Jobs**: `markStaleRuns` — marks Runs as failed when `last_heartbeat_at` is older than threshold
 
-### Pages & Routes (14 total)
+### Pages & Routes (13 total)
 
 1. `/login` — email/password + Google OAuth
 2. `/onboarding` — workspace creation with required AI provider config
@@ -295,14 +295,11 @@ Slack webhook integration. Accepts alert rules (trigger event type, optional thr
 5. `/runs/[id]` — split-panel run detail with step timeline, screenshots, console, AI root cause
 6. `/flakiness-map` — heatmap grid with AI cluster analysis
 7. `/projects/new` — project creation wizard (name, URL, PRD text/file upload)
-8. `/projects/[id]/explore` — AI exploration view with discovered flows and selection
-9. `/projects/[id]/suites/[suiteId]` — test suite review and code editor
-10. `/suites` — suite management list
-11. `/environments` — environment configuration
-12. `/insights` — aggregated AI insights across all runs
-13. `/integrations/ci` — CI pipeline configuration
-14. `/integrations/slack` — Slack alert configuration
-15. `/settings` — AI provider config, profile, workspace settings
+8. `/projects/[id]` — project detail with info card + suite list (with "Create Suite" button)
+9. `/projects/[id]/explore` — AI exploration view with discovered flows and selection
+10. `/projects/[id]/suites/[suiteId]` — suite detail with test accordion, inline code editor (textarea + syntax-highlighted preview), draft/approved toggle
+11. `/insights` — aggregated AI insights across all runs
+12. `/settings` — AI provider config, profile, workspace settings
 
 ### Design System
 
