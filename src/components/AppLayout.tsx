@@ -7,6 +7,8 @@ import { useQuery } from "convex/react";
 import { api } from "@/lib/convex";
 import { authClient } from "@/lib/auth-client";
 import { Topbar } from "@/components/ui/Topbar";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { useBreadcrumbs } from "@/lib/use-breadcrumbs";
 import type { ReactNode } from "react";
 
 type NavItem = {
@@ -61,6 +63,15 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Testing",
     items: [
       {
+        href: "/projects",
+        label: "Projects",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+        ),
+      },
+      {
         href: "/suites",
         label: "Suites",
         icon: (
@@ -110,6 +121,8 @@ export function AppLayout({ children, pageTitle, pageSubtitle, pageActions }: Ap
   const user = useQuery(api.workspaces.queries.getCurrentUser);
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
 
+  const breadcrumbs = useBreadcrumbs(pathname);
+
   return (
     <div className="grid grid-cols-[240px_1fr] min-h-screen max-[900px]:grid-cols-1 max-[900px]:[.sidebar]:hidden">
       <aside className="sidebar bg-[var(--accent)] text-[var(--accent-on)] p-4 sticky top-0 h-screen overflow-y-auto">
@@ -122,15 +135,15 @@ export function AppLayout({ children, pageTitle, pageSubtitle, pageActions }: Ap
               {section.label}
             </div>
             {section.items.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`flex items-center gap-3 px-2 py-2 rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--motion-fast)] ${
                     isActive
-                      ? "bg-[rgba(27,97,201,0.25)] text-white"
-                      : "text-white/75 hover:bg-white/10 hover:text-white"
+                      ? "bg-white/20 text-white font-semibold"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {item.icon}
@@ -180,6 +193,11 @@ export function AppLayout({ children, pageTitle, pageSubtitle, pageActions }: Ap
           subtitle={pageSubtitle}
           actions={pageActions}
         />
+        {breadcrumbs.length > 0 && (
+          <div className="px-6 py-2">
+            <Breadcrumbs items={breadcrumbs} />
+          </div>
+        )}
         <div className="flex-1 p-6">
           {children}
         </div>

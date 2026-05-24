@@ -1,12 +1,15 @@
 import { ConvexError } from "convex/values";
 
-export function validateWorkspaceName(name: string) {
+function validateName(name: string, label: string) {
   const trimmed = name.trim();
   if (trimmed.length === 0 || trimmed.length > 100) {
-    throw new ConvexError("Workspace name must be 1-100 characters");
+    throw new ConvexError(`${label} must be 1-100 characters`);
   }
   return trimmed;
 }
+
+export const validateWorkspaceName = (name: string) => validateName(name, "Workspace name");
+export const validateProjectName = (name: string) => validateName(name, "Project name");
 
 export function validateEndpointUrl(url: string) {
   try {
@@ -22,6 +25,20 @@ export function validateRequiredField(value: string, fieldName: string) {
     throw new ConvexError(`${fieldName} is required`);
   }
   return value.trim();
+}
+
+export function normalizeAppUrl(url: string): string {
+  const trimmed = url.trim();
+  if (trimmed.length === 0) {
+    throw new ConvexError("App URL is required");
+  }
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    new URL(withScheme);
+  } catch {
+    throw new ConvexError("Invalid app URL");
+  }
+  return withScheme;
 }
 
 export function maskApiKey(apiKey: string): string {

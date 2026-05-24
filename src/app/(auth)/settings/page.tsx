@@ -5,7 +5,6 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/lib/convex";
-import type { Doc } from "@/lib/convex";
 import { AIConfigForm } from "@/components/AIConfigForm";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
@@ -18,12 +17,7 @@ import {
   type WorkspaceSettingsValues,
   type AccountValues,
 } from "@/lib/schemas";
-
-type WorkspaceMasked = Omit<Doc<"workspaces">, "ai_config"> & {
-  ai_config: Omit<Doc<"workspaces">["ai_config"], "api_key"> & {
-    api_key_masked: string;
-  };
-};
+import type { WorkspaceMasked } from "@/lib/types";
 
 function useAutoDismissMessage(ms: number) {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -85,7 +79,7 @@ function SettingsForm({
   const handleSaveAI = aiForm.handleSubmit(async (data) => {
     setSaving("ai");
     try {
-      const resolvedKey = data.api_key || "___KEEP___";
+      const resolvedKey = data.api_key || undefined;
       await updateWorkspace({
         ai_config: { endpoint_url: data.endpoint_url, api_key: resolvedKey, model_name: data.model_name },
       });

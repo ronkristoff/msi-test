@@ -1,6 +1,5 @@
 import { query } from "../_generated/server";
-import { getOptionalAuthUser } from "../lib/requireAuth";
-import { getOwnerId } from "../lib/requireAuth";
+import { getOptionalOwnedWorkspace, getOptionalAuthUser } from "../lib/requireAuth";
 import { maskApiKey } from "../lib/validation";
 
 export const getCurrentUser = query({
@@ -13,15 +12,10 @@ export const getCurrentUser = query({
 export const getWorkspaceForUser = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getOptionalAuthUser(ctx);
-    if (!user) return null;
+    const result = await getOptionalOwnedWorkspace(ctx);
+    if (!result) return null;
 
-    const workspace = await ctx.db
-      .query("workspaces")
-      .withIndex("by_owner_id", (q) => q.eq("owner_id", getOwnerId(user)))
-      .first();
-    if (!workspace) return null;
-
+    const { workspace } = result;
     const { api_key, ...safeAiConfig } = workspace.ai_config;
     return {
       ...workspace,
@@ -33,13 +27,7 @@ export const getWorkspaceForUser = query({
 export const hasWorkspace = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getOptionalAuthUser(ctx);
-    if (!user) return false;
-
-    const workspace = await ctx.db
-      .query("workspaces")
-      .withIndex("by_owner_id", (q) => q.eq("owner_id", getOwnerId(user)))
-      .first();
-    return workspace !== null;
+    const result = await getOptionalOwnedWorkspace(ctx);
+    return result !== null;
   },
 });

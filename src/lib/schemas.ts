@@ -52,3 +52,17 @@ export const accountSchema = z.object({
 );
 
 export type AccountValues = z.infer<typeof accountSchema>;
+
+export const projectBaseSchema = z.object({
+  name: z.string().min(1, "Project name is required").max(100, "Project name must be under 100 characters"),
+  app_url: z.string().min(1, "App URL is required").refine(
+    (val) => { try { new URL(/^https?:\/\//i.test(val) ? val : `https://${val}`); return true; } catch { return false; } },
+    "Please enter a valid URL",
+  ),
+});
+
+export const projectStep1Schema = projectBaseSchema;
+export type ProjectStep1Values = z.infer<typeof projectStep1Schema>;
+
+export const projectSettingsSchema = projectBaseSchema;
+export type ProjectSettingsValues = z.infer<typeof projectSettingsSchema>;

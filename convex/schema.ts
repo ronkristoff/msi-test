@@ -29,7 +29,9 @@ export default defineSchema({
     app_url: v.string(),
     prd_text: v.optional(v.string()),
     prd_file_id: v.optional(v.id("_storage")),
-  }).index("by_workspace_id", ["workspace_id"]),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_workspace_id_and_name", ["workspace_id", "name"]),
 
   suites: defineTable({
     workspace_id: v.id("workspaces"),

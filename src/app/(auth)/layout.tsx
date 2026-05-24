@@ -14,6 +14,7 @@ const PAGE_META: Record<string, { title: string; subtitle?: string }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Test results and activity overview" },
   "/runs": { title: "Runs", subtitle: "All test execution history" },
   "/flakiness-map": { title: "Flakiness Map", subtitle: "Test stability heatmap across runs" },
+  "/projects": { title: "Projects", subtitle: "Manage your test projects" },
   "/suites": { title: "Suites", subtitle: "Manage test suites" },
   "/insights": { title: "AI Insights", subtitle: "Aggregated AI analysis across runs" },
   "/settings": { title: "Settings", subtitle: "Manage your workspace, AI provider, and account" },
@@ -84,7 +85,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  const meta = PAGE_META[pathname];
+  const meta = PAGE_META[pathname] ?? Object.entries(PAGE_META).find(([key]) => pathname.startsWith(key + "/"))?.[1];
   return (
     <AppLayout pageTitle={meta?.title} pageSubtitle={meta?.subtitle}>
       {children}
