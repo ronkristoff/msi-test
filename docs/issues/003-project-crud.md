@@ -43,23 +43,23 @@ End-to-end: `/projects/new` 2-step wizard → Convex mutations (`createProject`,
 
 ## Acceptance criteria
 
-- [ ] `/projects/new` 2-step wizard: Step 1 collects project name + app URL (required), Step 2 collects optional PRD (text OR file upload, mutually exclusive)
-- [ ] App URL auto-prepends `https://` if missing; validated as URL on frontend and backend
-- [ ] Project names are unique within a workspace (enforced by mutation + `by_workspace_id_and_name` index)
-- [ ] PRD files upload to Convex file storage (`.md`, `.pdf`, `.txt`, max 10MB) and store `prd_file_id` on the project
-- [ ] PRD text is saved to `prd_text`; setting one clears the other
-- [ ] Replacing a PRD file deletes the old file from Convex storage
-- [ ] Project list page (`/projects`) shows all projects in current workspace as a card grid with name, app URL, and creation date
-- [ ] `getProjects` query returns projects scoped to current workspace, ordered by creation time
-- [ ] `getProject` query returns a single project by ID
-- [ ] `createProject` mutation validates required fields (name, app_url), name uniqueness, and normalizes URL
-- [ ] `updateProject` mutation allows editing name, app_url, prd_text, prd_file_id with name collision check on rename
-- [ ] After creation, user lands on project detail page (`/projects/[id]`)
-- [ ] Project detail shows info card (name, app URL, PRD indicator, creation date) + suites section (empty state)
-- [ ] Project settings page (`/projects/[id]/settings`) allows editing name, app URL, and PRD
-- [ ] Navigation from project list to project detail works (cards are clickable)
-- [ ] "Projects" nav item appears in sidebar Testing section, above Suites
-- [ ] Empty state on project list prompts user to create their first project
+- [x] `/projects/new` 2-step wizard: Step 1 collects project name + app URL (required), Step 2 collects optional PRD (text OR file upload, mutually exclusive)
+- [x] App URL auto-prepends `https://` if missing; validated as URL on frontend and backend
+- [x] Project names are unique within a workspace (enforced by mutation + `by_workspace_id_and_name` index)
+- [x] PRD files upload to Convex file storage (`.md`, `.pdf`, `.txt`, max 10MB) and store `prd_file_id` on the project
+- [x] PRD text is saved to `prd_text`; setting one clears the other
+- [x] Replacing a PRD file deletes the old file from Convex storage
+- [x] Project list page (`/projects`) shows all projects in current workspace as a card grid with name, app URL, and creation date
+- [x] `getProjects` query returns projects scoped to current workspace, ordered by creation time
+- [x] `getProject` query returns a single project by ID
+- [x] `createProject` mutation validates required fields (name, app_url), name uniqueness, and normalizes URL
+- [x] `updateProject` mutation allows editing name, app_url, prd_text, prd_file_id with name collision check on rename
+- [x] After creation, user lands on project detail page (`/projects/[id]`)
+- [x] Project detail shows info card (name, app URL, PRD indicator, creation date) + suites section (empty state)
+- [x] Project settings page (`/projects/[id]/settings`) allows editing name, app URL, and PRD
+- [x] Navigation from project list to project detail works (cards are clickable)
+- [x] "Projects" nav item appears in sidebar Testing section, above Suites
+- [x] Empty state on project list prompts user to create their first project
 
 ## Blocked by
 
