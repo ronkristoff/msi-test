@@ -66,17 +66,21 @@ Two-process system: **Next.js 16 frontend** (`src/`) + **Convex backend** (`conv
 
 #### Backend Module Organization
 
-- Convex functions organized by domain (`workspaces/`, `users/`), then by read/write (`queries.ts`, `mutations.ts`)
+- Convex functions organized by domain (`workspaces/`, `users/`, `logs/`), then by read/write (`queries.ts`, `mutations.ts`)
 - Shared utilities in `convex/lib/` — `requireAuth.ts` for auth, `validation.ts` for input validation and masking
 - Every protected mutation uses `requireAuth(ctx)` from `convex/lib/requireAuth.ts` — never inline the auth check
+- Every public query uses `getOptionalAuthUser(ctx)` (try/catch wrapper) — `authComponent.getAuthUser()` throws on unauthenticated, never returns null
 - Use `Doc<"tableName">` from `src/lib/convex` for frontend types — never manual type definitions
 - API key masking uses `maskApiKey()` from `convex/lib/validation.ts`, not inline in query handlers
 
 #### Auth Routing
 
-- `src/proxy.ts` handles unauthenticated redirect to `/login` (edge middleware, cannot query Convex)
-- `src/app/(auth)/layout.tsx` handles client-side routing: no session → `/login`, no workspace → `/onboarding`, workspace exists → continue
-- After login, the `hasWorkspace` query determines redirect target (`/onboarding` or `/dashboard`)
+- **Three-layer auth gate** — each layer has ONE responsibility:
+  1. `src/proxy.ts` (edge): Cookie-only check → redirects to `/login` if no session cookie. **Only layer that redirects to `/login`.**
+  2. `src/app/(auth)/layout.tsx` (client): Convex query-based workspace routing → only handles workspace/onboarding redirects, **never redirects to `/login`**
+  3. Login page: Uses `useSession()` for already-logged-in redirect → navigates directly to `/dashboard`
+- After successful login/signup, navigate directly to `/dashboard` — never to `/` (causes redirect loop)
+- After sign-out, navigate to `/login` immediately in the same handler (before Convex queries fire without auth)
 - Onboarding is sidebarless (listed in `SIDEBARLESS_ROUTES` in the auth layout)
 - Use the `"skip"` pattern for conditional Convex queries: `useQuery(api.foo.bar, condition ? {} : "skip")`
 
@@ -158,6 +162,29 @@ Before submitting any code:
 **Secret management:** NEVER hardcode secrets. Use environment variables or a secret manager. Validate required secrets at startup. Rotate any exposed secrets immediately.
 
 **If a security issue is found:** STOP → use security-reviewer agent → fix CRITICAL issues → rotate exposed secrets → review codebase for similar issues.
+
+### React 19 Strict Rules
+
+- `router.push()` / `router.replace()` must be inside `useEffect` or event handlers — **never in the render body**. React 19 forbids calling setState on other components during render.
+- `forwardRef` components must destructure overridden props before `{...props}` spread: `({ type, ...props })` then `<input type={computed} {...props} />`. Otherwise the spread silently overwrites your computed value.
+
+### Convex Schema Rules
+
+- Index names cannot be `by_creation_time` or `by_id` — these are reserved by Convex
+- `_creationTime` is auto-appended to every index — never add it explicitly as an index field
+- New directories under `convex/` may require `pnpm dev` restart to be detected by the file watcher
+
+### Error Logging
+
+- `src/lib/error-logger.ts` provides `useErrorLogger()` hook + `initGlobalErrorHandlers()` for global `onerror`/`unhandledrejection`
+- `convex/logs/mutations.ts` — `logError` mutation (public, no auth required). Truncates strings to prevent oversized documents.
+- Call `setGlobalErrorLogger(logError)` and `initGlobalErrorHandlers()` once in root layout mount
+- All `try/catch` blocks in UI code should call `logError()` with context
+
+### Form Schema Patterns
+
+- For forms that switch modes (e.g. login vs signup), don't use `useForm<A | B>` union types with `zodResolver` — TypeScript resolver mismatch
+- Instead: type the form as the superset type (signup). Define a base schema with relaxed validation for mode-specific fields (`z.string()` without `.min()`). Switch resolver between schemas.
 
 ### Known Tech Debt
 

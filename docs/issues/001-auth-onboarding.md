@@ -11,14 +11,14 @@ End-to-end: Better Auth setup on Convex → login page (`/login`) → onboarding
 
 ## Acceptance criteria
 
-- [ ] Better Auth configured with email/password and Google OAuth providers
-- [ ] `/login` page renders sign-in form (email/password) and Google OAuth button
-- [ ] `/onboarding` wizard creates a workspace with required AI provider config (endpoint URL, API key, model name); defaults pre-filled to `https://api.openai.com/v1` and `gpt-4o`
-- [ ] Cannot proceed past onboarding without entering an API key
-- [ ] Convex `workspaces` table created with fields: name, owner_id, ai_config (endpoint_url, api_key, model_name), created_at
-- [ ] `/settings` page allows updating AI provider config, profile name/email, and password
-- [ ] Unauthenticated users are redirected to `/login`
-- [ ] Auth session context available to all pages (current user, current workspace)
+- [x] Better Auth configured with email/password and Google OAuth providers
+- [x] `/login` page renders sign-in form (email/password) and Google OAuth button
+- [x] `/onboarding` wizard creates a workspace with required AI provider config (endpoint URL, API key, model name); defaults pre-filled to `https://api.openai.com/v1` and `gpt-4o`
+- [x] Cannot proceed past onboarding without entering an API key
+- [x] Convex `workspaces` table created with fields: name, owner_id, ai_config (endpoint_url, api_key, model_name), created_at
+- [x] `/settings` page allows updating AI provider config, profile name/email, and password
+- [x] Unauthenticated users are redirected to `/login`
+- [x] Auth session context available to all pages (current user, current workspace)
 
 ## Blocked by
 
