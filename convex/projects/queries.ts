@@ -12,7 +12,7 @@ export const getProjects = query({
     return ctx.db
       .query("projects")
       .withIndex("by_workspace_id", (q) => q.eq("workspace_id", args.workspace_id))
-      .order("asc")
+      .order("desc")
       .collect();
   },
 });
