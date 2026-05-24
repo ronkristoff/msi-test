@@ -28,7 +28,9 @@ Two-process system: **Next.js 16 frontend** (`src/`) + **Convex backend** (`conv
 - `pnpm dev:next` / `pnpm dev:convex` — run each process individually
 - `pnpm build` — Next.js production build only
 - `pnpm lint` — ESLint (next/core-web-vitals + typescript)
-- No `test` or `typecheck` script yet
+- `pnpm test` — vitest (frontend: `src/**/*.test.{ts,tsx}`)
+- `pnpm test:convex` — vitest with edge-runtime (backend: `convex/**/*.test.ts`)
+- `pnpm test:all` — runs both frontend and convex tests
 
 ### Architecture
 
@@ -189,8 +191,67 @@ Before submitting any code:
 ### Known Tech Debt
 
 - `___KEEP___` sentinel value in `updateWorkspace` mutation — should be replaced with optional `api_key` field (absent = keep existing)
-- No test infrastructure yet (`convex-test`, `vitest` not installed)
+- Test infrastructure installed but minimal coverage — vitest, convex-test, @testing-library/react ready to use
 - Only 1 of 11 planned schema tables exists
 - Dashboard, Runs, Flakiness Map, Suites, Insights pages are placeholder empty states — need backend queries when schema tables are added
 - Settings danger zone "Delete workspace" button is disabled — needs backend mutation
 - No `max_tokens` field in workspace schema yet — needs schema migration
+
+## Agent Orchestration
+
+Delegate to specialized agents proactively without waiting for user prompt:
+
+- Complex feature request → **planner** agent
+- Bug fix or new feature → **tdd-guide** agent (write tests FIRST)
+- Code just written or modified → **code-reviewer** agent
+- Security-sensitive code → **security-reviewer** agent
+- Build/type errors → **build-error-resolver** agent
+
+Use parallel execution for independent operations.
+
+## Testing Requirements
+
+**Minimum coverage: 80%**
+
+Test types (all required):
+1. **Unit tests** — Individual functions, utilities, components
+2. **Integration tests** — Convex mutations/queries with `convex-test`
+3. **Component tests** — React components with `@testing-library/react`
+
+**TDD workflow (HARD RULE — not optional):**
+1. Write test first (RED) — test MUST fail
+2. Write minimal implementation (GREEN) — test passes
+3. Refactor (IMPROVE) — verify coverage stays 80%+
+
+NEVER write implementation code before a test exists for it. The only exception is when no test infrastructure exists for that layer yet — in that case, set up the infrastructure first, then write tests before implementation.
+
+### Frontend Testing
+
+- Test runner: `vitest` with `jsdom` environment
+- Component testing: `@testing-library/react` + `@testing-library/user-event`
+- DOM matchers: `@testing-library/jest-dom/vitest` (auto-loaded via `src/test/setup.ts`)
+- Test files: `src/**/*.test.{ts,tsx}` alongside the source file
+- Config: `vitest.config.ts` at project root
+
+### Backend Testing
+
+- Test runner: `vitest` with `edge-runtime` environment
+- Convex testing: `convex-test` with `import.meta.glob` module map pattern
+- Test files: `convex/**/*.test.ts` inside the `convex/` directory
+- Config: `convex/vitest.config.ts`
+- See `convex/_generated/ai/guidelines.md` for the exact `convexTest` setup
+
+## Development Workflow
+
+1. **Plan** — Use planner agent for complex features. Identify dependencies and risks. Break into phases.
+2. **TDD** — Use tdd-guide agent. Write tests first, implement, refactor. No exceptions.
+3. **Review** — Use code-reviewer agent immediately after writing code. Address CRITICAL/HIGH issues.
+4. **Commit** — Conventional commits format (see Git Conventions below).
+
+## Git Conventions
+
+**Commit format:** `<type>: <description>`
+
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
+
+**PR workflow:** Analyze full commit history → draft comprehensive summary → include test plan → push with `-u` flag.
