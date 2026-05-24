@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test Runs — MSITest</title>
+  <style>
+    /* ─── tokens — Airtable DS ─────────────────────────────────────────── */
+    :root {
+      --bg:           #ffffff;
+      --surface:      #ffffff;
+      --surface-warm: #f8fafc;
+      --fg:           #181d26;
+      --fg-2:         #333333;
+      --muted:        rgba(4, 14, 32, 0.69);
+      --meta:         var(--muted);
+      --border:       #e0e2e6;
+      --border-soft:  #eef0f3;
+
+      --accent:       #1b61c9;
+      --accent-on:     #ffffff;
+      --accent-hover:  #254fad;
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+
+      --success:      #006400;
+      --success-text: #006400;
+      --warn:         #eab308;
+      --warn-text:    #8a6500;
+      --danger:       #dc2626;
+      --danger-text:  #a10d3d;
+      --link:         #1264A3;
+
+      --browser-bg:   #1a1a2e;
+      --console-error: #ff6b6b;
+      --console-warn:  #ffd93d;
+      --console-info:  #6bcbff;
+
+      --font-display: "Haas Groot Disp", Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-body:    Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+
+      --text-xs:   12px;
+      --text-sm:   14px;
+      --text-base: 16px;
+      --text-lg:   20px;
+      --text-xl:   24px;
+      --text-2xl:  32px;
+      --text-3xl:  40px;
+      --text-4xl:  48px;
+
+      --leading-body:  1.35;
+      --leading-tight: 1.20;
+      --tracking-display: 0;
+
+      --space-1:  4px;
+      --space-2:  8px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-12: 48px;
+
+      --section-y-desktop: 96px;
+      --section-y-tablet: 64px;
+      --section-y-phone: 48px;
+
+      --radius-sm:   12px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --radius-pill: 9999px;
+
+      --elev-flat: none;
+      --elev-ring: 0 0 0 1px var(--border);
+      --elev-raised:
+        0 0 1px rgba(0, 0, 0, 0.32),
+        0 0 2px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(45, 127, 249, 0.28),
+        inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+
+      --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+      --motion-fast: 150ms;
+      --motion-base: 200ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+      --container-max: 1200px;
+      --container-gutter-desktop: 24px;
+      --container-gutter-tablet: 16px;
+      --container-gutter-phone: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-body);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+
+    /* ─── layout ─────────────────────────────────────────────────────── */
+    .container {
+      max-width: 1280px;
+      margin-inline: auto;
+      padding-inline: var(--space-6);
+    }
+    .page-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ─── sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--accent);
+      color: var(--accent-on);
+      padding: var(--space-4);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      padding: var(--space-2) var(--space-2) var(--space-6);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: var(--space-4);
+    }
+    .sidebar-logo span { color: var(--logo-blue); }
+    .sidebar-section { margin-bottom: var(--space-6); }
+    .sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-2);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.75);
+      cursor: pointer;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); color: var(--accent-on); }
+    .sidebar-item.active {
+      background: rgba(27, 97, 201, 0.25);
+      color: var(--accent-on);
+    }
+    .sidebar-item.active {
+      background: rgba(27, 97, 201, 0.25);
+      color: var(--accent-on);
+    }
+    .sidebar-item .count {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .sidebar-item .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+    .sidebar-item .dot.danger { background: var(--danger); }
+
+    /* ─── main content ──────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: color-mix(in oklch, var(--bg) 96%, transparent);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    .topbar-left { display: flex; align-items: center; gap: var(--space-4); }
+    .topbar-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+    .topbar-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+    .topbar-actions { display: flex; align-items: center; gap: var(--space-3); }
+    .content { flex: 1; padding: var(--space-6); }
+
+    /* ─── buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--fg); background: var(--surface); }
+    .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
+    .btn-ghost:hover { color: var(--fg); background: var(--surface); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    /* ─── status pills ───────────────────────────────────────────────── */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .status-pill.success { background: rgba(0, 100, 0, 0.12); color: var(--success-text); }
+    .status-pill.danger  { background: rgba(220, 38, 38, 0.10); color: var(--danger-text); }
+    .status-pill.warn    { background: rgba(234, 179, 8, 0.12); color: var(--warn-text); }
+    .status-pill.neutral { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-pill.success .dot { background: var(--success); }
+    .status-pill.danger .dot { background: var(--danger); }
+    .status-pill.warn .dot { background: var(--warn); }
+
+    /* ─── filters ────────────────────────────────────────────────────── */
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-4);
+      flex-wrap: wrap;
+    }
+    .filter-group { display: flex; align-items: center; gap: var(--space-2); }
+    .filter-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .filter-select {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      font: inherit;
+      font-size: var(--text-sm);
+      color: var(--fg);
+      cursor: pointer;
+    }
+    .filter-select:focus { outline: 2px solid rgba(18, 100, 163, 0.25); border-color: var(--link); }
+    .filter-search {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      font-size: var(--text-sm);
+      color: var(--muted);
+      flex: 1;
+      max-width: 260px;
+    }
+    .filter-search input {
+      border: none;
+      background: transparent;
+      font: inherit;
+      font-size: var(--text-sm);
+      color: var(--fg);
+      outline: none;
+      width: 100%;
+    }
+    .filter-search input::placeholder { color: var(--muted); }
+    .filter-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+
+    /* ─── table ─────────────────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+    .data-table th {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid var(--fg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .data-table th a { color: inherit; }
+    .data-table th a:hover { color: var(--fg); }
+    .data-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--border-soft);
+      vertical-align: middle;
+    }
+    .data-table tbody tr { cursor: pointer; }
+    .data-table tbody tr:hover { background: var(--surface); }
+    .data-table .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+    .data-table .name { font-weight: 600; }
+    .data-table .mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+    .data-table .clickable { cursor: pointer; }
+
+    /* ─── progress bar ─────────────────────────────────────────────── */
+    .progress-cell { min-width: 100px; }
+    .progress-bar {
+      height: 5px;
+      background: var(--border-soft);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 5px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .progress-bar-fill.pass { background: var(--success); }
+    .progress-bar-fill.fail { background: var(--danger); }
+    .progress-bar-fill.warn { background: var(--warn); }
+    .progress-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+
+    /* ─── section header ────────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .section-title { font-size: var(--text-lg); font-weight: 700; }
+    .section-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+
+    /* ─── ai badge ───────────────────────────────────────────────────── */
+    .ai-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--accent);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: var(--radius-pill);
+    }
+    .ai-badge svg { width: 10px; height: 10px; }
+
+    /* ─── tabs ─────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: var(--space-4); }
+    .tab {
+      padding: 10px 20px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      margin-bottom: -1px;
+    }
+    .tab:hover { color: var(--fg); }
+    .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .tab .count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 8px;
+      margin-left: 6px;
+      color: var(--muted);
+    }
+    .tab.active .count { background: rgba(27,97,201,0.10); color: var(--accent); }
+
+    /* ─── empty state ────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-12) var(--space-6);
+      color: var(--muted);
+    }
+    .empty-state svg { margin: 0 auto var(--space-4); opacity: 0.4; }
+    .empty-state p { font-size: var(--text-sm); }
+
+    /* ─── badge on run name ────────────────────────────────────────── */
+    .run-name-cell { display: flex; flex-direction: column; gap: 3px; }
+    .run-name-primary { font-weight: 600; }
+    .run-name-secondary { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="page-layout">
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">MSITest</div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Workspace</div>
+        <a href="index.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+        <div class="sidebar-item active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Test Runs
+          <span class="count">847</span>
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+          Suites
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Environments
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Intelligence</div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><path d="M18 2l4 4-4 4"/></svg>
+          Flakiness Map
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          AI Insights
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Integrations</div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+          CI Pipelines
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+          Slack Alerts
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="margin-top: auto; padding-top: var(--space-4); border-top: 1px solid rgba(255,255,255,0.1);">
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Settings
+        </div>
+      </div>
+    </aside>
+
+    <!-- main -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div>
+            <div class="topbar-title">Test Runs</div>
+            <div class="topbar-meta">847 runs · 12 active</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button class="btn btn-primary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run Tests
+          </button>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- tabs -->
+        <div class="tabs">
+          <div class="tab active">All runs<span class="count">847</span></div>
+          <div class="tab">Failed<span class="count">23</span></div>
+          <div class="tab">Flaky<span class="count">41</span></div>
+          <div class="tab">Running<span class="count">3</span></div>
+          <div class="tab">Passed<span class="count">780</span></div>
+        </div>
+
+        <!-- filters -->
+        <div class="filters">
+          <div class="filter-search">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search by name, file, or ID..." />
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Branch</span>
+            <select class="filter-select">
+              <option>All branches</option>
+              <option selected>main</option>
+              <option>pr-4821</option>
+              <option>pr-4798</option>
+              <option>hotfix/checkout-timeout</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Env</span>
+            <select class="filter-select">
+              <option selected>All</option>
+              <option>staging</option>
+              <option>production</option>
+              <option>dev</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Result</span>
+            <select class="filter-select">
+              <option selected>All</option>
+              <option>Passed</option>
+              <option>Failed</option>
+              <option>Flaky</option>
+              <option>Running</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Sorted by</span>
+            <select class="filter-select">
+              <option selected>Latest first</option>
+              <option>Longest duration</option>
+              <option>Most failures</option>
+              <option>Flakiest</option>
+            </select>
+          </div>
+          <span class="filter-count">Showing 847 runs</span>
+        </div>
+
+        <!-- runs table -->
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Branch</th>
+              <th>Commit</th>
+              <th>Progress</th>
+              <th class="num">Passed</th>
+              <th class="num">Failed</th>
+              <th class="num">Flaky</th>
+              <th class="num">Duration</th>
+              <th>Started</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2847 — pr-4821 checkout flow</span>
+                  <span class="run-name-secondary">staging · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">a3f9c21</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:67%"></div></div>
+                <div class="progress-meta">1,912 / 2,847</div>
+              </td>
+              <td class="num" style="color:var(--success);">1,901</td>
+              <td class="num" style="color:var(--danger);">4</td>
+              <td class="num" style="color:var(--warn);">7</td>
+              <td class="num">3m 12s</td>
+              <td class="mono">4m ago</td>
+              <td><span class="status-pill warn"><span class="dot"></span>Running</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2846 — main regression suite</span>
+                  <span class="run-name-secondary">staging · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">c7d2e10</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">2,847 / 2,847</div>
+              </td>
+              <td class="num" style="color:var(--success);">2,770</td>
+              <td class="num" style="color:var(--danger);">7</td>
+              <td class="num" style="color:var(--warn);">12</td>
+              <td class="num">4m 38s</td>
+              <td class="mono">38m ago</td>
+              <td><span class="status-pill danger"><span class="dot"></span>Failed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2845 — hotfix/checkout-timeout</span>
+                  <span class="run-name-secondary">staging · e2e/checkout.spec.ts</span>
+                </div>
+              </td>
+              <td class="mono">hotfix/checkout-timeout</td>
+              <td class="mono" style="color:var(--muted);">b91f384</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">142 / 142</div>
+              </td>
+              <td class="num" style="color:var(--success);">140</td>
+              <td class="num" style="color:var(--danger);">2</td>
+              <td class="num">0</td>
+              <td class="num">1m 54s</td>
+              <td class="mono">2h ago</td>
+              <td><span class="status-pill danger"><span class="dot"></span>Failed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2844 — main regression suite</span>
+                  <span class="run-name-secondary">staging · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">9e1a402</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">2,847 / 2,847</div>
+              </td>
+              <td class="num" style="color:var(--success);">2,840</td>
+              <td class="num" style="color:var(--danger);">3</td>
+              <td class="num" style="color:var(--warn);">4</td>
+              <td class="num">4m 22s</td>
+              <td class="mono">3h ago</td>
+              <td><span class="status-pill danger"><span class="dot"></span>Failed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2843 — pr-4798 search redesign</span>
+                  <span class="run-name-secondary">staging · e2e/search.spec.ts</span>
+                </div>
+              </td>
+              <td class="mono">pr-4798</td>
+              <td class="mono" style="color:var(--muted);">f2c8a91</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">88 / 88</div>
+              </td>
+              <td class="num" style="color:var(--success);">88</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+              <td class="num">58s</td>
+              <td class="mono">4h ago</td>
+              <td><span class="status-pill success"><span class="dot"></span>Passed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2842 — main regression suite</span>
+                  <span class="run-name-secondary">staging · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">d4b7f22</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">2,847 / 2,847</div>
+              </td>
+              <td class="num" style="color:var(--success);">2,847</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+              <td class="num">4m 50s</td>
+              <td class="mono">5h ago</td>
+              <td><span class="status-pill success"><span class="dot"></span>Passed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2841 — main regression suite</span>
+                  <span class="run-name-secondary">production · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">a9e2c11</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">2,312 / 2,312</div>
+              </td>
+              <td class="num" style="color:var(--success);">2,290</td>
+              <td class="num" style="color:var(--danger);">18</td>
+              <td class="num" style="color:var(--warn);">4</td>
+              <td class="num">8m 14s</td>
+              <td class="mono">8h ago</td>
+              <td><span class="status-pill danger"><span class="dot"></span>Failed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2840 — onboarding flow</span>
+                  <span class="run-name-secondary">staging · e2e/onboarding.spec.ts</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--muted);">c1f3a44</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill warn" style="width:100%"></div></div>
+                <div class="progress-meta">210 / 210</div>
+              </td>
+              <td class="num" style="color:var(--success);">198</td>
+              <td class="num">0</td>
+              <td class="num" style="color:var(--warn);">12</td>
+              <td class="num">2m 08s</td>
+              <td class="mono">10h ago</td>
+              <td><span class="status-pill warn"><span class="dot"></span>Flaky</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2839 — pr-4762 pricing page</span>
+                  <span class="run-name-secondary">staging · e2e/pricing.spec.ts</span>
+                </div>
+              </td>
+              <td class="mono">pr-4762</td>
+              <td class="mono" style="color:var(--muted);">e8d4a20</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">56 / 56</div>
+              </td>
+              <td class="num" style="color:var(--success);">56</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+              <td class="num">41s</td>
+              <td class="mono">12h ago</td>
+              <td><span class="status-pill success"><span class="dot"></span>Passed</span></td>
+            </tr>
+            <tr onclick="window.location='run-detail.html'">
+              <td>
+                <div class="run-name-cell">
+                  <span class="run-name-primary">#2838 — main regression suite</span>
+                  <span class="run-name-secondary">staging · e2e/</span>
+                </div>
+              </td>
+              <td class="mono">main</td>
+              <td class="mono" style="color:var(--accent);">b2e9c33</td>
+              <td class="progress-cell">
+                <div class="progress-bar"><div class="progress-bar-fill pass" style="width:100%"></div></div>
+                <div class="progress-meta">2,847 / 2,847</div>
+              </td>
+              <td class="num" style="color:var(--success);">2,839</td>
+              <td class="num" style="color:var(--danger);">6</td>
+              <td class="num" style="color:var(--warn);">2</td>
+              <td class="num">4m 31s</td>
+              <td class="mono">14h ago</td>
+              <td><span class="status-pill danger"><span class="dot"></span>Failed</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- pagination -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border-soft);">
+          <div class="section-meta">Showing 10 of 847 runs</div>
+          <div style="display:flex;gap:var(--space-2);">
+            <button class="btn btn-secondary btn-sm" disabled>← Prev</button>
+            <button class="btn btn-secondary btn-sm">1</button>
+            <button class="btn btn-ghost btn-sm">2</button>
+            <button class="btn btn-ghost btn-sm">3</button>
+            <button class="btn btn-ghost btn-sm">...</button>
+            <button class="btn btn-ghost btn-sm">85</button>
+            <button class="btn btn-secondary btn-sm">Next →</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>

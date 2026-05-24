@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Get started — MSITest</title>
+  <style>
+    /* ─── Airtable tokens ───────────────────────────────────────────── */
+    :root {
+      --bg:           #ffffff;
+      --surface:      #ffffff;
+      --fg:           #181d26;
+      --fg-2:         #333333;
+      --muted:        rgba(4, 14, 32, 0.69);
+      --border:       #e0e2e6;
+      --border-soft:  #eef0f3;
+      --accent:       #1b61c9;
+      --accent-on:    #ffffff;
+      --accent-hover: #254fad;
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+      --success:      #006400;
+      --success-text: #006400;
+      --warn:         #eab308;
+      --warn-text:    #8a6500;
+      --danger:       #dc2626;
+      --danger-text:  #a10d3d;
+      --font-display: "Haas Groot Disp", Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-body:    Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+      --text-xs:   12px;
+      --text-sm:   14px;
+      --text-base: 16px;
+      --text-lg:   20px;
+      --text-xl:   24px;
+      --text-2xl:  32px;
+      --text-3xl:  40px;
+      --text-4xl:  48px;
+      --leading-body:  1.35;
+      --leading-tight: 1.20;
+      --tracking-display: 0;
+      --space-1:  4px;
+      --space-2:  8px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-12: 48px;
+      --radius-sm:   12px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --radius-pill: 9999px;
+      --elev-raised:
+        0 0 1px rgba(0, 0, 0, 0.32),
+        0 0 2px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(45, 127, 249, 0.28),
+        inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+      --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+      --motion-fast: 150ms;
+      --motion-base: 200ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-body);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); }
+    p { text-wrap: pretty; }
+    h1, h2, h3, h4 { text-wrap: balance; }
+
+    /* ─── centered layout ─────────────────────────────────────────────── */
+    .onboarding-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--space-8) var(--space-6);
+    }
+
+    /* ─── brand ─────────────────────────────────────────────────────── */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--fg);
+      margin-bottom: var(--space-12);
+    }
+
+    /* ─── step indicator ────────────────────────────────────────────── */
+    .steps {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-8);
+    }
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background var(--motion-base) var(--ease-standard);
+    }
+    .step-dot.active { background: var(--accent); }
+    .step-dot.done { background: var(--success); }
+    .step-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ─── card ──────────────────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-8);
+      box-shadow: var(--elev-raised);
+    }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0 0 var(--space-2);
+    }
+    .card-desc {
+      font-size: var(--text-sm);
+      color: var(--muted);
+      margin: 0 0 var(--space-8);
+      line-height: 1.5;
+    }
+
+    /* ─── form ──────────────────────────────────────────────────────── */
+    .field { margin-bottom: var(--space-5); }
+    .field label {
+      display: block;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: var(--space-2);
+    }
+    .field-hint {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      margin-top: var(--space-1);
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--fg);
+      background: var(--surface);
+      transition: border-color var(--motion-fast) var(--ease-standard),
+                  box-shadow var(--motion-fast) var(--ease-standard);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .field input::placeholder { color: var(--muted); }
+    .field input:focus-visible, .field select:focus-visible {
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+    .field input.error { border-color: var(--danger); }
+    .error-msg {
+      font-size: var(--text-xs);
+      color: var(--danger);
+      margin-top: var(--space-1);
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ─── required badge ─────────────────────────────────────────────── */
+    .required-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--danger);
+      margin-left: var(--space-1);
+    }
+
+    /* ─── primary button ────────────────────────────────────────────── */
+    .btn-primary {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: 13px 24px;
+      background: var(--accent);
+      color: var(--accent-on);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 500;
+      letter-spacing: 0.08px;
+      cursor: pointer;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:active { background: var(--accent-active); }
+    .btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ─── back button ───────────────────────────────────────────────── */
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 9px 16px;
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: color var(--motion-fast) var(--ease-standard),
+                  background var(--motion-fast) var(--ease-standard);
+    }
+    .btn-ghost:hover { color: var(--fg); background: var(--border-soft); }
+
+    /* ─── provider presets ─────────────────────────────────────────── */
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+    .preset-btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      background: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-2);
+      cursor: pointer;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .preset-btn.active { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+
+    /* ─── model select ──────────────────────────────────────────────── */
+    .model-select {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      margin-bottom: var(--space-4);
+    }
+    .model-select label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .model-select select {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font: inherit;
+      color: var(--fg);
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* ─── success state ─────────────────────────────────────────────── */
+    .success-state {
+      text-align: center;
+      padding: var(--space-8) 0;
+    }
+    .success-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(0, 100, 0, 0.10);
+      border: 1px solid var(--success);
+      display: grid;
+      place-items: center;
+      margin: 0 auto var(--space-6);
+    }
+    .success-title {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0 0 var(--space-2);
+    }
+    .success-desc { font-size: var(--text-sm); color: var(--muted); margin: 0 0 var(--space-6); }
+    .btn-next {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: 13px 32px;
+      background: var(--accent);
+      color: var(--accent-on);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 500;
+      cursor: pointer;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+    .btn-next:hover { background: var(--accent-hover); }
+    .btn-next:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  </style>
+</head>
+<body>
+  <div class="onboarding-wrap">
+
+    <!-- Brand -->
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="28" height="28" rx="7" fill="#1b61c9"/>
+        <path d="M8 10.5L13.5 17L20 10.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 17L13.5 10.5L20 17" stroke="rgba(255,255,255,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      MSITest
+    </div>
+
+    <!-- Step indicator -->
+    <div class="steps" id="stepIndicator">
+      <div class="step-dot active" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+    </div>
+
+    <!-- Step 1: Workspace name -->
+    <div class="card" id="step1">
+      <h1 class="card-title">Name your workspace</h1>
+      <p class="card-desc">Your workspace holds projects, test suites, and run history. You can add teammates later.</p>
+
+      <div class="field">
+        <label for="workspace-name">Workspace name <span class="required-badge">● Required</span></label>
+        <input id="workspace-name" type="text" placeholder="Acme Corp QA" autocomplete="organization" />
+        <div class="error-msg" id="nameError">Please enter a workspace name</div>
+      </div>
+
+      <button class="btn-primary" id="step1Btn" onclick="goStep2()">
+        Continue
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <!-- Step 2: AI provider config -->
+    <div class="card" id="step2" style="display:none;">
+      <h1 class="card-title">Configure your AI provider</h1>
+      <p class="card-desc">MSITest uses your LLM to generate tests, analyze failures, and identify flakiness clusters. Enter your OpenAI-compatible endpoint details below.</p>
+
+      <div class="presets">
+        <button class="preset-btn active" onclick="setPreset('openai')">OpenAI</button>
+        <button class="preset-btn" onclick="setPreset('azure')">Azure OpenAI</button>
+        <button class="preset-btn" onclick="setPreset('anthropic')">Anthropic</button>
+        <button class="preset-btn" onclick="setPreset('ollama')">Ollama</button>
+        <button class="preset-btn" onclick="setPreset('deepseek')">DeepSeek</button>
+      </div>
+
+      <div class="field">
+        <label for="endpoint">Endpoint URL <span class="required-badge">● Required</span></label>
+        <input id="endpoint" type="url" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1" />
+        <div class="field-hint">OpenAI-compatible base URL. Supports GLM, DeepSeek, Mistral, Ollama, and any OpenAI-compatible provider.</div>
+        <div class="error-msg" id="endpointError">Please enter a valid endpoint URL</div>
+      </div>
+
+      <div class="model-select">
+        <label for="model">Model</label>
+        <select id="model">
+          <option value="gpt-4o" selected>gpt-4o</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+          <option value="gpt-4-turbo">gpt-4-turbo</option>
+          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+          <option value="o1-preview">o1-preview</option>
+          <option value="o1-mini">o1-mini</option>
+          <option value="custom">Custom...</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="api-key">API key <span class="required-badge">● Required</span></label>
+        <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" />
+        <div class="field-hint">Your API key is stored encrypted and only used for AI calls from your workspace.</div>
+        <div class="error-msg" id="keyError">Please enter an API key</div>
+      </div>
+
+      <button class="btn-ghost" onclick="goStep1()" style="margin-bottom:var(--space-3);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <button class="btn-primary" id="step2Btn" onclick="goStep3()">
+        Create workspace
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <!-- Step 3: Success -->
+    <div class="card" id="step3" style="display:none;">
+      <div class="success-state">
+        <div class="success-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#006400" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 class="success-title">Workspace ready</h2>
+        <p class="success-desc">Your workspace is set up and connected to your AI provider. Create your first project to start generating tests.</p>
+        <button class="btn-next" onclick="window.location='index.html'">
+          Go to dashboard
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function setPreset(provider) {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      const presets = {
+        openai:    { url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+        azure:     { url: 'https://YOUR_RESOURCE.openai.azure.com/v1', model: 'gpt-4o' },
+        anthropic: { url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022' },
+        ollama:    { url: 'http://localhost:11434/v1', model: 'llama3.2' },
+        deepseek:  { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+      };
+      const p = presets[provider];
+      if (p) {
+        document.getElementById('endpoint').value = p.url;
+        document.getElementById('model').value = p.model;
+      }
+    }
+
+    function showStep(n) {
+      document.getElementById('step1').style.display = n === 1 ? 'block' : 'none';
+      document.getElementById('step2').style.display = n === 2 ? 'block' : 'none';
+      document.getElementById('step3').style.display = n === 3 ? 'block' : 'none';
+      document.getElementById('dot1').className = 'step-dot' + (n >= 1 ? ' done' : n === 1 ? ' active' : '');
+      document.getElementById('dot2').className = 'step-dot' + (n >= 2 ? ' done' : n === 2 ? ' active' : '');
+      document.getElementById('dot3').className = 'step-dot' + (n >= 3 ? ' done' : n === 3 ? ' active' : '');
+    }
+
+    function goStep2() {
+      const name = document.getElementById('workspace-name').value.trim();
+      if (!name) {
+        const inp = document.getElementById('workspace-name');
+        inp.classList.add('error');
+        document.getElementById('nameError').classList.add('visible');
+        inp.addEventListener('input', () => {
+          inp.classList.remove('error');
+          document.getElementById('nameError').classList.remove('visible');
+        }, { once: true });
+        return;
+      }
+      showStep(2);
+    }
+
+    function goStep1() { showStep(1); }
+
+    function goStep3() {
+      const endpoint = document.getElementById('endpoint').value.trim();
+      const key = document.getElementById('api-key').value.trim();
+      let valid = true;
+      if (!endpoint) {
+        const inp = document.getElementById('endpoint');
+        inp.classList.add('error');
+        document.getElementById('endpointError').classList.add('visible');
+        inp.addEventListener('input', () => {
+          inp.classList.remove('error');
+          document.getElementById('endpointError').classList.remove('visible');
+        }, { once: true });
+        valid = false;
+      }
+      if (!key) {
+        const inp = document.getElementById('api-key');
+        inp.classList.add('error');
+        document.getElementById('keyError').classList.add('visible');
+        inp.addEventListener('input', () => {
+          inp.classList.remove('error');
+          document.getElementById('keyError').classList.remove('visible');
+        }, { once: true });
+        valid = false;
+      }
+      if (!valid) return;
+      showStep(3);
+    }
+  </script>
+</body>
+</html>

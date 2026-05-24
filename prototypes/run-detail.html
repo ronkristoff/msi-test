@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Run #2846 — MSITest</title>
+  <style>
+    /* ─── tokens — Airtable DS ─────────────────────────────────────────── */
+    :root {
+      --bg:           #ffffff;
+      --surface:      #ffffff;
+      --surface-warm: #f8fafc;
+      --fg:           #181d26;
+      --fg-2:         #333333;
+      --muted:        rgba(4, 14, 32, 0.69);
+      --meta:         var(--muted);
+      --border:       #e0e2e6;
+      --border-soft:  #eef0f3;
+
+      --accent:       #1b61c9;
+      --accent-on:     #ffffff;
+      --accent-hover:  #254fad;
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+
+      --success:      #006400;
+      --success-text: #006400;
+      --warn:         #eab308;
+      --warn-text:    #8a6500;
+      --danger:       #dc2626;
+      --danger-text:  #a10d3d;
+      --link:         #1264A3;
+
+      --browser-bg:   #1a1a2e;
+      --console-error: #ff6b6b;
+      --console-warn:  #ffd93d;
+      --console-info:  #6bcbff;
+
+      --font-display: "Haas Groot Disp", Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-body:    Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+
+      --text-xs:   12px;
+      --text-sm:   14px;
+      --text-base: 16px;
+      --text-lg:   20px;
+      --text-xl:   24px;
+      --text-2xl:  32px;
+      --text-3xl:  40px;
+      --text-4xl:  48px;
+
+      --leading-body:  1.35;
+      --leading-tight: 1.20;
+      --tracking-display: 0;
+
+      --space-1:  4px;
+      --space-2:  8px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-12: 48px;
+
+      --section-y-desktop: 96px;
+      --section-y-tablet: 64px;
+      --section-y-phone: 48px;
+
+      --radius-sm:   12px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --radius-pill: 9999px;
+
+      --elev-flat: none;
+      --elev-ring: 0 0 0 1px var(--border);
+      --elev-raised:
+        0 0 1px rgba(0, 0, 0, 0.32),
+        0 0 2px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(45, 127, 249, 0.28),
+        inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+
+      --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+      --motion-fast: 150ms;
+      --motion-base: 200ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+      --container-max: 1200px;
+      --container-gutter-desktop: 24px;
+      --container-gutter-tablet: 16px;
+      --container-gutter-phone: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-body);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+
+    /* ─── layout ─────────────────────────────────────────────────────── */
+    .container { max-width: 100%; }
+    .page-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ─── sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--accent);
+      color: var(--accent-on);
+      padding: var(--space-4);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      padding: var(--space-2) var(--space-2) var(--space-6);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: var(--space-4);
+    }
+    .sidebar-logo span { color: var(--logo-blue); }
+    .sidebar-section { margin-bottom: var(--space-6); }
+    .sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-2);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.75);
+      cursor: pointer;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); color: var(--accent-on); }
+    .sidebar-item.active {
+      background: rgba(27, 97, 201, 0.25);
+      color: var(--accent-on);
+    }
+    .sidebar-item .count {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .sidebar-item .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+    .sidebar-item .dot.danger { background: var(--danger); }
+
+    /* ─── main content ──────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: color-mix(in oklch, var(--bg) 96%, transparent);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    .topbar-left { display: flex; align-items: center; gap: var(--space-4); }
+    .topbar-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+    .topbar-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+    .topbar-actions { display: flex; align-items: center; gap: var(--space-3); }
+    .content { flex: 1; display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: 0; }
+
+    /* ─── buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--fg); background: var(--surface); }
+    .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
+    .btn-ghost:hover { color: var(--fg); background: var(--surface); }
+    .btn-sm { padding: 8px 16px; font-size: 12px; }
+    .btn-icon { padding: 7px; }
+
+    /* ─── status pills ───────────────────────────────────────────────── */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .status-pill.success { background: rgba(0, 100, 0, 0.12); color: var(--success-text); }
+    .status-pill.danger  { background: rgba(220, 38, 38, 0.10); color: var(--danger-text); }
+    .status-pill.warn    { background: rgba(234, 179, 8, 0.12); color: var(--warn-text); }
+    .status-pill.neutral { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-pill.success .dot { background: var(--success); }
+    .status-pill.danger .dot { background: var(--danger); }
+    .status-pill.warn .dot { background: var(--warn); }
+
+    /* ─── test list panel ───────────────────────────────────────────── */
+    .test-list-panel {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      background: var(--surface);
+    }
+    .panel-header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 2;
+    }
+    .panel-title { font-weight: 700; font-size: var(--text-base); margin-bottom: 2px; }
+    .panel-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+
+    .test-filter {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .test-filter input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      font: inherit;
+      font-size: var(--text-sm);
+      padding: 5px 10px;
+      color: var(--fg);
+      outline: none;
+    }
+    .test-filter input:focus { border-color: var(--link); box-shadow: var(--focus-ring); }
+    .test-filter input::placeholder { color: var(--muted); }
+
+    .test-list { padding: var(--space-2); }
+    .test-item {
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      margin-bottom: 2px;
+      border: 1px solid transparent;
+    }
+    .test-item:hover { background: var(--bg); }
+    .test-item.active { background: var(--bg); border-color: var(--accent); }
+    .test-item-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin-bottom: var(--space-2);
+    }
+    .test-item-name { font-size: var(--text-sm); font-weight: 600; line-height: 1.4; }
+    .test-item-id { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .test-item-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+    .test-item-time { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-left: auto; }
+    .test-item.failed .test-item-name { color: var(--danger); }
+    .test-item.flaky .test-item-name { color: var(--warn); }
+
+    .list-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border-soft);
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+    .list-stat { background: var(--surface); padding: var(--space-3); text-align: center; }
+    .list-stat .val { font-family: var(--font-mono); font-size: 16px; font-weight: 700; }
+    .list-stat .lbl { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .list-stat.passed .val { color: var(--success); }
+    .list-stat.failed .val { color: var(--danger); }
+    .list-stat.flaky .val { color: var(--warn); }
+
+    /* ─── detail panel ───────────────────────────────────────────────── */
+    .detail-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .detail-header {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .detail-test-name { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); }
+    .detail-test-id { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--space-3); }
+    .detail-meta-row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+    .detail-meta-item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+    .detail-meta-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .detail-meta-value { font-weight: 600; }
+
+    .detail-body { flex: 1; overflow-y: auto; padding: var(--space-5); }
+
+    /* ─── step timeline ─────────────────────────────────────────────── */
+    .step-timeline { margin-bottom: var(--space-6); }
+    .step-timeline-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .step-row {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .step-row:last-child { border-bottom: none; }
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .step-row.fail .step-number { background: rgba(224,30,90,0.1); border-color: var(--danger); color: var(--danger); }
+    .step-row.pass .step-number { background: rgba(46,182,125,0.1); border-color: var(--success); color: var(--success); }
+    .step-row.current .step-number { background: var(--accent); border-color: var(--accent); color: white; }
+    .step-content { min-width: 0; }
+    .step-command {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 2px;
+    }
+    .step-row.fail .step-command { color: var(--danger); }
+    .step-locator { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .step-error { font-size: var(--text-sm); color: var(--danger); margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: rgba(224,30,90,0.06); border-radius: var(--radius-sm); border-left: 3px solid var(--danger); }
+    .step-screenshot-thumb {
+      width: 80px;
+      height: 50px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-top: var(--space-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--muted);
+    }
+    .step-screenshot-thumb:hover { border-color: var(--accent); }
+    .step-screenshot-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ─── ai insight ─────────────────────────────────────────────────── */
+    .ai-insight {
+      background: linear-gradient(135deg, rgba(74, 20, 75, 0.03), rgba(74, 20, 75, 0.07));
+      border: 1px solid rgba(74, 20, 75, 0.12);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-5);
+    }
+    .ai-insight-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+    .ai-badge svg { width: 12px; height: 12px; }
+    .ai-confidence { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+    .ai-insight-body { font-size: var(--text-sm); line-height: 1.65; color: var(--fg); }
+    .ai-insight-body strong { color: var(--accent); }
+    .ai-insight-body code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: rgba(74, 20, 75, 0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--accent);
+    }
+    .ai-insight-body .fix-block {
+      margin-top: var(--space-3);
+      padding: var(--space-3);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--success);
+    }
+    .ai-insight-body .fix-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--success);
+      margin-bottom: var(--space-2);
+    }
+    .ai-insight-body .fix-code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fg);
+      line-height: 1.5;
+    }
+
+    /* ─── screenshot viewer ─────────────────────────────────────────── */
+    .screenshot-viewer {
+      margin-bottom: var(--space-5);
+    }
+    .screenshot-viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+    .screenshot-viewer-title { font-weight: 700; font-size: var(--text-base); }
+    .screenshot-viewer-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+    .screenshot-viewer-img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: var(--browser-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.4);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      position: relative;
+    }
+    .screenshot-viewer-img img { width: 100%; height: 100%; object-fit: cover; }
+    .screenshot-overlay-label {
+      position: absolute;
+      bottom: var(--space-3);
+      right: var(--space-3);
+      background: rgba(0,0,0,0.75);
+      color: white;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+    }
+    .screenshot-nav { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+    .screenshot-nav button { flex: 1; }
+    .screenshot-nav-info { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); text-align: center; flex: 0; }
+
+    /* ─── console output ─────────────────────────────────────────────── */
+    .console-output {
+      background: var(--browser-bg);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-5);
+      overflow-x: auto;
+    }
+    .console-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .console-title { font-family: var(--font-mono); font-size: var(--text-xs); color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.06em; }
+    .console-body { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: rgba(255,255,255,0.75); }
+    .console-line { margin-bottom: 2px; }
+    .console-line.error { color: var(--console-error); }
+    .console-line.warn { color: var(--console-warn); }
+    .console-line.info { color: var(--console-info); }
+    .console-line.cmd { color: rgba(255,255,255,0.4); }
+    .console-line.cmd::before { content: '→ '; color: var(--accent); }
+
+    /* ─── related failures ────────────────────────────────────────────── */
+    .related-failures { margin-top: var(--space-6); }
+    .related-title { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-3); }
+    .related-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-2);
+      cursor: pointer;
+      font-size: var(--text-sm);
+    }
+    .related-item:hover { background: var(--surface); border-color: var(--border); }
+    .related-item-name { font-weight: 600; flex: 1; }
+    .related-item-run { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="page-layout">
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">MSITest</div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Workspace</div>
+        <a href="index.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+        <a href="runs.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Test Runs
+          <span class="count">847</span>
+        </a>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+          Suites
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Environments
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Intelligence</div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><path d="M18 2l4 4-4 4"/></svg>
+          Flakiness Map
+        </div>
+        <div class="sidebar-item active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          AI Insights
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Integrations</div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+          CI Pipelines
+        </div>
+        <div class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+          Slack Alerts
+        </div>
+      </div>
+    </aside>
+
+    <!-- test list panel -->
+    <div class="test-list-panel" style="display:flex;flex-direction:column;">
+      <div class="panel-header">
+        <div class="panel-title">Run #2846</div>
+        <div class="panel-meta">main · a3f9c21 · 38m ago · staging</div>
+      </div>
+      <div class="test-filter">
+        <input type="text" placeholder="Filter tests..." />
+      </div>
+      <div class="test-list" style="flex:1;overflow-y:auto;">
+        <!-- failed tests -->
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Checkout — Visa payment fails on 3DS step</div>
+              <div class="test-item-id">e2e/checkout.spec.ts:142</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Onboarding — Name field clears on blur</div>
+              <div class="test-item-id">e2e/onboarding.spec.ts:88</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill warn"><span class="dot"></span>Flaky</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Search — No results state not shown</div>
+              <div class="test-item-id">e2e/search.spec.ts:56</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Dashboard — Filter chip state not persisted</div>
+              <div class="test-item-id">e2e/dashboard.spec.ts:203</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Auth — Session expires mid-flow</div>
+              <div class="test-item-id">e2e/auth.spec.ts:91</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">Payments — Subscription cancellation flow broken</div>
+              <div class="test-item-id">e2e/payments.spec.ts:177</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <div class="test-item failed">
+          <div class="test-item-header">
+            <div>
+              <div class="test-item-name">API — Rate limit headers not returned</div>
+              <div class="test-item-id">e2e/api.spec.ts:34</div>
+            </div>
+          </div>
+          <div class="test-item-meta">
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+            <span class="test-item-time">38m ago</span>
+          </div>
+        </div>
+        <!-- passed tests (collapsed summary) -->
+        <div style="padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--muted);">
+          2,770 passing tests hidden — <span style="color:var(--success);">98.8% passed</span>
+        </div>
+      </div>
+      <div class="list-stats">
+        <div class="list-stat passed">
+          <div class="val">2,770</div>
+          <div class="lbl">Pass</div>
+        </div>
+        <div class="list-stat failed">
+          <div class="val">7</div>
+          <div class="lbl">Fail</div>
+        </div>
+        <div class="list-stat flaky">
+          <div class="val">12</div>
+          <div class="lbl">Flaky</div>
+        </div>
+        <div class="list-stat" style="grid-column:span 1;">
+          <div class="val">58s</div>
+          <div class="lbl">Avg</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- detail panel -->
+    <main class="detail-panel">
+      <div class="detail-header">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-3);">
+          <div>
+            <div class="detail-test-name">Checkout — Visa payment fails on 3DS step</div>
+            <div class="detail-test-id">e2e/checkout.spec.ts:142 · #checkout-visa-3ds</div>
+          </div>
+          <div style="display:flex;gap:var(--space-2);flex-shrink:0;">
+            <button class="btn btn-secondary btn-sm btn-icon" title="Retest">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            </button>
+            <button class="btn btn-secondary btn-sm btn-icon" title="Download logs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="detail-meta-row">
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Status</span>
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Duration</span>
+            <span class="detail-meta-value">31.4s</span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Attempts</span>
+            <span class="detail-meta-value">1 / 3</span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Env</span>
+            <span class="detail-meta-value">staging</span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-label">Retries</span>
+            <span class="detail-meta-value">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <!-- AI Root Cause -->
+        <div class="ai-insight">
+          <div class="ai-insight-header">
+            <span class="ai-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/><path d="M18 2l4 4-4 4"/></svg>
+              AI Root Cause · 98% confidence
+            </span>
+            <span class="ai-confidence">Analyzed 3 previous occurrences, 847 total runs</span>
+          </div>
+          <div class="ai-insight-body">
+            The <code>iframe</code> for 3DS verification returns <code>result=timeout</code> after 30s. Stripe's SDK sets a hard 30s timeout for issuer verification — the test clicks the bank button but doesn't wait for the iframe message. The page shows a spinner but Playwright's <code>waitForTimeout(35000)</code> fires before the message arrives at 31s.
+            <div class="fix-block">
+              <div class="fix-label">Suggested fix</div>
+              <div class="fix-code">await page.waitForFrameFunction(
+  'iframe[name^="__privateStripeFrame"]',
+  (frame) => frame.contentWindow.location.href.includes('acs'),
+  { timeout: 45000 }
+);</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step timeline -->
+        <div class="step-timeline">
+          <div class="step-timeline-title">Execution steps — 14 total · failed at step 9</div>
+
+          <div class="step-row pass">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-command">goto https://checkout.staging.app/checkout</div>
+              <div class="step-locator">line 98</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-command">fill #card-number, 4242424242424242</div>
+              <div class="step-locator">line 99</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-command">fill #expiry, 12/28</div>
+              <div class="step-locator">line 100</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-command">fill #cvc, 123</div>
+              <div class="step-locator">line 101</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">5</div>
+            <div class="step-content">
+              <div class="step-command">fill #name, Jane Doe</div>
+              <div class="step-locator">line 102</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">6</div>
+            <div class="step-content">
+              <div class="step-command">fill #email, jane@example.com</div>
+              <div class="step-locator">line 103</div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">7</div>
+            <div class="step-content">
+              <div class="step-command">click button[type="submit"]</div>
+              <div class="step-locator">line 104</div>
+              <div class="step-screenshot-thumb">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 14h20"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="step-row pass">
+            <div class="step-number">8</div>
+            <div class="step-content">
+              <div class="step-command">waitForSelector(.stripe-3ds-challenge, { state: 'visible' })</div>
+              <div class="step-locator">line 105</div>
+              <div class="step-screenshot-thumb">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 14h20"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="step-row fail">
+            <div class="step-number">9</div>
+            <div class="step-content">
+              <div class="step-command">waitForTimeout(35000)</div>
+              <div class="step-locator">line 142 · timeout 35s</div>
+              <div class="step-error">TimeoutError: Timeout of 35000ms exceeded during step 9/14.</div>
+              <div class="step-screenshot-thumb" style="width:120px;height:75px;flex-direction:column;gap:4px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 14h20"/><circle cx="12" cy="10" r="2"/></svg>
+                <span>Step 9 — 3DS spinner</span>
+              </div>
+            </div>
+          </div>
+          <div class="step-row" style="opacity:0.4;">
+            <div class="step-number" style="background:var(--border-soft);border-color:var(--border);color:var(--muted);">10</div>
+            <div class="step-content">
+              <div class="step-command">frame.locator('button[name="authorize"]').click()</div>
+              <div class="step-locator">line 143 · not executed</div>
+            </div>
+          </div>
+          <div class="step-row" style="opacity:0.4;">
+            <div class="step-number" style="background:var(--border-soft);border-color:var(--border);color:var(--muted);">11</div>
+            <div class="step-content">
+              <div class="step-command">expect(page).toHaveURL(/confirmation/)</div>
+              <div class="step-locator">line 144 · not executed</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screenshot viewer -->
+        <div class="screenshot-viewer">
+          <div class="screenshot-viewer-header">
+            <div class="screenshot-viewer-title">Screenshot — Step 9 failure state</div>
+            <div class="screenshot-viewer-meta">1280×720 · captured 31.2s into run</div>
+          </div>
+          <div class="screenshot-viewer-img">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.3">
+              <rect x="1" y="4" width="22" height="16" rx="2"/>
+              <path d="M1 12h22"/>
+              <circle cx="12" cy="9" r="2.5"/>
+              <path d="M7 18h4M6 16h8" stroke-width="1.2"/>
+            </svg>
+            <span style="margin-top:12px;opacity:0.6;">Browser state at timeout — Stripe 3DS challenge iframe stuck</span>
+            <div class="screenshot-overlay-label">Step 9/14 · 31.2s</div>
+          </div>
+          <div class="screenshot-nav">
+            <button class="btn btn-secondary btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+              Prev (Step 8)
+            </button>
+            <span class="screenshot-nav-info">Step 9 of 14</span>
+            <button class="btn btn-secondary btn-sm">
+              Next (Step 10)
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Console output -->
+        <div class="console-output">
+          <div class="console-header">
+            <div class="console-title">Browser console</div>
+            <div style="margin-left:auto;display:flex;gap:var(--space-3);">
+              <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,0.3);">Errors: 2</span>
+              <span style="font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,0.3);">Warnings: 4</span>
+            </div>
+          </div>
+          <div class="console-body">
+            <div class="console-line cmd">page.goto(https://checkout.staging.app/checkout)</div>
+            <div class="console-line info">INFO: Navigation succeeded · status 200 · 48ms</div>
+            <div class="console-line info">INFO: Stripe.js loaded · v3.324.0</div>
+            <div class="console-line info">INFO: Elements instance created · Elements_id_7f8a2b</div>
+            <div class="console-line cmd">card.locator.fill(4242424242424242)</div>
+            <div class="console-line info">INFO: Card number accepted · Visa · BIN 424242</div>
+            <div class="console-line cmd">submit.click()</div>
+            <div class="console-line info">INFO: Stripe.confirmPayment() called · client_secret pi_3...</div>
+            <div class="console-line info">INFO: 3DS challenge iframe mounted · name=__privateStripeFrame...</div>
+            <div class="console-line warn">WARN: iframe contentWindow not accessible — cross-origin</div>
+            <div class="console-line warn">WARN: Stripe event: 'ready' received · challenge_url set</div>
+            <div class="console-line warn">WARN: Stripe event: 'timeout' · 30000ms elapsed</div>
+            <div class="console-line error">ERROR: TimeoutError: waitForTimeout(35000) exceeded</div>
+            <div class="console-line warn">WARN: iframe postMessage received · result: error · reason: timeout</div>
+          </div>
+        </div>
+
+        <!-- Related failures -->
+        <div class="related-failures">
+          <div class="related-title">Same failure in previous runs</div>
+          <div class="related-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div style="flex:1;">
+              <div class="related-item-name">Checkout — Visa payment fails on 3DS step</div>
+              <div class="related-item-run">#2838 · main · b2e9c33 · 14h ago</div>
+            </div>
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+          </div>
+          <div class="related-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div style="flex:1;">
+              <div class="related-item-name">Checkout — Visa payment fails on 3DS step</div>
+              <div class="related-item-run">#2801 · main · 9a4bc12 · 3d ago</div>
+            </div>
+            <span class="status-pill danger"><span class="dot"></span>Failed</span>
+          </div>
+          <div class="related-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>
+            <div style="flex:1;">
+              <div class="related-item-name">Checkout — Visa payment fails on 3DS step</div>
+              <div class="related-item-run">#2764 · main · c8d2e41 · 7d ago</div>
+            </div>
+            <span class="status-pill warn"><span class="dot"></span>Flaky</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

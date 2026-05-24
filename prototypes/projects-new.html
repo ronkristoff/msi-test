@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New project — MSITest</title>
+  <style>
+    /* ─── Airtable tokens ───────────────────────────────────────────── */
+    :root {
+      --bg:           #ffffff;
+      --surface:      #ffffff;
+      --fg:           #181d26;
+      --fg-2:         #333333;
+      --muted:        rgba(4, 14, 32, 0.69);
+      --border:       #e0e2e6;
+      --border-soft:  #eef0f3;
+      --accent:       #1b61c9;
+      --accent-on:    #ffffff;
+      --accent-hover: #254fad;
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+      --success:      #006400;
+      --success-text: #006400;
+      --warn:         #eab308;
+      --warn-text:    #8a6500;
+      --danger:       #dc2626;
+      --danger-text:  #a10d3d;
+      --font-display: "Haas Groot Disp", Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-body:    Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+      --text-xs:   12px;
+      --text-sm:   14px;
+      --text-base: 16px;
+      --text-lg:   20px;
+      --text-xl:   24px;
+      --text-2xl:  32px;
+      --text-3xl:  40px;
+      --text-4xl:  48px;
+      --leading-body:  1.35;
+      --leading-tight: 1.20;
+      --tracking-display: 0;
+      --space-1:  4px;
+      --space-2:  8px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-12: 48px;
+      --radius-sm:   12px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --radius-pill: 9999px;
+      --elev-raised:
+        0 0 1px rgba(0, 0, 0, 0.32),
+        0 0 2px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(45, 127, 249, 0.28),
+        inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+      --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+      --motion-fast: 150ms;
+      --motion-base: 200ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-body);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); }
+    p { text-wrap: pretty; }
+    h1, h2, h3, h4 { text-wrap: balance; }
+
+    /* ─── layout ─────────────────────────────────────────────────────── */
+    .page-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ─── sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--accent);
+      color: var(--accent-on);
+      padding: var(--space-4);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      padding: var(--space-2) var(--space-2) var(--space-6);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: var(--space-4);
+    }
+    .sidebar-section { margin-bottom: var(--space-6); }
+    .sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-2);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px var(--space-2);
+      border-radius: 6px;
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.75);
+      cursor: pointer;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); color: var(--accent-on); }
+    .sidebar-item.active { background: rgba(27, 97, 201, 0.25); color: var(--accent-on); }
+    .sidebar-item .count {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+
+    /* ─── main ────────────────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: color-mix(in oklch, var(--bg) 96%, transparent);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      gap: var(--space-3);
+    }
+    .topbar-back { display: flex; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--text-sm); cursor: pointer; }
+    .topbar-back:hover { color: var(--fg); }
+    .topbar-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+
+    /* ─── wizard layout ─────────────────────────────────────────────── */
+    .wizard-content {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      padding: var(--space-8) var(--space-6);
+    }
+    .wizard-card {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* ─── card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-8);
+      box-shadow: var(--elev-raised);
+      margin-bottom: var(--space-6);
+    }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0 0 var(--space-2);
+    }
+    .card-desc {
+      font-size: var(--text-sm);
+      color: var(--muted);
+      margin: 0 0 var(--space-8);
+      line-height: 1.5;
+    }
+
+    /* ─── form ──────────────────────────────────────────────────────── */
+    .field { margin-bottom: var(--space-6); }
+    .field label {
+      display: block;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: var(--space-2);
+    }
+    .field-hint {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      margin-top: var(--space-1);
+    }
+    .required-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--danger);
+      margin-left: var(--space-1);
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--fg);
+      background: var(--surface);
+      transition: border-color var(--motion-fast) var(--ease-standard),
+                  box-shadow var(--motion-fast) var(--ease-standard);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .field textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
+    .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+    .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+    }
+    .field input.error, .field textarea.error { border-color: var(--danger); }
+    .error-msg { font-size: var(--text-xs); color: var(--danger); margin-top: var(--space-1); display: none; }
+    .error-msg.visible { display: block; }
+
+    /* ─── file upload ───────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-8);
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: color-mix(in oklab, var(--accent) 4%, transparent);
+    }
+    .upload-zone.has-file { border-style: solid; border-color: var(--success); background: rgba(0,100,0,0.04); }
+    .upload-icon { margin: 0 auto var(--space-3); opacity: 0.4; }
+    .upload-label { font-size: var(--text-sm); font-weight: 500; color: var(--fg); margin-bottom: var(--space-1); }
+    .upload-hint { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-filename {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--success);
+      justify-content: center;
+    }
+    .upload-filename button {
+      background: none; border: none; cursor: pointer; color: var(--muted); padding: 0;
+      display: flex; align-items: center;
+    }
+    .upload-filename button:hover { color: var(--danger); }
+
+    /* ─── generation mode selector ─────────────────────────────────── */
+    .mode-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .mode-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      cursor: pointer;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .mode-card:hover { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 4%, transparent); }
+    .mode-card.selected { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 6%, transparent); }
+    .mode-card-title {
+      font-weight: 700;
+      font-size: var(--text-base);
+      color: var(--fg);
+      margin-bottom: var(--space-1);
+    }
+    .mode-card-desc { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
+    .mode-card-icon { margin-bottom: var(--space-3); }
+
+    /* ─── divider ───────────────────────────────────────────────────── */
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      margin: var(--space-6) 0;
+      color: var(--muted);
+      font-size: var(--text-sm);
+    }
+    .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ─── actions ───────────────────────────────────────────────────── */
+    .actions { display: flex; align-items: center; gap: var(--space-3); }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: 11px 24px;
+      background: var(--accent);
+      color: var(--accent-on);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 500;
+      letter-spacing: 0.08px;
+      cursor: pointer;
+      transition: background var(--motion-fast) var(--ease-standard);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:active { background: var(--accent-active); }
+    .btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: 11px 24px;
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .btn-secondary:hover { border-color: var(--fg); background: var(--border-soft); }
+    .btn-secondary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  </style>
+</head>
+<body>
+  <div class="page-layout">
+
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">MSITest</div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Workspace</div>
+        <a href="index.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+        <a href="runs.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Test Runs
+        </a>
+        <a href="suites.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+          Suites
+        </a>
+        <a href="environments.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Environments
+        </a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Intelligence</div>
+        <a href="flakiness-map.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M18.5 8.5l-5.5 5.5-3.5-3.5-4 4"/></svg>
+          Flakiness Map
+        </a>
+        <a href="insights.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          AI Insights
+        </a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Integrations</div>
+        <a href="integrations-ci.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+          CI Pipelines
+        </a>
+        <a href="integrations-slack.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>
+          Slack Alerts
+        </a>
+      </div>
+      <div class="sidebar-section" style="margin-top:auto;padding-top:var(--space-4);border-top:1px solid rgba(255,255,255,0.1);">
+        <a href="settings.html" class="sidebar-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Settings
+        </a>
+      </div>
+    </aside>
+
+    <!-- main -->
+    <main class="main">
+      <header class="topbar">
+        <a href="index.html" class="topbar-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </a>
+        <span class="topbar-title">New project</span>
+      </header>
+
+      <div class="wizard-content">
+        <div class="wizard-card">
+
+          <!-- Step 1: Project name + URL -->
+          <div class="card">
+            <h1 class="card-title">Create a project</h1>
+            <p class="card-desc">A project groups your test suites and run history around a single application. You can create multiple projects for different apps or environments.</p>
+
+            <div class="field">
+              <label for="project-name">Project name <span class="required-badge">● Required</span></label>
+              <input id="project-name" type="text" placeholder="Checkout App" autocomplete="off" />
+              <div class="error-msg" id="nameError">Please enter a project name</div>
+            </div>
+
+            <div class="field">
+              <label for="app-url">Application URL <span class="required-badge">● Required</span></label>
+              <input id="app-url" type="url" placeholder="https://checkout.staging.app" autocomplete="off" />
+              <div class="field-hint">The base URL MSITest will explore. Include the protocol (https://).</div>
+              <div class="error-msg" id="urlError">Please enter a valid URL</div>
+            </div>
+          </div>
+
+          <!-- Step 2: PRD source -->
+          <div class="card">
+            <h2 class="card-title">Product requirements (optional)</h2>
+            <p class="card-desc">Attach your PRD to let the AI generate tests aligned with your product specs. You can skip this and describe tests in natural language instead.</p>
+
+            <!-- Mode selector -->
+            <div class="mode-cards">
+              <div class="mode-card" id="mode-nl" onclick="selectMode('nl')">
+                <div class="mode-card-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div class="mode-card-title">Natural language</div>
+                <div class="mode-card-desc">Describe what you want to test in plain English — e.g. "test that checkout works with a Visa card"</div>
+              </div>
+              <div class="mode-card" id="mode-prd" onclick="selectMode('prd')">
+                <div class="mode-card-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <div class="mode-card-title">Upload PRD</div>
+                <div class="mode-card-desc">Upload a Markdown or PDF file with your product requirements and let the AI generate tests from it</div>
+              </div>
+            </div>
+
+            <!-- PRD text area (hidden until natural language selected) -->
+            <div id="nl-section" style="display:none;">
+              <div class="field">
+                <label for="prd-text">Describe your test scenarios</label>
+                <textarea id="prd-text" placeholder="e.g. Test that users can complete checkout with a Visa card&#10;&#10;Test that the cart persists items after page refresh&#10;&#10;Test that the search returns no-results state when query matches nothing"></textarea>
+              </div>
+            </div>
+
+            <!-- File upload (hidden until PRD selected) -->
+            <div id="prd-section" style="display:none;">
+              <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".md,.pdf,.txt" onchange="handleFile(this)" />
+                <div class="upload-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div class="upload-label">Click to upload or drag and drop</div>
+                <div class="upload-hint">Markdown (.md) or PDF — up to 10MB</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="actions">
+            <button class="btn-secondary" onclick="window.location='index.html'">Cancel</button>
+            <button class="btn-primary" onclick="handleCreate()">
+              Create project
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let selectedMode = null;
+    let uploadedFile = null;
+
+    function selectMode(mode) {
+      selectedMode = mode;
+      document.getElementById('mode-nl').classList.toggle('selected', mode === 'nl');
+      document.getElementById('mode-prd').classList.toggle('selected', mode === 'prd');
+      document.getElementById('nl-section').style.display = mode === 'nl' ? 'block' : 'none';
+      document.getElementById('prd-section').style.display = mode === 'prd' ? 'block' : 'none';
+    }
+
+    function handleFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      uploadedFile = file;
+      const zone = document.getElementById('uploadZone');
+      zone.classList.add('has-file');
+      zone.innerHTML = `
+        <input type="file" id="fileInput" accept=".md,.pdf,.txt" onchange="handleFile(this)" />
+        <div class="upload-filename">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          ${file.name}
+          <button onclick="event.stopPropagation(); removeFile();">✕</button>
+        </div>
+      `;
+    }
+
+    function removeFile() {
+      uploadedFile = null;
+      const zone = document.getElementById('uploadZone');
+      zone.classList.remove('has-file');
+      zone.innerHTML = `
+        <input type="file" id="fileInput" accept=".md,.pdf,.txt" onchange="handleFile(this)" />
+        <div class="upload-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="upload-label">Click to upload or drag and drop</div>
+        <div class="upload-hint">Markdown (.md) or PDF — up to 10MB</div>
+      `;
+    }
+
+    function handleCreate() {
+      const name = document.getElementById('project-name').value.trim();
+      const url = document.getElementById('app-url').value.trim();
+      let valid = true;
+
+      if (!name) {
+        const inp = document.getElementById('project-name');
+        inp.classList.add('error');
+        const err = document.getElementById('nameError');
+        err.classList.add('visible');
+        inp.addEventListener('input', () => {
+          inp.classList.remove('error');
+          err.classList.remove('visible');
+        }, { once: true });
+        valid = false;
+      }
+      if (!url || !url.startsWith('http')) {
+        const inp = document.getElementById('app-url');
+        inp.classList.add('error');
+        const err = document.getElementById('urlError');
+        err.classList.add('visible');
+        inp.addEventListener('input', () => {
+          inp.classList.remove('error');
+          err.classList.remove('visible');
+        }, { once: true });
+        valid = false;
+      }
+      if (!valid) return;
+
+      window.location = 'project-explore.html?name=' + encodeURIComponent(name) + '&url=' + encodeURIComponent(url);
+    }
+  </script>
+</body>
+</html>

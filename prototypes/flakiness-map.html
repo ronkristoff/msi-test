@@ -1,0 +1,1032 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flakiness Map — MSITest</title>
+  <style>
+    /* ─── Airtable tokens ───────────────────────────────────────────── */
+    :root {
+      --bg:           #ffffff;
+      --surface:      #f8fafc;
+      --surface-warm: #f8fafc;
+      --fg:           #181d26;
+      --fg-2:         #333333;
+      --muted:        rgba(4, 14, 32, 0.69);
+      --meta:         rgba(4, 14, 32, 0.69);
+      --border:       #e0e2e6;
+      --border-soft:  #eef0f3;
+      --accent:       #1b61c9;
+      --accent-on:    #ffffff;
+      --accent-hover: #254fad;
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+      --success:      #006400;
+      --success-text: #006400;
+      --warn:         #eab308;
+      --warn-text:    #8a6500;
+      --danger:       #dc2626;
+      --danger-text:  #a10d3d;
+      --link:         #1264A3;
+      --font-display: "Haas Groot Disp", Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-body:    Haas, -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      --font-mono:    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+      --text-xs:   12px;
+      --text-sm:   14px;
+      --text-base: 16px;
+      --text-lg:   20px;
+      --text-xl:   24px;
+      --text-2xl:  32px;
+      --text-3xl:  40px;
+      --text-4xl:  48px;
+      --leading-body:  1.35;
+      --leading-tight: 1.2;
+      --tracking-display: 0;
+      --space-1:  4px;
+      --space-2:  8px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-12: 48px;
+      --radius-sm:   12px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --radius-pill: 9999px;
+      --elev-raised:
+        0 0 1px rgba(0, 0, 0, 0.32),
+        0 0 2px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(45, 127, 249, 0.28),
+        inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+      --focus-ring: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 70%);
+      --motion-fast: 150ms;
+      --motion-base: 200ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-body);
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { color: var(--accent-hover); }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3, h4 { text-wrap: balance; }
+    img, svg { display: block; max-width: 100%; }
+
+    /* ─── layout ─────────────────────────────────────────────────────── */
+    .page-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ─── sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--accent);
+      color: var(--accent-on);
+      padding: var(--space-4);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      padding: var(--space-2) var(--space-2) var(--space-6);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: var(--space-4);
+    }
+    .sidebar-section { margin-bottom: var(--space-6); }
+    .sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-2);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px var(--space-2);
+      border-radius: 6px;
+      font-size: var(--text-sm);
+      color: rgba(255,255,255,0.75);
+      cursor: pointer;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); color: var(--accent-on); }
+    .sidebar-item.active { background: rgba(27,97,201,0.25); color: var(--accent-on); }
+    .sidebar-item .count {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .sidebar-item .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+    .sidebar-item .dot.danger { background: var(--danger); }
+
+    /* ─── main ──────────────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ─── topbar ────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: color-mix(in oklab, var(--bg) 96%, transparent);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+    .topbar-left { display: flex; align-items: center; gap: var(--space-4); }
+    .topbar-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--fg);
+    }
+    .topbar-meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+    }
+    .topbar-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+    /* ─── buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--fg); background: var(--surface); }
+    .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
+    .btn-ghost:hover { color: var(--fg); background: var(--surface); }
+    .btn-sm { padding: 6px 12px; font-size: var(--text-xs); }
+
+    /* ─── filter pills ──────────────────────────────────────────────── */
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+    .filter-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .filter-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      cursor: pointer;
+      transition: all var(--motion-fast) var(--ease-standard);
+    }
+    .filter-pill:hover { border-color: var(--fg); }
+    .filter-pill.active { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+    .filter-pill .remove {
+      display: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      color: inherit;
+      font-size: 10px;
+      line-height: 12px;
+      text-align: center;
+    }
+    .filter-pill.active .remove { display: inline-block; }
+
+    /* ─── content ──────────────────────────────────────────────────── */
+    .content { flex: 1; padding: var(--space-6); }
+
+    /* ─── stats row ──────────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .stats-row { grid-template-columns: 1fr; } }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+    .stat-card .label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+    }
+    .stat-card .value {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+      line-height: 1;
+    }
+    .stat-card .sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--muted);
+      margin-top: var(--space-2);
+    }
+    .stat-card.danger .value { color: var(--danger); }
+    .stat-card.success .value { color: var(--success); }
+    .stat-card.accent .value { color: var(--accent); }
+
+    /* ─── heatmap section ────────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+    .section-title { font-size: var(--text-lg); font-weight: 700; }
+    .section-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+
+    /* ─── heatmap layout ────────────────────────────────────────────── */
+    .heatmap-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: var(--space-4);
+      align-items: start;
+    }
+    @media (max-width: 1200px) {
+      .heatmap-layout { grid-template-columns: 1fr; }
+      .heatmap-sidebar { display: none; }
+    }
+
+    /* ─── heatmap sidebar panels ────────────────────────────────────── */
+    .heatmap-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+    }
+    .panel-title {
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--fg);
+      margin-bottom: var(--space-3);
+    }
+    .panel-title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+
+    /* ─── test list ─────────────────────────────────────────────────── */
+    .test-list { display: flex; flex-direction: column; gap: 2px; }
+    .test-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 6px var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .test-item:hover, .test-item.selected { background: var(--border-soft); color: var(--fg); }
+    .test-item.selected { background: color-mix(in oklab, var(--accent) 10%, transparent); color: var(--accent); }
+    .test-item .score {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      min-width: 36px;
+      text-align: right;
+    }
+    .test-item .score.flaky { color: var(--danger); font-weight: 600; }
+    .test-item .score.stable { color: var(--success); }
+    .test-item .suite-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--border-soft);
+      color: var(--muted);
+    }
+
+    /* ─── legend ────────────────────────────────────────────────────── */
+    .legend { display: flex; flex-direction: column; gap: var(--space-2); }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-xs);
+    }
+    .legend-swatch {
+      width: 28px;
+      height: 18px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .legend-label { color: var(--muted); font-family: var(--font-mono); }
+    .legend-pct { margin-left: auto; font-family: var(--font-mono); color: var(--muted); }
+
+    /* ─── AI insight panel ─────────────────────────────────────────── */
+    .ai-insight {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 4px 10px;
+      background: color-mix(in oklab, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in oklab, var(--accent) 25%, transparent);
+      border-radius: var(--radius-pill);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      width: fit-content;
+    }
+    .ai-badge svg { color: var(--accent); }
+    .ai-insight p {
+      font-size: var(--text-sm);
+      color: var(--fg-2);
+      line-height: 1.5;
+      margin: 0;
+    }
+    .ai-insight ul {
+      margin: 0;
+      padding-left: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .ai-insight li { font-size: var(--text-sm); color: var(--fg-2); }
+    .ai-insight code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 1px 4px;
+      background: var(--border-soft);
+      border-radius: 3px;
+      color: var(--fg);
+    }
+
+    /* ─── heatmap grid ───────────────────────────────────────────────── */
+    .heatmap-scroll {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: calc(100vh - 260px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: 260px repeat(15, minmax(36px, 1fr));
+      min-width: 800px;
+    }
+
+    /* header row */
+    .heatmap-header {
+      display: contents;
+    }
+    .heatmap-header-cell {
+      padding: 8px 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      border-bottom: 2px solid var(--border);
+      border-right: 1px solid var(--border-soft);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+    }
+    .heatmap-header-cell:first-child {
+      text-align: left;
+      padding-left: var(--space-3);
+      position: sticky;
+      left: 0;
+      z-index: 2;
+    }
+    .heatmap-header-cell:last-child { border-right: none; }
+
+    /* data rows */
+    .heatmap-row {
+      display: contents;
+      cursor: pointer;
+    }
+    .heatmap-row:hover .heatmap-test-cell { background: var(--border-soft); }
+    .heatmap-row:hover .heatmap-cell { filter: brightness(0.92); }
+
+    .heatmap-test-cell {
+      padding: 8px var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--fg);
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      position: sticky;
+      left: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .heatmap-test-cell .test-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .heatmap-test-cell .test-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .heatmap-test-cell .test-score {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .heatmap-test-cell .test-score.flake-0 { background: rgba(0,100,0,0.15); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-1 { background: rgba(0,100,0,0.20); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-2 { background: rgba(234,179,8,0.15); color: var(--warn-text); }
+    .heatmap-test-cell .test-score.flake-3 { background: rgba(220,38,38,0.12); color: var(--danger-text); }
+
+    .heatmap-cell {
+      border-bottom: 1px solid var(--border-soft);
+      border-right: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(0,0,0,0.45);
+      min-height: 38px;
+      transition: filter var(--motion-fast);
+    }
+    .heatmap-cell:last-child { border-right: none; }
+    .heatmap-cell.empty { background: var(--surface); color: var(--muted); }
+
+    /* Flakiness color scale — 5 steps */
+    .flake-0 { background: rgba(0,100,0,0.60); color: #fff; }
+    .flake-1 { background: rgba(0,100,0,0.25); }
+    .flake-2 { background: rgba(234,179,8,0.40); }
+    .flake-3 { background: rgba(220,38,38,0.22); }
+    .flake-4 { background: rgba(220,38,38,0.55); color: #fff; }
+
+    .heatmap-test-cell .test-score.flake-0 { background: rgba(0,100,0,0.15); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-1 { background: rgba(0,100,0,0.20); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-2 { background: rgba(234,179,8,0.15); color: var(--warn-text); }
+    .heatmap-test-cell .test-score.flake-3 { background: rgba(220,38,38,0.12); color: var(--danger-text); }
+
+    .heatmap-test-cell .test-score.flake-0 { background: rgba(0,100,0,0.15); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-1 { background: rgba(0,100,0,0.20); color: var(--success); }
+    .heatmap-test-cell .test-score.flake-2 { background: rgba(234,179,8,0.15); color: var(--warn-text); }
+    .heatmap-test-cell .test-score.flake-3 { background: rgba(220,38,38,0.12); color: var(--danger-text); }
+
+    /* ─── run label ─────────────────────────────────────────────────── */
+    .run-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      letter-spacing: 0.04em;
+    }
+    .run-label.fail { color: var(--danger); }
+    .run-label.pass { color: var(--success); }
+
+    /* ─── detail panel (right sidebar) ───────────────────────────────── */
+    .detail-panel { display: flex; flex-direction: column; gap: var(--space-4); }
+    .detail-empty {
+      display: grid;
+      place-items: center;
+      height: 160px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-sm);
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+    .detail-name { font-weight: 700; font-size: var(--text-base); }
+    .detail-id { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); margin-top: 2px; }
+    .detail-score-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .detail-score-badge .val {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .detail-score-badge .lbl {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .detail-score-badge.flake-high .val { color: var(--danger); }
+    .detail-score-badge.flake-mid .val { color: var(--warn); }
+    .detail-score-badge.flake-low .val { color: var(--success); }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: var(--text-sm);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .dt { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+    .detail-row .dd { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--fg); font-weight: 600; }
+    .detail-row .dd.danger { color: var(--danger); }
+    .detail-row .dd.success { color: var(--success); }
+
+    /* ─── trend sparkline ────────────────────────────────────────────── */
+    .sparkline {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 36px;
+      margin-top: var(--space-2);
+    }
+    .spark-bar {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      min-height: 4px;
+    }
+
+    /* ─── suspect runs ──────────────────────────────────────────────── */
+    .suspect-runs { display: flex; flex-direction: column; gap: var(--space-2); }
+    .suspect-run {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-soft);
+      background: var(--bg);
+      font-size: var(--text-xs);
+    }
+    .suspect-run .run-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 28px;
+    }
+    .suspect-run .run-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .suspect-run .run-desc { flex: 1; color: var(--fg-2); }
+    .suspect-run .run-time { font-family: var(--font-mono); color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="page-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">MSITest</div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Test Intelligence</div>
+      <a class="sidebar-item" href="index.html">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
+      </a>
+      <a class="sidebar-item" href="runs.html">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Runs
+      </a>
+      <a class="sidebar-item active" href="flakiness-map.html">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18.5 8.5l-5.5 5.5-3.5-3.5-4 4"/></svg>
+        Flakiness Map
+        <span class="count">18</span>
+      </a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Suites</div>
+      <div class="sidebar-item"><span class="dot danger"></span>auth-oauth <span class="count">4</span></div>
+      <div class="sidebar-item"><span class="dot danger"></span>checkout-flow <span class="count">3</span></div>
+      <div class="sidebar-item"><span class="dot"></span>api-rest <span class="count">0</span></div>
+      <div class="sidebar-item"><span class="dot"></span>smoke-prod <span class="count">0</span></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-title">Flakiness Map</span>
+        <span class="topbar-meta">Last 15 runs · updated 2 min ago</span>
+      </div>
+      <div class="topbar-actions">
+        <div class="filter-group">
+          <span class="filter-label">Filter:</span>
+          <button class="filter-pill active" onclick="this.classList.toggle('active')">All <span class="remove">×</span></button>
+          <button class="filter-pill" onclick="this.classList.toggle('active')">Flaky only <span class="remove">×</span></button>
+          <button class="filter-pill" onclick="this.classList.toggle('active')">Stable only <span class="remove">×</span></button>
+        </div>
+        <button class="btn btn-secondary btn-sm">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="label">Total tests</div>
+          <div class="value">248</div>
+          <div class="sub">across 12 suites</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="label">Flaky tests</div>
+          <div class="value">18</div>
+          <div class="sub">7.3% of total · 7 critical</div>
+        </div>
+        <div class="stat-card accent">
+          <div class="label">Avg flakiness</div>
+          <div class="value">12%</div>
+          <div class="sub">↓ 3pp from last week</div>
+        </div>
+        <div class="stat-card success">
+          <div class="label">Fully stable</div>
+          <div class="value">230</div>
+          <div class="sub">0 failures in 15 runs</div>
+        </div>
+      </div>
+
+      <!-- Heatmap + panels -->
+      <div class="heatmap-layout">
+
+        <!-- Left: test list + legend -->
+        <div class="heatmap-sidebar">
+          <div class="panel">
+            <div class="panel-title-bar">
+              <span class="panel-title">Tests by flakiness</span>
+              <span class="section-meta">248 total</span>
+            </div>
+            <div class="test-list" id="testList">
+              <!-- populated by JS -->
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Legend</div>
+            <div class="legend">
+              <div class="legend-row">
+                <div class="legend-swatch" style="background: rgba(0,100,0,0.50)"></div>
+                <span class="legend-label">0%</span>
+                <span class="legend-pct">Always passes</span>
+              </div>
+              <div class="legend-row">
+                <div class="legend-swatch" style="background: rgba(0,100,0,0.25)"></div>
+                <span class="legend-label">1–33%</span>
+                <span class="legend-pct">Rarely flakes</span>
+              </div>
+              <div class="legend-row">
+                <div class="legend-swatch" style="background: rgba(234,179,8,0.40)"></div>
+                <span class="legend-label">34–66%</span>
+                <span class="legend-pct">Intermittent</span>
+              </div>
+              <div class="legend-row">
+                <div class="legend-swatch" style="background: rgba(220,38,38,0.22)"></div>
+                <span class="legend-label">67–89%</span>
+                <span class="legend-pct">Often flakes</span>
+              </div>
+              <div class="legend-row">
+                <div class="legend-swatch" style="background: rgba(220,38,38,0.55)"></div>
+                <span class="legend-label">90–100%</span>
+                <span class="legend-pct">Almost never passes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center: heatmap grid -->
+        <div class="heatmap-scroll">
+          <div class="heatmap-grid" id="heatmapGrid">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <!-- Right: AI insight + detail -->
+        <div class="heatmap-sidebar">
+          <div class="panel ai-insight">
+            <div class="ai-badge">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              AI Analysis
+            </div>
+            <p>
+              <strong>3 root-cause clusters</strong> account for 83% of all flaky failures in the last 15 runs:
+            </p>
+            <ul>
+              <li><code>auth-oauth/token-refresh</code> — 94% flake rate; fails when CI runner clock drifts &gt;30s</li>
+              <li><code>checkout-flow/payment-idempotency</code> — 78% flake rate; race between capture and refund calls</li>
+              <li><code>smoke-prod/cdn-assets</code> — 61% flake rate; flaky CDN health-check in eu-west-1</li>
+            </ul>
+            <button class="btn btn-secondary btn-sm" style="width:100%">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              View full AI report
+            </button>
+          </div>
+
+          <div class="panel" id="detailPanel">
+            <div class="panel-title-bar">
+              <span class="panel-title">Test detail</span>
+              <span class="section-meta">select a row</span>
+            </div>
+            <div class="detail-empty">
+              Click any test row to<br>inspect its flakiness history
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">Most suspect runs</div>
+            <div class="suspect-runs">
+              <div class="suspect-run">
+                <span class="run-num">#847</span>
+                <span class="run-dot" style="background:var(--danger)"></span>
+                <span class="run-desc">auth-oauth/token-refresh timed out</span>
+                <span class="run-time">18m ago</span>
+              </div>
+              <div class="suspect-run">
+                <span class="run-num">#846</span>
+                <span class="run-dot" style="background:var(--danger)"></span>
+                <span class="run-desc">checkout idempotency key conflict</span>
+                <span class="run-time">2h ago</span>
+              </div>
+              <div class="suspect-run">
+                <span class="run-num">#845</span>
+                <span class="run-dot" style="background:var(--warn)"></span>
+                <span class="run-desc">cdn health-check eu-west-1 flapped</span>
+                <span class="run-time">4h ago</span>
+              </div>
+              <div class="suspect-run">
+                <span class="run-num">#843</span>
+                <span class="run-dot" style="background:var(--danger)"></span>
+                <span class="run-desc">payment capture race with refund</span>
+                <span class="run-time">6h ago</span>
+              </div>
+              <div class="suspect-run">
+                <span class="run-num">#841</span>
+                <span class="run-dot" style="background:var(--danger)"></span>
+                <span class="run-desc">token-refresh SSO session expired</span>
+                <span class="run-time">1d ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /page-layout -->
+
+<script>
+(function () {
+  'use strict';
+
+  var TESTS = [
+    { id: 'AUTH-001', name: 'oauth/token-refresh-expiry',  suite: 'auth-oauth',      flakePct: 94, results: [0,4,4,4,4,4,4,4,4,4,4,4,4,4,4] },
+    { id: 'AUTH-002', name: 'oauth/session-invalidate', suite: 'auth-oauth',      flakePct: 41, results: [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+    { id: 'AUTH-003', name: 'oauth/mfa-bypass-redirect', suite: 'auth-oauth',     flakePct: 20, results: [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0] },
+    { id: 'AUTH-004', name: 'oauth/token-store-consistency', suite: 'auth-oauth',   flakePct: 67, results: [0,1,4,1,1,4,1,1,4,1,1,4,1,0,1] },
+    { id: 'AUTH-005', name: 'oauth/slo-redirect-loop',   suite: 'auth-oauth',      flakePct: 33, results: [0,0,1,0,0,0,0,1,0,0,0,0,0,1,0] },
+    { id: 'CHK-001',  name: 'checkout/payment-idempotency', suite: 'checkout-flow', flakePct: 78, results: [0,1,4,1,4,1,4,1,4,1,4,1,0,4,1] },
+    { id: 'CHK-002',  name: 'checkout/capture-race-refund', suite: 'checkout-flow', flakePct: 61, results: [0,4,1,1,4,1,1,4,1,1,0,4,1,1,0] },
+    { id: 'CHK-003',  name: 'checkout/3ds-fallback-retry', suite: 'checkout-flow',  flakePct: 28, results: [0,0,0,1,0,0,0,0,0,0,1,0,0,0,0] },
+    { id: 'CHK-004',  name: 'checkout/coupon-stack-order', suite: 'checkout-flow',  flakePct: 11, results: [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0] },
+    { id: 'CHK-005',  name: 'checkout/address-autocomplete', suite: 'checkout-flow', flakePct: 6, results: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+    { id: 'CDN-001',  name: 'smoke/cdn-assets-eu-west',   suite: 'smoke-prod',     flakePct: 61, results: [0,1,4,1,1,4,1,0,1,1,4,1,1,4,1] },
+    { id: 'CDN-002',  name: 'smoke/cdn-assets-us-east',   suite: 'smoke-prod',     flakePct: 33, results: [0,0,1,0,0,0,0,0,0,0,0,0,0,1,0] },
+    { id: 'API-001',  name: 'api/rest/user-profile-patch', suite: 'api-rest',      flakePct: 0,  results: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+    { id: 'API-002',  name: 'api/rest/webhook-retry-logic', suite: 'api-rest',     flakePct: 6,  results: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+    { id: 'API-003',  name: 'api/rest/rate-limit-backoff', suite: 'api-rest',      flakePct: 0,  results: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+    { id: 'API-004',  name: 'api/rest/list-with-cursor',   suite: 'api-rest',      flakePct: 0,  results: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+  ];
+
+  var RUNS = [
+    { num: 847, age: '18m ago',  fail: 3,  pass: 37, ok: false },
+    { num: 846, age: '2h ago',   fail: 1,  pass: 39, ok: false },
+    { num: 845, age: '4h ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 844, age: '6h ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 843, age: '8h ago',   fail: 2,  pass: 38, ok: false },
+    { num: 842, age: '10h ago',  fail: 0,  pass: 40, ok: true  },
+    { num: 841, age: '1d ago',   fail: 1,  pass: 39, ok: false },
+    { num: 840, age: '1d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 839, age: '1d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 838, age: '2d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 837, age: '2d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 836, age: '2d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 835, age: '3d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 834, age: '3d ago',   fail: 0,  pass: 40, ok: true  },
+    { num: 833, age: '4d ago',   fail: 0,  pass: 40, ok: true  },
+  ];
+
+  var FLAKE_CLASS = ['flake-0','flake-1','flake-2','flake-3','flake-4'];
+
+  function renderGrid(selectedId) {
+    var grid = document.getElementById('heatmapGrid');
+    var testList = document.getElementById('testList');
+    if (!grid) return;
+
+    var html = '';
+
+    /* ── header row ── */
+    html += '<div class="heatmap-header">';
+    html += '<div class="heatmap-header-cell">Test</div>';
+    for (var r = 0; r < RUNS.length; r++) {
+      var cls = RUNS[r].ok ? 'run-label pass' : 'run-label fail';
+      html += '<div class="heatmap-header-cell"><span class="' + cls + '">#' + RUNS[r].num + '</span></div>';
+    }
+    html += '</div>';
+
+    /* ── data rows ── */
+    for (var t = 0; t < TESTS.length; t++) {
+      var test = TESTS[t];
+      var rowCls = test.id === selectedId ? 'heatmap-row selected' : 'heatmap-row';
+      html += '<div class="' + rowCls + '" data-id="' + test.id + '">';
+
+      /* test name cell */
+      var dotColor = test.flakePct === 0 ? 'var(--success)' : test.flakePct > 66 ? 'var(--danger)' : test.flakePct > 33 ? 'var(--warn)' : 'var(--muted)';
+      var scoreCls = test.flakePct === 0 ? 'flake-0' : test.flakePct <= 33 ? 'flake-1' : test.flakePct <= 66 ? 'flake-2' : 'flake-3';
+      html += '<div class="heatmap-test-cell">';
+      html += '<span class="test-dot" style="background:' + dotColor + '"></span>';
+      html += '<span class="test-name">' + test.name + '</span>';
+      html += '<span class="test-score ' + scoreCls + '">' + test.flakePct + '%</span>';
+      html += '</div>';
+
+      /* result cells */
+      for (var r = 0; r < test.results.length; r++) {
+        var res = test.results[r];
+        var cls = res === 0 ? 'heatmap-cell empty' : 'heatmap-cell ' + FLAKE_CLASS[res];
+        html += '<div class="' + cls + '"></div>';
+      }
+
+      html += '</div>';
+    }
+
+    grid.innerHTML = html;
+
+    /* ── test list ── */
+    var listHtml = '';
+    for (var t = 0; t < TESTS.length; t++) {
+      var test = TESTS[t];
+      var selCls = test.id === selectedId ? ' selected' : '';
+      var scoreCls = test.flakePct === 0 ? ' stable' : test.flakePct > 0 ? ' flaky' : '';
+      listHtml += '<div class="test-item' + selCls + '" data-id="' + test.id + '">';
+      listHtml += '<span class="suite-tag">' + test.suite + '</span>';
+      listHtml += '<span>' + test.name + '</span>';
+      listHtml += '<span class="score' + scoreCls + '">' + (test.flakePct === 0 ? 'stable' : test.flakePct + '%') + '</span>';
+      listHtml += '</div>';
+    }
+    testList.innerHTML = listHtml;
+
+    /* ── click handlers ── */
+    var rows = document.querySelectorAll('.heatmap-row, .test-item');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        renderGrid(id);
+        renderDetail(id);
+      });
+    }
+  }
+
+  function renderDetail(id) {
+    var panel = document.getElementById('detailPanel');
+    if (!panel) return;
+    var test = null;
+    for (var t = 0; t < TESTS.length; t++) { if (TESTS[t].id === id) { test = TESTS[t]; break; } }
+    if (!test) return;
+
+    var flakeLevel = test.flakePct === 0 ? 'flake-low' : test.flakePct <= 33 ? 'flake-low' : test.flakePct <= 66 ? 'flake-mid' : 'flake-high';
+    var failCount = 0;
+    for (var r = 0; r < test.results.length; r++) { if (test.results[r] > 0) failCount++; }
+
+    /* sparkline bars */
+    var sparkHtml = '';
+    for (var r = 0; r < test.results.length; r++) {
+      var h = Math.round(4 + (test.results[r] / 4) * 32);
+      var color = test.results[r] === 0 ? 'rgba(0,100,0,0.65)' : 'rgba(220,38,38,0.65)';
+      sparkHtml += '<div class="spark-bar" style="height:' + h + 'px;background:' + color + '"></div>';
+    }
+
+    panel.innerHTML =
+      '<div class="panel-title-bar">' +
+        '<span class="panel-title">Test detail</span>' +
+        '<span class="section-meta">' + test.id + '</span>' +
+      '</div>' +
+      '<div class="detail-header">' +
+        '<div>' +
+          '<div class="detail-name">' + test.name + '</div>' +
+          '<div class="detail-id">' + test.suite + '</div>' +
+        '</div>' +
+        '<div class="detail-score-badge ' + flakeLevel + '">' +
+          '<span class="val">' + test.flakePct + '%</span>' +
+          '<span class="lbl">Flakiness</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:var(--space-1)">' +
+        '<div class="detail-row"><span class="dt">Total runs</span><span class="dd">' + test.results.length + '</span></div>' +
+        '<div class="detail-row"><span class="dt">Failed runs</span><span class="dd danger">' + failCount + '</span></div>' +
+        '<div class="detail-row"><span class="dt">Pass rate</span><span class="dd success">' + (100 - test.flakePct) + '%</span></div>' +
+        '<div class="detail-row"><span class="dt">Last failure</span><span class="dd danger">#847 · 18m ago</span></div>' +
+        '<div class="detail-row"><span class="dt">First seen flaky</span><span class="dd">#833 · 4d ago</span></div>' +
+        '<div class="detail-row"><span class="dt">Avg duration</span><span class="dd">2.4s</span></div>' +
+      '</div>' +
+      '<div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:var(--space-2)">' +
+        '<span class="dt">Flakiness trend</span>' +
+        '<div class="sparkline">' + sparkHtml + '</div>' +
+      '</div>';
+  }
+
+  renderGrid(null);
+  renderDetail('AUTH-001');
+
+})();
+</script>
+</body>
+</html>
