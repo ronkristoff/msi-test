@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { api } from "@/lib/convex";
+import { api, asId } from "@/lib/convex";
 
 export type BreadcrumbItem = {
   label: string;
@@ -12,6 +12,7 @@ type BreadcrumbDef = {
   label: string;
   href?: string;
   dynamic?: boolean;
+  suiteId?: boolean;
 };
 
 function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
@@ -32,6 +33,16 @@ function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
     ];
   }
 
+  const suiteMatch = pathname.match(/^\/projects\/([^/]+)\/suites\/([^/]+)$/);
+  if (suiteMatch) {
+    const [, projectId, suiteId] = suiteMatch;
+    return [
+      { label: "Projects", href: "/projects" },
+      { label: projectId, href: `/projects/${projectId}`, dynamic: true },
+      { label: suiteId, dynamic: true, suiteId: true },
+    ];
+  }
+
   const projectMatch = pathname.match(/^\/projects\/([^/]+)$/);
   if (projectMatch) {
     const id = projectMatch[1];
@@ -46,18 +57,32 @@ function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
 
 export function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const defs = getBreadcrumbDefs(pathname);
-  const dynamicDef = defs?.find((d) => d.dynamic);
+  const projectDef = defs?.find((d) => d.dynamic && !d.suiteId);
+  const suiteDef = defs?.find((d) => d.suiteId);
 
   const project = useQuery(
     api.projects.queries.getProject,
-    dynamicDef
-      ? ({ project_id: dynamicDef.label as never } as never)
+    projectDef
+      ? { project_id: asId(projectDef.label, "projects") }
+      : "skip",
+  );
+
+  const suite = useQuery(
+    api.suites.queries.getSuite,
+    suiteDef
+      ? { suite_id: asId(suiteDef.label, "suites") }
       : "skip",
   );
 
   if (!defs) return [];
 
   return defs.map((def) => {
+    if (def.suiteId && suite) {
+      return { label: suite.name, href: def.href };
+    }
+    if (def.suiteId) {
+      return { label: "…", href: def.href };
+    }
     if (def.dynamic && project) {
       return { label: project.name, href: def.href };
     }

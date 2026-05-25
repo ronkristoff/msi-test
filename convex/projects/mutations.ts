@@ -1,7 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { getOwnedWorkspace } from "../lib/requireAuth";
+import { getOwnedWorkspace, getOwnedEntity } from "../lib/requireAuth";
 import { validateProjectName, normalizeAppUrl } from "../lib/validation";
 
 export const createProject = mutation({
@@ -15,7 +15,7 @@ export const createProject = mutation({
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
     if (args.workspace_id !== workspace._id) {
-      throw new ConvexError("Workspace not found or access denied");
+      throw new ConvexError("Not found or access denied");
     }
 
     const name = validateProjectName(args.name);
@@ -51,15 +51,7 @@ export const updateProject = mutation({
     clear_prd: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { workspace } = await getOwnedWorkspace(ctx);
-
-    const project = await ctx.db.get(args.project_id);
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
-    if (project.workspace_id !== workspace._id) {
-      throw new ConvexError("Access denied");
-    }
+    const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
 
     const updates: Record<string, unknown> = {};
 

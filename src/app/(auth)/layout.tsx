@@ -15,7 +15,6 @@ const PAGE_META: Record<string, { title: string; subtitle?: string }> = {
   "/runs": { title: "Runs", subtitle: "All test execution history" },
   "/flakiness-map": { title: "Flakiness Map", subtitle: "Test stability heatmap across runs" },
   "/projects": { title: "Projects", subtitle: "Manage your test projects" },
-  "/suites": { title: "Suites", subtitle: "Manage test suites" },
   "/insights": { title: "AI Insights", subtitle: "Aggregated AI analysis across runs" },
   "/settings": { title: "Settings", subtitle: "Manage your workspace, AI provider, and account" },
 };

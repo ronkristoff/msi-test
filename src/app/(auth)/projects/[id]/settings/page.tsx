@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "@/lib/convex";
+import { api, asId } from "@/lib/convex";
 import { Input } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
@@ -13,19 +13,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PRDInput } from "@/components/PRDInput";
 import { projectSettingsSchema, type ProjectSettingsValues } from "@/lib/schemas";
 import { useFileUpload, type PRDMode } from "@/lib/use-file-upload";
+import { normalizeAppUrl } from "@/lib/urls";
 import Link from "next/link";
-
-function normalizeUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
 
 export default function ProjectSettingsPage() {
   const params = useParams<{ id: string }>();
+  const projectId = asId(params.id, "projects");
   const project = useQuery(api.projects.queries.getProject, {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    project_id: params.id as any,
+    project_id: projectId,
   });
   const updateProject = useMutation(api.projects.mutations.updateProject);
   const { upload } = useFileUpload();
@@ -81,7 +76,7 @@ export default function ProjectSettingsPage() {
     try {
       const updates: Record<string, unknown> = {
         name: data.name,
-        app_url: normalizeUrl(data.app_url),
+        app_url: normalizeAppUrl(data.app_url),
       };
 
       if (prdMode === "text") {
@@ -89,8 +84,7 @@ export default function ProjectSettingsPage() {
         if (!prdText.trim()) updates.clear_prd = true;
       } else if (prdMode === "file" && prdFile) {
         const storageId = await upload(prdFile);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updates.prd_file_id = storageId as any;
+        updates.prd_file_id = asId(storageId, "_storage");
       }
 
       await updateProject({ project_id: project!._id, ...updates });

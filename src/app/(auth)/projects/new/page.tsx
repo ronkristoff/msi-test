@@ -5,19 +5,14 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "@/lib/convex";
+import { api, asId } from "@/lib/convex";
 import { Input } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { projectStep1Schema, type ProjectStep1Values } from "@/lib/schemas";
 import { useFileUpload, type PRDMode } from "@/lib/use-file-upload";
 import { PRDInput } from "@/components/PRDInput";
-
-function normalizeUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
+import { normalizeAppUrl } from "@/lib/urls";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -54,7 +49,7 @@ export default function NewProjectPage() {
     setCreating(true);
     try {
       const name = step1Form.getValues("name");
-      const appUrl = normalizeUrl(step1Form.getValues("app_url"));
+      const appUrl = normalizeAppUrl(step1Form.getValues("app_url"));
 
       let prdTextValue: string | undefined;
       let prdFileId: string | undefined;
@@ -70,8 +65,7 @@ export default function NewProjectPage() {
         name,
         app_url: appUrl,
         prd_text: prdTextValue,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        prd_file_id: prdFileId as any,
+        prd_file_id: prdFileId ? asId(prdFileId, "_storage") : undefined,
       });
 
       router.push(`/projects/${projectId}`);
