@@ -35,9 +35,9 @@ export default function ProjectDetailPage() {
       router.push(`/projects/${params.id}/suites/${suiteId}`);
     } catch (err) {
       logError(err instanceof Error ? err.message : "Failed to create suite", {
-        source: "ProjectDetailPage.handleCreateSuite",
-        severity: "error",
-      });
+          severity: "error",
+          context: { source: "ProjectDetailPage.handleCreateSuite" },
+        });
     } finally {
       setCreating(false);
     }

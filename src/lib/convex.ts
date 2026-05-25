@@ -1,11 +1,12 @@
 export { api } from "../../convex/_generated/api";
 export type { Doc, Id } from "../../convex/_generated/dataModel";
 
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id, TableNames } from "../../convex/_generated/dataModel";
+import type { SystemTableNames } from "convex/server";
 
-type TableNames = keyof import("../../convex/_generated/dataModel")["Id"];
+type AllTableNames = TableNames | SystemTableNames;
 
-export function asId<T extends TableNames>(value: string, _table: T): Id<T> {
+export function asId<T extends AllTableNames>(value: string, _table: T): Id<T> {
   void _table;
   return value as Id<T>;
 }
