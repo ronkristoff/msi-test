@@ -218,13 +218,13 @@ Convex mutations and queries for projects. Each project stores: name, `app_url`,
 
 #### 3. AI Provider Module (deep)
 
-Configures `@convex-dev/agent` Agent instances with the workspace's AI model settings. Uses `createOpenAI({ baseURL, apiKey })` from `@ai-sdk/openai` for BYOK support. Defines three specialized agents:
+Configures `@convex-dev/agent` (v0.6.x) with Vercel AI SDK (v6.x) and `@ai-sdk/openai` (v3.x) for BYOK support. Defines three specialized agents as module-level definitions (prompts, schemas, tools) with the AI model injected per-call from workspace config via `getWorkspaceModel(ctx)`:
 
-- **Test Generation Agent** — generates Playwright test files from exploration scenarios, PRD content, or natural language prompts
-- **Exploration Analysis Agent** — analyzes rendered page structure (DOM snapshots, screenshots) and proposes testable scenarios
-- **Failure Analysis Agent** — analyzes failed test code, error messages, screenshots, and console output to produce root cause analysis and suggested fixes
+- **Test Generation Agent** — `generateText`, returns Playwright test code in markdown fence. Thread scoped per suite (derived ID). Tools: `readExistingTests`, `readProjectContext`.
+- **Exploration Analysis Agent** — `generateObject` with zod schema for structured scenario output. Thread managed by caller. Tools: `readProjectContext`, `readPreviousExplorations` (stub).
+- **Failure Analysis Agent** — `generateObject` with zod schema for root cause + suggested fix + confidence score. One-shot (no thread). Tools: `readTestCode`, `readRecentFailures` (stub).
 
-Leverages the Agent component's thread persistence (exploration history, generation history), streaming, usage tracking, and rate limiting.
+Module organized in `convex/ai/` with agents, model bootstrapping, tools, and structured error handling. Error codes: `invalid_api_key`, `rate_limit`, `timeout`, `malformed_response`. Usage tracking enabled via Agent component (no UI). No rate limiting for MVP.
 
 #### 4. Exploration Module (deep)
 
@@ -315,9 +315,13 @@ Test external behavior, not implementation details. Mock external dependencies (
 
 **AI Provider Module (unit tests)**
 
-- Mock the AI SDK layer. Verify correct prompts and configuration are passed to the Agent for each of the three specialized agents.
-- Verify error handling: rate limits, invalid API keys, timeouts, malformed responses.
+- Mock the AI SDK model layer only (not the Agent component). Use `convex-test` with a real test DB so the Agent component runs for real.
+- Use canned fixture responses for the mock model layer (Playwright code, scenario arrays, root cause analyses).
+- Verify correct prompts and configuration are passed to each of the three specialized agents.
+- Verify error handling: rate limits, invalid API keys, timeouts, malformed responses — all via structured `ConvexError` with `{ type: "ai_error", code, message }`.
 - Verify the response parsing extracts test code, root cause text, and confidence scores correctly.
+- Verify Tier 1 tools (`readExistingTests`, `readProjectContext`, `readTestCode`) return data from test DB.
+- Verify Tier 2 stub tools (`readPreviousExplorations`, `readRecentFailures`) return empty arrays.
 
 **Exploration Module (integration tests)**
 

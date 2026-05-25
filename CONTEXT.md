@@ -14,6 +14,10 @@
 - **AI Insight** — An AI-generated analysis linked to a test failure. Contains root cause text, suggested fix, and confidence score.
 - **Flakiness** — A measure of test instability across multiple runs. Computed as the ratio of inconsistent results (pass then fail, or vice versa) over recent run history.
 - **Environment** — A named deployment target (e.g. staging, production) with a base URL, scoped to a project.
+- **AI Agent** — A specialized `@convex-dev/agent` instance with a defined role, system prompt, and tools. MSITest defines three: Test Generation Agent, Exploration Analysis Agent, and Failure Analysis Agent. Agents are module-level definitions; the AI model is injected per-call from the workspace's BYOK config.
+- **Thread** — A persistent conversation context managed by `@convex-dev/agent`. Test Generation threads are scoped per suite (derived ID `testGen:${suiteId}`). Exploration Analysis threads are caller-managed. Failure Analysis is one-shot (no thread).
+- **Agent Tool** — A Convex query that an AI agent can invoke during generation to fetch context from the database. Five tools are defined: `readExistingTests`, `readProjectContext`, `readTestCode`, `readPreviousExplorations` (stub), `readRecentFailures` (stub).
+- **AI Error** — A structured error from AI operations. Uses `ConvexError` with `{ type: "ai_error", code, message }` where code is one of: `invalid_api_key`, `rate_limit`, `timeout`, `malformed_response`.
 
 ## Data Hierarchy
 
