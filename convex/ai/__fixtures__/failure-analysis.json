@@ -1,0 +1,5 @@
+{
+  "rootCause": "Element selector '[data-testid=\"submit\"]' is not found within the timeout period. The button renders asynchronously after a network request completes.",
+  "suggestedFix": "Add an explicit waitForSelector before clicking, or increase the timeout. Consider using page.waitForResponse to wait for the pre-submit network call.",
+  "confidenceScore": 0.85
+}

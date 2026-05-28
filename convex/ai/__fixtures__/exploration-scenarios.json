@@ -1,0 +1,12 @@
+[
+  {
+    "name": "User Login Flow",
+    "description": "Standard email/password login with validation",
+    "flowSummary": "Navigate to /login → Enter credentials → Submit → Verify dashboard loads"
+  },
+  {
+    "name": "Password Reset Flow",
+    "description": "User requests a password reset via email",
+    "flowSummary": "Click forgot password → Enter email → Check email → Set new password → Login"
+  }
+]

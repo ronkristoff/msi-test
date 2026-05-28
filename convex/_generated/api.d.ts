@@ -8,9 +8,16 @@
  * @module
  */
 
+import type * as ai_agents from "../ai/agents.js";
+import type * as ai_errors from "../ai/errors.js";
+import type * as ai_model from "../ai/model.js";
+import type * as ai_tools_definitions from "../ai/tools/definitions.js";
+import type * as ai_tools_logic from "../ai/tools/logic.js";
+import type * as ai_tools_queries from "../ai/tools/queries.js";
 import type * as auth from "../auth.js";
 import type * as files_actions from "../files/actions.js";
 import type * as http from "../http.js";
+import type * as lib_constraints from "../lib/constraints.js";
 import type * as lib_requireAuth from "../lib/requireAuth.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as logs_mutations from "../logs/mutations.js";
@@ -18,6 +25,7 @@ import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
 import type * as suites_mutations from "../suites/mutations.js";
 import type * as suites_queries from "../suites/queries.js";
+import type * as testHelpers from "../testHelpers.js";
 import type * as tests_mutations from "../tests/mutations.js";
 import type * as tests_queries from "../tests/queries.js";
 import type * as users_mutations from "../users/mutations.js";
@@ -31,9 +39,16 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "ai/agents": typeof ai_agents;
+  "ai/errors": typeof ai_errors;
+  "ai/model": typeof ai_model;
+  "ai/tools/definitions": typeof ai_tools_definitions;
+  "ai/tools/logic": typeof ai_tools_logic;
+  "ai/tools/queries": typeof ai_tools_queries;
   auth: typeof auth;
   "files/actions": typeof files_actions;
   http: typeof http;
+  "lib/constraints": typeof lib_constraints;
   "lib/requireAuth": typeof lib_requireAuth;
   "lib/validation": typeof lib_validation;
   "logs/mutations": typeof logs_mutations;
@@ -41,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   "projects/queries": typeof projects_queries;
   "suites/mutations": typeof suites_mutations;
   "suites/queries": typeof suites_queries;
+  testHelpers: typeof testHelpers;
   "tests/mutations": typeof tests_mutations;
   "tests/queries": typeof tests_queries;
   "users/mutations": typeof users_mutations;
@@ -76,4 +92,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
 };
