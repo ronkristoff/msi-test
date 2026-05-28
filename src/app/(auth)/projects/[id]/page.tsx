@@ -125,6 +125,11 @@ export default function ProjectDetailPage() {
             Suites
           </h3>
           <div className="flex items-center gap-2">
+            <Link href={`/projects/${params.id}/generate-nl`}>
+              <Button variant="secondary" size="sm">
+                Generate from NL
+              </Button>
+            </Link>
             {hasPrd && (
               <Link href={`/projects/${params.id}/generate`}>
                 <Button variant="secondary" size="sm">

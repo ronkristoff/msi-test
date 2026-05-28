@@ -15,6 +15,14 @@ export const createSuite = mutation({
     project_id: v.id("projects"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
+    source_type: v.optional(
+      v.union(
+        v.literal("url_exploration"),
+        v.literal("prd"),
+        v.literal("natural_language"),
+        v.literal("manual"),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
@@ -27,7 +35,7 @@ export const createSuite = mutation({
       project_id: project._id,
       name,
       description: args.description?.trim() || undefined,
-      source_type: "manual",
+      source_type: args.source_type ?? "manual",
     });
   },
 });

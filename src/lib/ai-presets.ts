@@ -15,3 +15,13 @@ export const MODELS = [
   "o1-mini",
   "custom",
 ];
+
+export function hasAiConfig(workspace?: {
+  ai_config?: { endpoint_url?: string; model_name?: string; api_key_masked?: string };
+} | null): boolean {
+  return !!(
+    workspace?.ai_config?.endpoint_url &&
+    workspace?.ai_config?.model_name &&
+    workspace?.ai_config?.api_key_masked
+  );
+}

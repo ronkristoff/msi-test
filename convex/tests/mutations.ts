@@ -8,13 +8,23 @@ export const updateTestCode = mutation({
   args: {
     test_id: v.id("tests"),
     playwright_code: v.string(),
+    name: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("draft"), v.literal("approved"))),
   },
   handler: async (ctx, args) => {
     await getOwnedEntity(ctx, args.test_id, "tests");
 
     const code = validateRequiredField(args.playwright_code, "Playwright code");
 
-    await ctx.db.patch(args.test_id, { playwright_code: code });
+    const updates: Record<string, unknown> = { playwright_code: code };
+    if (args.name !== undefined) {
+      updates.name = validateRequiredField(args.name, "Test name");
+    }
+    if (args.status !== undefined) {
+      updates.status = args.status;
+    }
+
+    await ctx.db.patch(args.test_id, updates);
   },
 });
 
@@ -49,6 +59,7 @@ export const createTestFromGeneration = internalMutation({
       v.literal("prd"),
       v.literal("natural_language"),
     ),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     if (!args.name.trim()) {
@@ -62,6 +73,7 @@ export const createTestFromGeneration = internalMutation({
       workspace_id: suite.workspace_id,
       suite_id: args.suite_id,
       name: args.name.trim(),
+      description: args.description?.trim() || undefined,
       playwright_code: args.playwright_code,
       source_type: args.source_type,
       status: "draft",

@@ -8,12 +8,17 @@ import { createAiError, classifyAiError } from "./errors";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
-export const generatePrdTests = action({
+export const generateNlTests = action({
   args: {
     project_id: v.id("projects"),
-    prd_text: v.optional(v.string()),
+    prompt: v.string(),
+    suite_id: v.optional(v.id("suites")),
   },
   handler: async (ctx, args) => {
+    if (!args.prompt.trim()) {
+      throw new ConvexError("Prompt cannot be empty");
+    }
+
     const project = await ctx.runQuery(api.projects.queries.getProject, {
       project_id: args.project_id,
     });
@@ -22,22 +27,19 @@ export const generatePrdTests = action({
       throw new ConvexError("Project not found");
     }
 
-    let prdContent = args.prd_text ?? project.prd_text ?? "";
-
-    if (!prdContent && project.prd_file_id) {
-      const blob = await ctx.storage.get(project.prd_file_id);
-      if (blob) {
-        prdContent = await blob.text();
-      }
-    }
-
-    if (!prdContent.trim()) {
-      throw new ConvexError("No PRD content found. Add PRD text or upload a file to the project.");
-    }
-
     const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
       workspace_id: project.workspace_id,
     });
+
+    let prdContext = "";
+    if (project.prd_text) {
+      prdContext = `\n\nProduct Requirements:\n${project.prd_text}`;
+    } else if (project.prd_file_id) {
+      const blob = await ctx.storage.get(project.prd_file_id);
+      if (blob) {
+        prdContext = `\n\nProduct Requirements:\n${await blob.text()}`;
+      }
+    }
 
     let responseText: string;
     try {
@@ -45,16 +47,16 @@ export const generatePrdTests = action({
         (await import("./model")).getWorkspaceModel(aiConfig),
       );
       const { thread } = await agent.createThread(ctx, {
-        title: `PRD Generation — ${project.name}`,
+        title: `NL Generation — ${project.name}`,
       });
       const result = await thread.generateText({
-        prompt: `Generate Playwright tests for the following application.
+        prompt: `Generate Playwright tests from the following test description.
 
 Project: ${project.name}
-URL: ${project.app_url}
+URL: ${project.app_url}${prdContext}
 
-Product Requirements:
-${prdContent}
+Test Description:
+${args.prompt}
 
 Generate complete, runnable Playwright tests. Each test should be in its own markdown code fence with the "typescript" language tag. Each test should be self-contained with its own imports.`,
       });
@@ -69,17 +71,21 @@ Generate complete, runnable Playwright tests. Each test should be in its own mar
       throw createAiError("malformed_response", "AI did not generate any valid Playwright tests.");
     }
 
-    const now = new Date();
-    const month = now.toLocaleString("en-US", { month: "short" });
-    const day = now.getDate();
-    const suiteName = `PRD Tests — ${month} ${day}`;
+    let suiteId: string;
 
-    const suiteId: string = await ctx.runMutation(api.suites.mutations.createSuite, {
-      project_id: args.project_id,
-      name: suiteName,
-      description: `Auto-generated from PRD for ${project.name}`,
-      source_type: "prd",
-    });
+    if (args.suite_id) {
+      suiteId = args.suite_id;
+    } else {
+      const now = new Date();
+      const month = now.toLocaleString("en-US", { month: "short" });
+      const day = now.getDate();
+      suiteId = await ctx.runMutation(api.suites.mutations.createSuite, {
+        project_id: args.project_id,
+        name: `NL Tests — ${month} ${day}`,
+        description: `Generated from natural language prompt`,
+        source_type: "natural_language",
+      });
+    }
 
     const testIds: string[] = [];
     for (let i = 0; i < testBlocks.length; i++) {
@@ -88,7 +94,8 @@ Generate complete, runnable Playwright tests. Each test should be in its own mar
         suite_id: suiteId as Id<"suites">,
         name: testName,
         playwright_code: testBlocks[i],
-        source_type: "prd",
+        source_type: "natural_language",
+        description: args.prompt,
       });
       testIds.push(testId);
     }

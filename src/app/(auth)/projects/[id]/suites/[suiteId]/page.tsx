@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import hljs from "highlight.js/lib/core";
@@ -13,7 +13,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
+import { Alert } from "@/components/ui/Alert";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
+import { useErrorLogger } from "@/lib/error-logger";
+import { hasAiConfig } from "@/lib/ai-presets";
 
 hljs.registerLanguage("javascript", javascript);
 
@@ -65,7 +68,10 @@ function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
   const updateTestCode = useMutation(api.tests.mutations.updateTestCode);
   const updateTestStatus = useMutation(api.tests.mutations.updateTestStatus);
   const deleteTest = useMutation(api.tests.mutations.deleteTest);
+  const regenerateTest = useAction(api.ai.regenerateTest.regenerateTest);
+  const { logError } = useErrorLogger();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const handleSave = async () => {
     await updateTestCode({ test_id: test._id, playwright_code: localCode! });
@@ -79,6 +85,18 @@ function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
   const toggleStatus = async () => {
     const newStatus = test.status === "draft" ? "approved" : "draft";
     await updateTestStatus({ test_id: test._id, status: newStatus });
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      await regenerateTest({ test_id: test._id });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Regeneration failed";
+      logError(msg, { severity: "error", context: { source: "TestAccordionItem.handleRegenerate" } });
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   return (
@@ -130,6 +148,22 @@ function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
             </div>
 
             <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-soft)]">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+              >
+                {regenerating ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Regenerating...
+                  </>
+                ) : "Regenerate"}
+              </Button>
               <Button
                 variant="primary"
                 size="sm"
@@ -183,6 +217,7 @@ function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
 export default function SuiteDetailPage() {
   const params = useParams<{ id: string; suiteId: string }>();
   const router = useRouter();
+  const { logError } = useErrorLogger();
   const suiteId = asId(params.suiteId, "suites");
   const suite = useQuery(api.suites.queries.getSuite, {
     suite_id: suiteId,
@@ -190,13 +225,21 @@ export default function SuiteDetailPage() {
   const tests = useQuery(api.tests.queries.getTests, {
     suite_id: suiteId,
   });
+  const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
 
   const updateSuite = useMutation(api.suites.mutations.updateSuite);
   const deleteSuite = useMutation(api.suites.mutations.deleteSuite);
+  const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const [nlPrompt, setNlPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  const aiConfigReady = hasAiConfig(workspace);
 
   const handleStartEditName = () => {
     if (!suite) return;
@@ -216,7 +259,27 @@ export default function SuiteDetailPage() {
     router.push(`/projects/${params.id}`);
   };
 
-  if (suite === undefined || tests === undefined) {
+  const handleGenerateNl = async () => {
+    if (!nlPrompt.trim()) return;
+    setGenerateError(null);
+    setGenerating(true);
+    try {
+      await generateNlTests({
+        project_id: suite.project_id,
+        prompt: nlPrompt.trim(),
+        suite_id: suiteId,
+      });
+      setNlPrompt("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Generation failed";
+      setGenerateError(msg);
+      logError(msg, { severity: "error", context: { source: "SuiteDetailPage.handleGenerateNl" } });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (suite === undefined || tests === undefined || workspace === undefined) {
     return <div className="text-[var(--muted)] text-sm">Loading...</div>;
   }
 
@@ -288,6 +351,49 @@ export default function SuiteDetailPage() {
           {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
         </div>
       </div>
+
+      {!aiConfigReady ? (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+          <Alert variant="error">
+            AI provider not configured.{" "}
+            <Link href="/settings" className="underline font-medium">
+              Configure AI settings
+            </Link>{" "}
+            to generate tests from descriptions.
+          </Alert>
+        </div>
+      ) : (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+            Describe a Test
+          </div>
+          {generateError && <Alert variant="error" className="mb-3">{generateError}</Alert>}
+          <div className="flex gap-3">
+            <textarea
+              value={nlPrompt}
+              onChange={(e) => setNlPrompt(e.target.value)}
+              placeholder={"e.g., Test that login works with valid credentials"}
+              className="flex-1 min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              disabled={generating}
+            />
+            <Button
+              onClick={handleGenerateNl}
+              disabled={generating || !nlPrompt.trim()}
+              className="self-end shrink-0"
+            >
+              {generating ? (
+                <>
+                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating...
+                </>
+              ) : "Generate Tests"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div>
         <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
