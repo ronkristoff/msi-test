@@ -39,19 +39,19 @@ Configure `@convex-dev/agent` (v0.6.x) with `ai` (v6.x) and `@ai-sdk/openai` (v3
 
 ## Acceptance criteria
 
-- [ ] `@convex-dev/agent`, `ai`, and `@ai-sdk/openai` packages installed
-- [ ] Three agent definitions in `convex/ai/agents.ts` with MSITest-specific system prompts
-- [ ] Test Generation Agent configured for `generateText` (returns Playwright code in markdown fence)
-- [ ] Exploration Analysis Agent configured for `generateObject` with zod schema: `z.array(z.object({ name, description, flowSummary }))`
-- [ ] Failure Analysis Agent configured for `generateObject` with zod schema: `z.object({ rootCause, suggestedFix, confidenceScore })`
-- [ ] `getWorkspaceModel(ctx)` in `convex/ai/model.ts` fetches workspace AI config via internal query and returns AI SDK model instance
-- [ ] `createAiError(code, message)` in `convex/ai/errors.ts` throws structured `ConvexError` with `{ type: "ai_error", code, message }`
-- [ ] 5 agent tools defined: `readExistingTests`, `readProjectContext`, `readTestCode` (Tier 1 with real internal queries), `readPreviousExplorations` (stub), `readRecentFailures` (stub)
-- [ ] Unit tests mock AI SDK model layer (not Agent component) and verify correct agent configuration and prompt construction
-- [ ] Unit tests verify response parsing: Playwright code extraction, scenario array parsing, root cause + confidence score
-- [ ] Unit tests verify error handling: invalid_api_key, rate_limit, timeout, malformed_response
-- [ ] Unit tests verify Tier 1 tools return data from test DB
-- [ ] Unit tests verify Tier 2 stub tools return empty arrays
+- [x] `@convex-dev/agent`, `ai`, and `@ai-sdk/openai` packages installed
+- [x] Three agent definitions in `convex/ai/agents.ts` with MSITest-specific system prompts
+- [x] Test Generation Agent configured for `generateText` (returns Playwright code in markdown fence)
+- [x] Exploration Analysis Agent configured for `generateObject` with zod schema: `z.array(z.object({ name, description, flowSummary }))`
+- [x] Failure Analysis Agent configured for `generateObject` with zod schema: `z.object({ rootCause, suggestedFix, confidenceScore })`
+- [x] `getWorkspaceModel(ctx)` in `convex/ai/model.ts` fetches workspace AI config via internal query and returns AI SDK model instance
+- [x] `createAiError(code, message)` in `convex/ai/errors.ts` throws structured `ConvexError` with `{ type: "ai_error", code, message }`
+- [x] 5 agent tools defined: `readExistingTests`, `readProjectContext`, `readTestCode` (Tier 1 with real internal queries), `readPreviousExplorations` (stub), `readRecentFailures` (stub)
+- [x] Unit tests mock AI SDK model layer (not Agent component) and verify correct agent configuration and prompt construction
+- [x] Unit tests verify response parsing: Playwright code extraction, scenario array parsing, root cause + confidence score
+- [x] Unit tests verify error handling: invalid_api_key, rate_limit, timeout, malformed_response
+- [x] Unit tests verify Tier 1 tools return data from test DB
+- [x] Unit tests verify Tier 2 stub tools return empty arrays
 
 ## Not in scope
 

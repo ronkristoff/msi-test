@@ -58,25 +58,25 @@ End-to-end: Project detail page (`/projects/[id]`) shows suite list → "Create 
 
 ## Acceptance criteria
 
-- [ ] Project detail page (`/projects/[id]`) shows suite list with name, test count, and source type badge
-- [ ] "Create Suite" button on project detail creates a suite with auto-generated name instantly
-- [ ] `createSuite` mutation auto-generates descriptive default name (e.g., "New Suite — May 24") when name not provided
-- [ ] `createSuite` mutation sets `source_type: manual`
-- [ ] Clicking a suite card navigates to `/projects/[id]/suites/[suiteId]`
-- [ ] Suite detail page shows suite name (inline-editable via `updateSuite`), source type badge, test count
-- [ ] Suite detail page has "Delete Suite" button with confirmation dialog
-- [ ] `deleteSuite` cascade-deletes all tests in the suite
-- [ ] Suite detail page shows all tests as expandable accordion rows with name, status badge, and source type
-- [ ] Expanding a test reveals textarea for editing + read-only syntax-highlighted preview of Playwright code
-- [ ] User can edit and save Playwright code via explicit save button with dirty state indication
-- [ ] User can toggle test status between draft and approved via `updateTestStatus` mutation
-- [ ] User can delete individual tests via `deleteTest` mutation with confirmation
-- [ ] `getSuites` query returns suites scoped to project with computed `testCount`, ordered by creation date
-- [ ] `getTests` query returns tests for a suite, ordered by creation date
-- [ ] "Suites" sidebar nav item removed
-- [ ] `/suites` route removed
-- [ ] Breadcrumbs work for suite detail page: Projects > {project name} > {suite name}
-- [ ] `source_type` displayed as read-only badge, not editable
+- [x] Project detail page (`/projects/[id]`) shows suite list with name, test count, and source type badge
+- [x] "Create Suite" button on project detail creates a suite with auto-generated name instantly
+- [x] `createSuite` mutation auto-generates descriptive default name (e.g., "New Suite — May 24") when name not provided
+- [x] `createSuite` mutation sets `source_type: manual`
+- [x] Clicking a suite card navigates to `/projects/[id]/suites/[suiteId]`
+- [x] Suite detail page shows suite name (inline-editable via `updateSuite`), source type badge, test count
+- [x] Suite detail page has "Delete Suite" button with confirmation dialog
+- [x] `deleteSuite` cascade-deletes all tests in the suite
+- [x] Suite detail page shows all tests as expandable accordion rows with name, status badge, and source type
+- [x] Expanding a test reveals textarea for editing + read-only syntax-highlighted preview of Playwright code
+- [x] User can edit and save Playwright code via explicit save button with dirty state indication
+- [x] User can toggle test status between draft and approved via `updateTestStatus` mutation
+- [x] User can delete individual tests via `deleteTest` mutation with confirmation
+- [x] `getSuites` query returns suites scoped to project with computed `testCount`, ordered by creation date
+- [x] `getTests` query returns tests for a suite, ordered by creation date
+- [x] "Suites" sidebar nav item removed
+- [x] `/suites` route removed
+- [x] Breadcrumbs work for suite detail page: Projects > {project name} > {suite name}
+- [x] `source_type` displayed as read-only badge, not editable
 
 ## Blocked by
 

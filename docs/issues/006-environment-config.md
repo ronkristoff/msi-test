@@ -11,12 +11,12 @@ End-to-end: `/environments` page → CRUD for environments scoped to current pro
 
 ## Acceptance criteria
 
-- [ ] `/environments` page lists all environments for the current project
-- [ ] User can create a new environment with a name (e.g., "staging") and base URL (e.g., "https://staging.myapp.com")
-- [ ] User can edit environment name and base URL
-- [ ] User can delete an environment
-- [ ] `getEnvironments` query returns environments scoped to project
-- [ ] `createEnvironment` and `updateEnvironment` mutations validate required fields (name, base_url)
+- [x] `/environments` page lists all environments for the current project
+- [x] User can create a new environment with a name (e.g., "staging") and base URL (e.g., "https://staging.myapp.com")
+- [x] User can edit environment name and base URL
+- [x] User can delete an environment
+- [x] `getEnvironments` query returns environments scoped to project
+- [x] `createEnvironment` and `updateEnvironment` mutations validate required fields (name, base_url)
 - [ ] Environment selector dropdown is available when triggering a run (wired in later slice)
 
 ## Blocked by
