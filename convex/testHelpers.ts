@@ -1,4 +1,5 @@
 import type { convexTest } from "convex-test";
+import type { Id } from "./_generated/dataModel";
 
 type TestCtx = ReturnType<typeof convexTest>;
 
@@ -67,6 +68,17 @@ export async function seedTestDoc(t: TestCtx, workspaceId: string, overrides?: T
       status: overrides?.status ?? "draft",
     });
     return { projectId, suiteId, testId };
+  });
+}
+
+export async function seedEnvironment(t: TestCtx, workspaceId: string, projectId: string) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("environments", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      name: "Staging",
+      base_url: "https://staging.example.com",
+    });
   });
 }
 

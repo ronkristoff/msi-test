@@ -65,3 +65,10 @@ export type ProjectStep1Values = z.infer<typeof projectStep1Schema>;
 
 export const projectSettingsSchema = projectBaseSchema;
 export type ProjectSettingsValues = z.infer<typeof projectSettingsSchema>;
+
+export const environmentSchema = z.object({
+  name: z.string().trim().min(1, "Environment name is required").max(NAME_MAX, `Name must be under ${NAME_MAX} characters`),
+  base_url: z.string().min(1, "Base URL is required").refine(isValidAppUrl, "Please enter a valid URL"),
+});
+
+export type EnvironmentValues = z.infer<typeof environmentSchema>;

@@ -86,9 +86,14 @@ export default function ProjectDetailPage() {
               {project.app_url}
             </a>
           </div>
-          <Link href={`/projects/${project._id}/settings`}>
-            <Button variant="secondary" size="sm">Edit</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/projects/${project._id}/environments`}>
+              <Button variant="secondary" size="sm">Environments</Button>
+            </Link>
+            <Link href={`/projects/${project._id}/settings`}>
+              <Button variant="secondary" size="sm">Edit</Button>
+            </Link>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
           <div>
