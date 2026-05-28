@@ -1,5 +1,6 @@
-import { mutation } from "../_generated/server";
+import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { ConvexError } from "convex/values";
 import { getOwnedEntity } from "../lib/requireAuth";
 import { validateRequiredField } from "../lib/validation";
 
@@ -35,5 +36,35 @@ export const deleteTest = mutation({
     await getOwnedEntity(ctx, args.test_id, "tests");
 
     await ctx.db.delete(args.test_id);
+  },
+});
+
+export const createTestFromGeneration = internalMutation({
+  args: {
+    suite_id: v.id("suites"),
+    name: v.string(),
+    playwright_code: v.string(),
+    source_type: v.union(
+      v.literal("url_exploration"),
+      v.literal("prd"),
+      v.literal("natural_language"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (!args.name.trim()) {
+      throw new ConvexError("Test name cannot be empty");
+    }
+
+    const suite = await ctx.db.get(args.suite_id);
+    if (!suite) throw new ConvexError("Suite not found");
+
+    return ctx.db.insert("tests", {
+      workspace_id: suite.workspace_id,
+      suite_id: args.suite_id,
+      name: args.name.trim(),
+      playwright_code: args.playwright_code,
+      source_type: args.source_type,
+      status: "draft",
+    });
   },
 });

@@ -1,9 +1,10 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { seedWorkspace, seedTestDoc } from "./testHelpers";
+import type { Id } from "./_generated/dataModel";
+import { seedWorkspace, seedTestDoc, seedSuite } from "./testHelpers";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -100,5 +101,77 @@ describe("tests mutations", () => {
 
     const suite = await t.run(async (ctx) => ctx.db.get(suiteId));
     expect(suite).not.toBeNull();
+  });
+
+  describe("createTestFromGeneration", () => {
+    it("creates test with draft status and inherited workspace_id", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      const testId = await t.mutation(internal.tests.mutations.createTestFromGeneration, {
+        suite_id: suiteId,
+        name: "login flow",
+        playwright_code: "import { test } from '@playwright/test';\ntest('login flow', async () => {});",
+        source_type: "prd",
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
+      expect(test!.name).toBe("login flow");
+      expect(test!.status).toBe("draft");
+      expect(test!.source_type).toBe("prd");
+      expect(test!.workspace_id).toBe(workspaceId);
+      expect(test!.suite_id).toBe(suiteId);
+    });
+
+    it("rejects empty test name", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      await expect(
+        t.mutation(internal.tests.mutations.createTestFromGeneration, {
+          suite_id: suiteId,
+          name: "   ",
+          playwright_code: "code",
+          source_type: "prd",
+        }),
+      ).rejects.toThrow("Test name cannot be empty");
+    });
+
+    it("rejects non-existent suite", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      await t.run(async (ctx) => {
+        await ctx.db.delete(suiteId);
+      });
+
+      await expect(
+        t.mutation(internal.tests.mutations.createTestFromGeneration, {
+          suite_id: suiteId,
+          name: "test",
+          playwright_code: "code",
+          source_type: "prd",
+        }),
+      ).rejects.toThrow("Suite not found");
+    });
+
+    it("trims test name", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      const testId = await t.mutation(internal.tests.mutations.createTestFromGeneration, {
+        suite_id: suiteId,
+        name: "  signup flow  ",
+        playwright_code: "code",
+        source_type: "url_exploration",
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
+      expect(test!.name).toBe("signup flow");
+    });
   });
 });

@@ -81,8 +81,26 @@ export function createFailureAnalysisAgent(model: AgentModel) {
   });
 }
 
+const CODE_FENCE_RE = /```(?:typescript|ts|javascript|js)\n([\s\S]*?)```/;
+
 export function extractPlaywrightCode(response: string): string | null {
-  const match = response.match(/```(?:typescript|ts|javascript|js)\n([\s\S]*?)```/);
+  const match = response.match(CODE_FENCE_RE);
   if (!match) return null;
   return match[1].trim();
+}
+
+export function extractMultipleTests(response: string): string[] {
+  const regex = new RegExp(CODE_FENCE_RE.source, "g");
+  const results: string[] = [];
+  let match;
+  while ((match = regex.exec(response)) !== null) {
+    results.push(match[1].trim());
+  }
+  return results;
+}
+
+export function deriveTestName(code: string, index?: number): string {
+  const match = code.match(/test\s*\(\s*['"`]([^'"`]+?)['"`]/);
+  if (match) return match[1];
+  return index !== undefined ? `Generated Test ${index + 1}` : "Generated Test";
 }
