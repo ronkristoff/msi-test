@@ -11,14 +11,14 @@ End-to-end: `/dashboard` page loads → `getDashboardStats` query computes aggre
 
 ## Acceptance criteria
 
-- [ ] `/dashboard` page displays overall pass rate as a percentage
-- [ ] Failed, flaky, and total test counts shown with trend arrows (up/down compared to previous period)
-- [ ] Pass rate trend chart visualizes last 20 runs on a line/bar chart
-- [ ] Recent failure cards show: test name, error summary, AI root cause analysis, suggested fix, confidence score
-- [ ] Active runs section shows currently running tests with live progress bars (test name, step progress)
-- [ ] All dashboard data updates in real-time via Convex subscriptions (no manual refresh needed)
-- [ ] `getDashboardStats` query computes all aggregates efficiently
-- [ ] Dashboard loads scoped to current workspace
+- [x] `/dashboard` page displays overall pass rate as a percentage
+- [x] Failed, flaky, and total test counts shown with trend arrows (up/down compared to previous period)
+- [x] Pass rate trend chart visualizes last 20 runs on a line/bar chart
+- [x] Recent failure cards show: test name, error summary, AI root cause analysis, suggested fix, confidence score
+- [x] Active runs section shows currently running tests with live progress bars (test name, step progress)
+- [x] All dashboard data updates in real-time via Convex subscriptions (no manual refresh needed)
+- [x] `getDashboardStats` query computes all aggregates efficiently
+- [x] Dashboard loads scoped to current workspace
 
 ## Blocked by
 

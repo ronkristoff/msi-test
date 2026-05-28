@@ -2,20 +2,25 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/lib/convex";
-import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { StatsGrid } from "@/components/dashboard/StatsGrid";
+import { PassRateChart } from "@/components/dashboard/PassRateChart";
+import { RecentFailures } from "@/components/dashboard/RecentFailures";
+import { ActiveRuns } from "@/components/dashboard/ActiveRuns";
 
 export default function DashboardPage() {
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
+  const stats = useQuery(api.dashboard.queries.getDashboardStats);
+  const activeRuns = useQuery(api.dashboard.queries.getActiveRuns);
 
-  const hasData = false;
-
-  if (workspace === undefined) {
+  if (workspace === undefined || stats === undefined || activeRuns === undefined) {
     return <div className="text-[var(--muted)] text-sm">Loading...</div>;
   }
 
-  if (!hasData) {
+  const hasCompletedRuns = stats.trendData.length > 0;
+
+  if (!hasCompletedRuns && activeRuns.length === 0) {
     return (
       <EmptyState
         icon={
@@ -37,39 +42,13 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-4 mb-6 max-[900px]:grid-cols-2">
-        <StatCard label="Pass Rate" value="—" />
-        <StatCard label="Failed" value="0" />
-        <StatCard label="Flaky" value="0" />
-        <StatCard label="Total Tests" value="0" />
-      </div>
+      <StatsGrid {...stats} />
 
-      <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-[var(--radius-md)] p-6 mb-6">
-        <h3 className="font-[var(--font-mono)] text-[12px] uppercase tracking-[0.06em] text-[var(--muted)] mb-4">
-          Pass Rate Trend
-        </h3>
-        <div className="h-48 flex items-center justify-center text-sm text-[var(--muted)]">
-          Trend chart appears after 2+ runs
-        </div>
-      </div>
+      <PassRateChart data={stats.trendData} />
 
-      <div className="mb-6">
-        <h3 className="font-[var(--font-mono)] text-[12px] uppercase tracking-[0.06em] text-[var(--muted)] mb-4">
-          Recent Failures
-        </h3>
-        <div className="text-sm text-[var(--muted)]">
-          Failed tests with AI root cause analysis will appear here.
-        </div>
-      </div>
+      <ActiveRuns runs={activeRuns} />
 
-      <div>
-        <h3 className="font-[var(--font-mono)] text-[12px] uppercase tracking-[0.06em] text-[var(--muted)] mb-4">
-          Active Runs
-        </h3>
-        <div className="text-sm text-[var(--muted)]">
-          Currently running tests will appear here with live progress.
-        </div>
-      </div>
+      <RecentFailures failures={stats.recentFailures} />
     </div>
   );
 }

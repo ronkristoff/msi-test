@@ -19,6 +19,7 @@ import type * as ai_tools_logic from "../ai/tools/logic.js";
 import type * as ai_tools_queries from "../ai/tools/queries.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
+import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as environments_mutations from "../environments/mutations.js";
 import type * as environments_queries from "../environments/queries.js";
 import type * as files_actions from "../files/actions.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   "ai/tools/queries": typeof ai_tools_queries;
   auth: typeof auth;
   crons: typeof crons;
+  "dashboard/queries": typeof dashboard_queries;
   "environments/mutations": typeof environments_mutations;
   "environments/queries": typeof environments_queries;
   "files/actions": typeof files_actions;
