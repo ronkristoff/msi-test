@@ -81,7 +81,7 @@ async function poll() {
     log(`Poll error: ${err}`);
     if (activeRunId) {
       try {
-        await client.completeRun(activeRunId, "failed");
+        await client.forceCompleteRun(activeRunId, "failed");
       } catch {
         // best effort
       }
@@ -105,7 +105,7 @@ async function shutdown() {
     cleanupSession();
     log(`Cancelling active run ${runId}`);
     try {
-      await client.completeRun(runId, "cancelled");
+      await client.forceCompleteRun(runId, "cancelled");
       log(`Run ${runId} cancelled`);
     } catch (err) {
       log(`Failed to cancel run ${runId}: ${err}`);

@@ -1,7 +1,74 @@
 import { query, internalQuery } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { getOptionalOwnedEntity } from "../lib/requireAuth";
+
+type StepRow = {
+  step_number: number;
+  command: string;
+  locator: string | null;
+  status: string;
+  error_message: string | null;
+  screenshot_file_id?: string | null;
+};
+
+type ResultWithSteps = {
+  _id: string;
+  test_id: string;
+  status: string;
+  duration_ms: number;
+  console_log_file_id?: string | null;
+  trace_file_id?: string | null;
+  video_file_id?: string | null;
+  screenshot_file_ids?: string[] | null;
+  test_name: string;
+  playwright_code: string | null;
+  steps: StepRow[];
+};
+
+async function fetchResultsWithSteps(
+  ctx: QueryCtx,
+  run_id: Id<"runs">,
+): Promise<ResultWithSteps[]> {
+  const runResults = await ctx.db
+    .query("run_results")
+    .withIndex("by_run_id", (q) => q.eq("run_id", run_id))
+    .collect();
+
+  return Promise.all(
+    runResults.map(async (rr) => {
+      const steps = await ctx.db
+        .query("steps")
+        .withIndex("by_run_result_id", (q) => q.eq("run_result_id", rr._id))
+        .collect();
+
+      const test = await ctx.db.get(rr.test_id);
+
+      return {
+        _id: rr._id,
+        test_id: rr.test_id,
+        status: rr.status,
+        duration_ms: rr.duration_ms,
+        console_log_file_id: rr.console_log_file_id ?? null,
+        trace_file_id: rr.trace_file_id ?? null,
+        video_file_id: rr.video_file_id ?? null,
+        screenshot_file_ids: rr.screenshot_file_ids ?? null,
+        test_name: test?.name ?? "Unknown test",
+        playwright_code: test?.playwright_code ?? null,
+        steps: steps.map((s) => ({
+          step_number: s.step_number,
+          command: s.command,
+          locator: s.locator ?? null,
+          status: s.status,
+          error_message: s.error_message ?? null,
+          screenshot_file_id: s.screenshot_file_id ?? null,
+        })),
+      };
+    }),
+  );
+}
 
 export const getPendingWork = internalQuery({
   args: {},
@@ -113,30 +180,9 @@ export const getRunDetail = query({
     if (!result) return null;
 
     const run = result.entity;
-    const runResults = await ctx.db
-      .query("run_results")
-      .withIndex("by_run_id", (q) => q.eq("run_id", args.run_id))
-      .collect();
+    const results = await fetchResultsWithSteps(ctx, args.run_id);
 
-    const resultsWithDetails = await Promise.all(
-      runResults.map(async (rr) => {
-        const steps = await ctx.db
-          .query("steps")
-          .withIndex("by_run_result_id", (q) => q.eq("run_result_id", rr._id))
-          .collect();
-
-        const test = await ctx.db.get(rr.test_id);
-
-        return {
-          ...rr,
-          test_name: test?.name ?? "Unknown test",
-          steps,
-        };
-      }),
-    );
-
-    let environment = null;
-    if (run.environment_id) {
+    let environment = null;    if (run.environment_id) {
       const env = await ctx.db.get(run.environment_id);
       if (env) environment = { name: env.name, base_url: env.base_url };
     }
@@ -144,7 +190,7 @@ export const getRunDetail = query({
     return {
       ...run,
       environment,
-      results: resultsWithDetails,
+      results,
     };
   },
 });
@@ -162,5 +208,29 @@ export const getActiveRunForSuite = query({
       .collect();
 
     return runs.find((r) => r.status === "running") ?? null;
+  },
+});
+
+export const getRunForAnalysis = internalQuery({
+  args: { run_id: v.id("runs") },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.run_id);
+    if (!run) return null;
+
+    const results = await fetchResultsWithSteps(ctx, args.run_id);
+
+    return {
+      workspace_id: run.workspace_id,
+      results: results.map((r) => ({
+        test_id: r.test_id,
+        test_name: r.test_name,
+        playwright_code: r.playwright_code,
+        status: r.status,
+        error_message: r.steps.find((s) => s.error_message)?.error_message ?? null,
+        console_log_file_id: r.console_log_file_id,
+        screenshot_file_id: r.steps.find((s) => s.status === "failed" && s.screenshot_file_id)?.screenshot_file_id ?? null,
+        steps: r.steps,
+      })),
+    };
   },
 });

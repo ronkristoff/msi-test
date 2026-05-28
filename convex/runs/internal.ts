@@ -1,4 +1,6 @@
 import { internalMutation } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 
 export const claimRun = internalMutation({
@@ -76,36 +78,72 @@ export const writeRunResult = internalMutation({
   },
 });
 
+async function aggregateAndFinalize(
+  ctx: MutationCtx,
+  run_id: Id<"runs">,
+  statusOverride?: "failed" | "cancelled" | "timed_out",
+) {
+  const now = Date.now();
+  const run = await ctx.db.get(run_id);
+  if (!run) throw new Error("Run not found");
+
+  const results = await ctx.db
+    .query("run_results")
+    .withIndex("by_run_id", (q) => q.eq("run_id", run_id))
+    .collect();
+
+  let pass_count = 0;
+  let fail_count = 0;
+  let skip_count = 0;
+  let total_duration_ms = 0;
+
+  for (const r of results) {
+    total_duration_ms += r.duration_ms;
+    if (r.status === "passed") pass_count++;
+    else if (r.status === "failed") fail_count++;
+    else skip_count++;
+  }
+
+  const status = statusOverride ?? (fail_count > 0 ? "failed" as const : "passed" as const);
+
+  await ctx.db.patch(run_id, {
+    status,
+    finished_at: now,
+    duration_ms: total_duration_ms,
+    pass_count,
+    fail_count,
+    skip_count,
+  });
+
+  const heartbeat = await ctx.db
+    .query("run_heartbeats")
+    .withIndex("by_run_id", (q) => q.eq("run_id", run_id))
+    .first();
+  if (heartbeat) {
+    await ctx.db.delete(heartbeat._id);
+  }
+}
+
 export const completeRun = internalMutation({
   args: {
     run_id: v.id("runs"),
-    status: v.union(
-      v.literal("passed"),
+  },
+  handler: async (ctx, args) => {
+    await aggregateAndFinalize(ctx, args.run_id);
+  },
+});
+
+export const forceCompleteRun = internalMutation({
+  args: {
+    run_id: v.id("runs"),
+    forced_status: v.union(
       v.literal("failed"),
       v.literal("cancelled"),
       v.literal("timed_out"),
     ),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const run = await ctx.db.get(args.run_id);
-    if (!run) throw new Error("Run not found");
-
-    const duration_ms = run.started_at ? now - run.started_at : 0;
-
-    await ctx.db.patch(args.run_id, {
-      status: args.status,
-      finished_at: now,
-      duration_ms,
-    });
-
-    const heartbeat = await ctx.db
-      .query("run_heartbeats")
-      .withIndex("by_run_id", (q) => q.eq("run_id", args.run_id))
-      .first();
-    if (heartbeat) {
-      await ctx.db.delete(heartbeat._id);
-    }
+    await aggregateAndFinalize(ctx, args.run_id, args.forced_status);
   },
 });
 
@@ -159,5 +197,27 @@ export const markStaleRuns = internalMutation({
         }
       }
     }
+  },
+});
+
+export const storeAiInsight = internalMutation({
+  args: {
+    workspace_id: v.id("workspaces"),
+    test_id: v.id("tests"),
+    run_id: v.id("runs"),
+    analysis_text: v.string(),
+    suggested_fix: v.optional(v.string()),
+    confidence_score: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("ai_insights", {
+      workspace_id: args.workspace_id,
+      test_id: args.test_id,
+      run_id: args.run_id,
+      type: "root_cause",
+      analysis_text: args.analysis_text,
+      suggested_fix: args.suggested_fix,
+      confidence_score: args.confidence_score,
+    });
   },
 });

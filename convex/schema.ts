@@ -90,6 +90,9 @@ export default defineSchema({
     started_at: v.optional(v.number()),
     finished_at: v.optional(v.number()),
     duration_ms: v.optional(v.number()),
+    pass_count: v.optional(v.number()),
+    fail_count: v.optional(v.number()),
+    skip_count: v.optional(v.number()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])

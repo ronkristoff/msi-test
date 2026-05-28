@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { getOwnedEntity, getOwnedWorkspace } from "../lib/requireAuth";
 
 export const triggerRun = mutation({
@@ -28,7 +29,7 @@ export const triggerRun = mutation({
       throw new ConvexError("Provide suite_id or test_id, not both");
     }
 
-    let testIds: string[];
+    let testIds: Id<"tests">[];
     if (args.suite_id) {
       const tests = await ctx.db
         .query("tests")

@@ -63,12 +63,9 @@ export async function executeRun(
 
     const consoleLogIds = await uploadConsoleLogs(client, reporterDir, indexToResultId, log);
 
-    let anyFailed = false;
     for (const result of summary) {
       const resultId = indexToResultId.get(result.file_index);
       if (!resultId) continue;
-
-      if (result.status === "failed") anyFailed = true;
 
       const testArtifacts = artifacts.get(result.file_index);
 
@@ -83,13 +80,12 @@ export async function executeRun(
       });
     }
 
-    const finalStatus = anyFailed ? "failed" : "passed";
-    await client.completeRun(work.run_id, finalStatus);
-    log(`Run ${work.run_id}: completed with status ${finalStatus}`);
+    await client.completeRun(work.run_id);
+    log(`Run ${work.run_id}: completed`);
   } catch (err) {
     log(`Run ${work.run_id}: execution error: ${err}`);
     try {
-      await client.completeRun(work.run_id, "failed");
+      await client.forceCompleteRun(work.run_id, "failed");
     } catch {
       log(`Run ${work.run_id}: failed to mark run as failed`);
     }

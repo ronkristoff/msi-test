@@ -153,3 +153,38 @@ export async function seedFullStack(t: TestCtx, ownerId = "user1") {
   const { projectId, suiteId, testId } = await seedTestDoc(t, workspaceId);
   return { workspaceId, projectId, suiteId, testId };
 }
+
+export async function seedRunWithTwoTests(t: TestCtx) {
+  const workspaceId = await seedWorkspace(t);
+  const projectId = await seedProject(t, workspaceId);
+  const suiteId = await t.run(async (ctx) => {
+    return ctx.db.insert("suites", {
+      workspace_id: workspaceId,
+      project_id: projectId,
+      name: "Test Suite",
+      source_type: "manual",
+    });
+  });
+  const testId1 = await t.run(async (ctx) => {
+    return ctx.db.insert("tests", {
+      workspace_id: workspaceId,
+      suite_id: suiteId,
+      name: "Test 1",
+      playwright_code: "test('t1', async ({ page }) => {});",
+      source_type: "prd",
+      status: "approved",
+    });
+  });
+  const testId2 = await t.run(async (ctx) => {
+    return ctx.db.insert("tests", {
+      workspace_id: workspaceId,
+      suite_id: suiteId,
+      name: "Test 2",
+      playwright_code: "test('t2', async ({ page }) => {});",
+      source_type: "prd",
+      status: "approved",
+    });
+  });
+  const runId = await seedRun(t, workspaceId, projectId, suiteId, null);
+  return { workspaceId, projectId, suiteId, testId1, testId2, runId };
+}

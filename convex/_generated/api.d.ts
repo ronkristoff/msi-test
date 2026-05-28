@@ -10,11 +10,17 @@
 
 import type * as ai_agents from "../ai/agents.js";
 import type * as ai_errors from "../ai/errors.js";
+import type * as ai_generateNlTests from "../ai/generateNlTests.js";
+import type * as ai_generatePrdTests from "../ai/generatePrdTests.js";
 import type * as ai_model from "../ai/model.js";
+import type * as ai_regenerateTest from "../ai/regenerateTest.js";
 import type * as ai_tools_definitions from "../ai/tools/definitions.js";
 import type * as ai_tools_logic from "../ai/tools/logic.js";
 import type * as ai_tools_queries from "../ai/tools/queries.js";
 import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
+import type * as environments_mutations from "../environments/mutations.js";
+import type * as environments_queries from "../environments/queries.js";
 import type * as files_actions from "../files/actions.js";
 import type * as http from "../http.js";
 import type * as lib_constraints from "../lib/constraints.js";
@@ -23,6 +29,10 @@ import type * as lib_validation from "../lib/validation.js";
 import type * as logs_mutations from "../logs/mutations.js";
 import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
+import type * as runs_actions from "../runs/actions.js";
+import type * as runs_internal from "../runs/internal.js";
+import type * as runs_mutations from "../runs/mutations.js";
+import type * as runs_queries from "../runs/queries.js";
 import type * as suites_mutations from "../suites/mutations.js";
 import type * as suites_queries from "../suites/queries.js";
 import type * as testHelpers from "../testHelpers.js";
@@ -41,11 +51,17 @@ import type {
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
   "ai/errors": typeof ai_errors;
+  "ai/generateNlTests": typeof ai_generateNlTests;
+  "ai/generatePrdTests": typeof ai_generatePrdTests;
   "ai/model": typeof ai_model;
+  "ai/regenerateTest": typeof ai_regenerateTest;
   "ai/tools/definitions": typeof ai_tools_definitions;
   "ai/tools/logic": typeof ai_tools_logic;
   "ai/tools/queries": typeof ai_tools_queries;
   auth: typeof auth;
+  crons: typeof crons;
+  "environments/mutations": typeof environments_mutations;
+  "environments/queries": typeof environments_queries;
   "files/actions": typeof files_actions;
   http: typeof http;
   "lib/constraints": typeof lib_constraints;
@@ -54,6 +70,10 @@ declare const fullApi: ApiFromModules<{
   "logs/mutations": typeof logs_mutations;
   "projects/mutations": typeof projects_mutations;
   "projects/queries": typeof projects_queries;
+  "runs/actions": typeof runs_actions;
+  "runs/internal": typeof runs_internal;
+  "runs/mutations": typeof runs_mutations;
+  "runs/queries": typeof runs_queries;
   "suites/mutations": typeof suites_mutations;
   "suites/queries": typeof suites_queries;
   testHelpers: typeof testHelpers;

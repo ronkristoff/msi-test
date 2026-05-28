@@ -7,6 +7,8 @@ import {
   seedFullRunWithTests,
   seedFullStack,
   seedEnvironment,
+  seedRunResult,
+  seedRunWithTwoTests,
 } from "./testHelpers";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -98,23 +100,31 @@ describe("runs internal mutations", () => {
 
   it("completeRun sets final status and duration", async () => {
     const t = convexTest(schema, modules);
-    const { runId } = await seedFullRunWithTests(t);
+    const { runId, runResultId } = await seedFullRunWithTests(t);
 
     await t.mutation(api.runs.internal.claimRun, {
       run_id: runId,
       runner_id: "runner-1",
     });
 
+    await t.mutation(api.runs.internal.writeRunResult, {
+      run_result_id: runResultId,
+      status: "passed",
+      duration_ms: 1500,
+    });
+
     await t.mutation(api.runs.internal.completeRun, {
       run_id: runId,
-      status: "passed",
     });
 
     await t.run(async (ctx) => {
       const run = await ctx.db.get(runId);
       expect(run!.status).toBe("passed");
       expect(run!.finished_at).toBeTypeOf("number");
-      expect(run!.duration_ms).toBeTypeOf("number");
+      expect(run!.duration_ms).toBe(1500);
+      expect(run!.pass_count).toBe(1);
+      expect(run!.fail_count).toBe(0);
+      expect(run!.skip_count).toBe(0);
     });
   });
 
@@ -313,13 +323,15 @@ describe("runs data layer", () => {
 
     await t.mutation(api.runs.internal.completeRun, {
       run_id: runId,
-      status: "failed",
     });
 
     await t.run(async (ctx) => {
       const run = await ctx.db.get(runId);
       expect(run!.status).toBe("failed");
-      expect(run!.duration_ms).toBeTypeOf("number");
+      expect(run!.duration_ms).toBe(1500);
+      expect(run!.pass_count).toBe(0);
+      expect(run!.fail_count).toBe(1);
+      expect(run!.skip_count).toBe(0);
     });
   });
 
@@ -364,6 +376,154 @@ describe("runs data layer", () => {
 
       const original = await ctx.db.get(originalRunId);
       expect(original!.status).toBe("failed");
+    });
+  });
+});
+
+describe("run aggregation", () => {
+  it("completeRun sums durations across multiple results", async () => {
+    const t = convexTest(schema, modules);
+    const { workspaceId, testId1, testId2, runId } = await seedRunWithTwoTests(t);
+
+    const rr1 = await seedRunResult(t, workspaceId, runId, testId1, { status: "passed", duration_ms: 1200 });
+    void rr1;
+    const rr2 = await seedRunResult(t, workspaceId, runId, testId2, { status: "failed", duration_ms: 800 });
+
+    await t.mutation(api.runs.internal.writeRunResult, {
+      run_result_id: rr2,
+      status: "failed",
+      duration_ms: 800,
+    });
+
+    await t.mutation(api.runs.internal.completeRun, {
+      run_id: runId,
+    });
+
+    await t.run(async (ctx) => {
+      const run = await ctx.db.get(runId);
+      expect(run!.status).toBe("failed");
+      expect(run!.duration_ms).toBe(2000);
+      expect(run!.pass_count).toBe(1);
+      expect(run!.fail_count).toBe(1);
+      expect(run!.skip_count).toBe(0);
+    });
+  });
+
+  it("completeRun sets passed when all results pass", async () => {
+    const t = convexTest(schema, modules);
+    const { workspaceId, testId1, testId2, runId } = await seedRunWithTwoTests(t);
+
+    await seedRunResult(t, workspaceId, runId, testId1, { status: "passed", duration_ms: 500 });
+    const rr2 = await seedRunResult(t, workspaceId, runId, testId2, { status: "passed", duration_ms: 700 });
+
+    await t.mutation(api.runs.internal.writeRunResult, {
+      run_result_id: rr2,
+      status: "passed",
+      duration_ms: 700,
+    });
+
+    await t.mutation(api.runs.internal.completeRun, {
+      run_id: runId,
+    });
+
+    await t.run(async (ctx) => {
+      const run = await ctx.db.get(runId);
+      expect(run!.status).toBe("passed");
+      expect(run!.duration_ms).toBe(1200);
+      expect(run!.pass_count).toBe(2);
+      expect(run!.fail_count).toBe(0);
+    });
+  });
+
+  it("forceCompleteRun sets forced status regardless of results", async () => {
+    const t = convexTest(schema, modules);
+    const { runId, runResultId } = await seedFullRunWithTests(t);
+
+    await t.mutation(api.runs.internal.claimRun, {
+      run_id: runId,
+      runner_id: "runner-1",
+    });
+
+    await t.mutation(api.runs.internal.writeRunResult, {
+      run_result_id: runResultId,
+      status: "passed",
+      duration_ms: 300,
+    });
+
+    await t.mutation(api.runs.internal.forceCompleteRun, {
+      run_id: runId,
+      forced_status: "cancelled",
+    });
+
+    await t.run(async (ctx) => {
+      const run = await ctx.db.get(runId);
+      expect(run!.status).toBe("cancelled");
+      expect(run!.duration_ms).toBe(300);
+      expect(run!.pass_count).toBe(1);
+    });
+  });
+});
+
+describe("ai insight storage", () => {
+  it("storeAiInsight creates record with correct linkage", async () => {
+    const t = convexTest(schema, modules);
+    const { workspaceId, testId, runId } = await seedFullRunWithTests(t);
+
+    await t.mutation(api.runs.internal.storeAiInsight, {
+      workspace_id: workspaceId,
+      test_id: testId,
+      run_id: runId,
+      analysis_text: "Element was not visible due to CSS animation delay",
+      suggested_fix: "Add waitForSelector with timeout: 5000",
+      confidence_score: 0.85,
+    });
+
+    await t.run(async (ctx) => {
+      const insights = await ctx.db
+        .query("ai_insights")
+        .withIndex("by_test_id", (q) => q.eq("test_id", testId))
+        .collect();
+
+      expect(insights).toHaveLength(1);
+      expect(insights[0].workspace_id).toBe(workspaceId);
+      expect(insights[0].test_id).toBe(testId);
+      expect(insights[0].run_id).toBe(runId);
+      expect(insights[0].type).toBe("root_cause");
+      expect(insights[0].analysis_text).toBe("Element was not visible due to CSS animation delay");
+      expect(insights[0].suggested_fix).toBe("Add waitForSelector with timeout: 5000");
+      expect(insights[0].confidence_score).toBe(0.85);
+    });
+  });
+
+  it("storeAiInsight supports multiple insights per test", async () => {
+    const t = convexTest(schema, modules);
+    const { workspaceId, testId, runId } = await seedFullRunWithTests(t);
+
+    await t.mutation(api.runs.internal.storeAiInsight, {
+      workspace_id: workspaceId,
+      test_id: testId,
+      run_id: runId,
+      analysis_text: "Root cause 1",
+      suggested_fix: "Fix 1",
+      confidence_score: 0.9,
+    });
+
+    await t.mutation(api.runs.internal.storeAiInsight, {
+      workspace_id: workspaceId,
+      test_id: testId,
+      run_id: runId,
+      analysis_text: "Root cause 2",
+      suggested_fix: "Fix 2",
+      confidence_score: 0.7,
+    });
+
+    await t.run(async (ctx) => {
+      const insights = await ctx.db
+        .query("ai_insights")
+        .withIndex("by_test_id", (q) => q.eq("test_id", testId))
+        .collect();
+
+      expect(insights).toHaveLength(2);
     });
   });
 });

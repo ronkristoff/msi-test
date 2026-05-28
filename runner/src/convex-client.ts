@@ -74,14 +74,21 @@ export class RunnerConvexClient {
     });
   }
 
-  async completeRun(
-    runId: string,
-    status: "passed" | "failed" | "cancelled" | "timed_out",
-  ): Promise<void> {
+  async completeRun(runId: string): Promise<void> {
     await this.client.action(api.runs.actions.runnerCompleteRun, {
       runner_secret: this.secret,
       run_id: runId as Id<"runs">,
-      status,
+    });
+  }
+
+  async forceCompleteRun(
+    runId: string,
+    status: "failed" | "cancelled" | "timed_out",
+  ): Promise<void> {
+    await this.client.action(api.runs.actions.runnerForceCompleteRun, {
+      runner_secret: this.secret,
+      run_id: runId as Id<"runs">,
+      forced_status: status,
     });
   }
 

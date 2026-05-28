@@ -3,6 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { createTestGenerationAgent, extractPlaywrightCode, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
 import { ConvexError } from "convex/values";
@@ -11,8 +12,12 @@ export const regenerateTest = action({
   args: {
     test_id: v.id("tests"),
   },
-  handler: async (ctx, args) => {
-    const test = await ctx.runQuery(internal.tests.queries.getTestInternal, {
+  handler: async (ctx, args): Promise<{ testId: string; newName: string }> => {
+    const test: {
+      suite_id: Id<"suites">;
+      name: string;
+      playwright_code: string;
+    } | null = await ctx.runQuery(internal.tests.queries.getTestInternal, {
       test_id: args.test_id,
     });
 
