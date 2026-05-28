@@ -11,15 +11,15 @@ End-to-end: Project page "Generate from PRD" action → Convex action `generateT
 
 ## Acceptance criteria
 
-- [ ] "Generate Tests from PRD" action available on project page
-- [ ] Accepts PRD as typed text or uploaded Markdown/PDF file
-- [ ] PDF content is extracted and passed to the Test Generation Agent as text
-- [ ] Test Generation Agent produces complete, valid Playwright test files (TypeScript with `import { test, expect }`)
-- [ ] Each generated test stored with `source_type: "prd"`, status `draft`
-- [ ] Auto-creates a new Suite with descriptive name (e.g., "PRD Tests — May 24")
-- [ ] User can specify multiple test scenarios in one generation request
-- [ ] Streaming progress shown during generation (loading spinner or progress indicator)
-- [ ] Generated tests appear in the suite review page for editing/approval
+- [x] "Generate Tests from PRD" action available on project page
+- [x] Accepts PRD as typed text or uploaded Markdown/PDF file
+- [x] PDF content is extracted and passed to the Test Generation Agent as text
+- [x] Test Generation Agent produces complete, valid Playwright test files (TypeScript with `import { test, expect }`)
+- [x] Each generated test stored with `source_type: "prd"`, status `draft`
+- [x] Auto-creates a new Suite with descriptive name (e.g., "PRD Tests — May 24")
+- [x] User can specify multiple test scenarios in one generation request
+- [x] Streaming progress shown during generation (loading spinner or progress indicator)
+- [x] Generated tests appear in the suite review page for editing/approval
 
 ## Blocked by
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MSITest Fixture</title>
+</head>
+<body>
+  <h1>Hello MSITest</h1>
+  <button id="submit-btn">Submit</button>
+  <div id="result"></div>
+  <script>
+    document.getElementById('submit-btn').addEventListener('click', function() {
+      document.getElementById('result').textContent = 'Clicked!';
+      console.log('Button clicked');
+    });
+  </script>
+</body>
+</html>

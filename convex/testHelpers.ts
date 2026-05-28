@@ -82,6 +82,72 @@ export async function seedEnvironment(t: TestCtx, workspaceId: string, projectId
   });
 }
 
+type RunOverrides = Partial<{
+  status: "running" | "passed" | "failed" | "cancelled" | "timed_out";
+  trigger_type: "manual" | "ci" | "rerun";
+  runner_id: string;
+  environment_id: string;
+}>;
+
+export async function seedRun(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  suiteId: string | null,
+  testId: string | null,
+  overrides?: RunOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("runs", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      suite_id: suiteId ? (suiteId as Id<"suites">) : undefined,
+      test_id: testId ? (testId as Id<"tests">) : undefined,
+      trigger_type: overrides?.trigger_type ?? "manual",
+      status: overrides?.status ?? "running",
+      runner_id: overrides?.runner_id,
+      environment_id: overrides?.environment_id
+        ? (overrides.environment_id as Id<"environments">)
+        : undefined,
+    });
+  });
+}
+
+export async function seedRunResult(
+  t: TestCtx,
+  workspaceId: string,
+  runId: string,
+  testId: string,
+  overrides?: Partial<{
+    status: "passed" | "failed" | "skipped";
+    duration_ms: number;
+  }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("run_results", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      run_id: runId as Id<"runs">,
+      test_id: testId as Id<"tests">,
+      status: overrides?.status ?? "passed",
+      duration_ms: overrides?.duration_ms ?? 0,
+      retries: 0,
+    });
+  });
+}
+
+export async function seedFullRunWithTests(t: TestCtx, ownerId = "user1") {
+  const workspaceId = await seedWorkspace(t, ownerId);
+  const { projectId, suiteId, testId } = await seedTestDoc(t, workspaceId, {
+    status: "approved",
+  });
+  const envId = await seedEnvironment(t, workspaceId, projectId);
+  const runId = await seedRun(t, workspaceId, projectId, suiteId, null, {
+    environment_id: envId,
+  });
+  const runResultId = await seedRunResult(t, workspaceId, runId, testId);
+  return { workspaceId, projectId, suiteId, testId, envId, runId, runResultId };
+}
+
 export async function seedFullStack(t: TestCtx, ownerId = "user1") {
   const workspaceId = await seedWorkspace(t, ownerId);
   const { projectId, suiteId, testId } = await seedTestDoc(t, workspaceId);

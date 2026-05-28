@@ -11,13 +11,13 @@ End-to-end: Suite page "Describe a test" input → Convex action `generateTests`
 
 ## Acceptance criteria
 
-- [ ] "Describe a Test" text input available on suite page
-- [ ] User can type a test scenario in plain English (e.g., "test that login works with valid credentials")
-- [ ] Test Generation Agent produces complete Playwright test file from the description
-- [ ] Multiple scenarios can be submitted in one request (batch generation)
-- [ ] Each generated test stored with `source_type: "natural_language"`, status `draft`
-- [ ] Auto-creates a new Suite if no suite is specified (e.g., "NL Tests — May 24")
-- [ ] User can re-generate a specific test with AI (regenerate button on test card)
+- [x] "Describe a Test" text input available on suite page
+- [x] User can type a test scenario in plain English (e.g., "test that login works with valid credentials")
+- [x] Test Generation Agent produces complete Playwright test file from the description
+- [x] Multiple scenarios can be submitted in one request (batch generation)
+- [x] Each generated test stored with `source_type: "natural_language"`, status `draft`
+- [x] Auto-creates a new Suite if no suite is specified (e.g., "NL Tests — May 24")
+- [x] User can re-generate a specific test with AI (regenerate button on test card)
 
 ## Blocked by
 

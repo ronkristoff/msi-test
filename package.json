@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npx convex dev\" \"next dev --turbopack\"",
+    "dev": "concurrently \"npx convex dev\" \"next dev --turbopack\" \"npx tsx runner/src/index.ts\"",
     "dev:next": "next dev --turbopack",
     "dev:convex": "npx convex dev",
+    "dev:runner": "npx tsx runner/src/index.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -22,6 +23,7 @@
     "better-auth": "~1.6.11",
     "convex": "^1.39.1",
     "highlight.js": "^11.11.1",
+    "mime": "^4.1.0",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -42,7 +45,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
+    "playwright": "^1.60.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.3",
     "typescript": "^5",
     "vitest": "^4.1.7"
   },

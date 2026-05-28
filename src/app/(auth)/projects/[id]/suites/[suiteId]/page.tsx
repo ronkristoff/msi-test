@@ -226,10 +226,19 @@ export default function SuiteDetailPage() {
     suite_id: suiteId,
   });
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
+  const environments = useQuery(
+    suite ? api.environments.queries.getEnvironments : "skip",
+    suite ? { project_id: suite.project_id } : "skip",
+  );
+  const activeRun = useQuery(
+    api.runs.queries.getActiveRunForSuite,
+    { suite_id: suiteId },
+  );
 
   const updateSuite = useMutation(api.suites.mutations.updateSuite);
   const deleteSuite = useMutation(api.suites.mutations.deleteSuite);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
+  const triggerRun = useMutation(api.runs.mutations.triggerRun);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState("");
@@ -239,7 +248,13 @@ export default function SuiteDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null);
+  const [triggeringRun, setTriggeringRun] = useState(false);
+  const [triggerError, setTriggerError] = useState<string | null>(null);
+
   const aiConfigReady = hasAiConfig(workspace);
+
+  const approvedCount = tests?.filter((t) => t.status === "approved").length ?? 0;
 
   const handleStartEditName = () => {
     if (!suite) return;
@@ -279,7 +294,27 @@ export default function SuiteDetailPage() {
     }
   };
 
-  if (suite === undefined || tests === undefined || workspace === undefined) {
+  const handleTriggerRun = async () => {
+    if (!suite) return;
+    setTriggerError(null);
+    setTriggeringRun(true);
+    try {
+      const runId = await triggerRun({
+        project_id: suite.project_id,
+        suite_id: suiteId,
+        environment_id: selectedEnvId ?? undefined,
+      });
+      router.push(`/runs/${runId}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to trigger run";
+      setTriggerError(msg);
+      logError(msg, { severity: "error", context: { source: "SuiteDetailPage.handleTriggerRun" } });
+    } finally {
+      setTriggeringRun(false);
+    }
+  };
+
+  if (suite === undefined || tests === undefined || workspace === undefined || environments === undefined) {
     return <div className="text-[var(--muted)] text-sm">Loading...</div>;
   }
 
@@ -351,6 +386,56 @@ export default function SuiteDetailPage() {
           {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
         </div>
       </div>
+
+      {activeRun && (
+        <div className="bg-[var(--surface)] border border-[var(--accent)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+          <div className="flex items-center gap-3">
+            <svg className="animate-spin h-4 w-4 text-[var(--accent)]" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-[var(--fg)]">Run in progress</span>
+            <Link href={`/runs/${activeRun._id}`} className="text-sm text-[var(--accent)] underline font-medium ml-auto">
+              View progress →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {!activeRun && approvedCount > 0 && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+            Run Tests ({approvedCount} approved)
+          </div>
+          {triggerError && <Alert variant="error" className="mb-3">{triggerError}</Alert>}
+          <div className="flex gap-3 items-center">
+            <select
+              value={selectedEnvId ?? ""}
+              onChange={(e) => setSelectedEnvId(e.target.value || null)}
+              className="font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            >
+              <option value="">Default URL</option>
+              {environments?.map((env) => (
+                <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
+              ))}
+            </select>
+            <Button
+              onClick={handleTriggerRun}
+              disabled={triggeringRun}
+            >
+              {triggeringRun ? (
+                <>
+                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Starting...
+                </>
+              ) : "Run Tests"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {!aiConfigReady ? (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
