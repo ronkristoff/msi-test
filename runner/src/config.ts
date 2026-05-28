@@ -6,6 +6,9 @@ export async function generatePlaywrightConfig(
   outputDir: string,
   reporterPath: string,
 ): Promise<string> {
+  const fixturePath = path.join(outputDir, "msitest-fixture.ts");
+  await fs.writeFile(fixturePath, FIXTURE_CONTENT, "utf-8");
+
   const configContent = `import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
@@ -15,6 +18,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [['${reporterPath}']],
+  outputDir: '${outputDir}/test-results',
   use: {
     baseURL: '${baseURL}',
     screenshot: 'on',
@@ -37,6 +41,41 @@ export default defineConfig({
   return configPath;
 }
 
+const FIXTURE_CONTENT = `import { test as base, ConsoleMessage } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+interface ConsoleEntry {
+  type: string;
+  text: string;
+  timestamp: number;
+}
+
+export const test = base.extend({
+  page: async ({ page }, use, testInfo) => {
+    const reporterDir = process.env.MSITEST_REPORTER_DIR || '/tmp/msitest-reporter';
+    const consoleFile = path.join(reporterDir, 'console.jsonl');
+    const fileIndex = parseInt(testInfo.file.match(/test-(\\d+)\\.spec\\.ts/)?.[1] || '0', 10);
+    const logs: ConsoleEntry[] = [];
+
+    page.on('console', (msg: ConsoleMessage) => {
+      logs.push({
+        type: msg.type(),
+        text: msg.text(),
+        timestamp: Date.now(),
+      });
+    });
+
+    await use(page);
+
+    if (logs.length > 0) {
+      const line = JSON.stringify({ file_index: fileIndex, logs });
+      fs.appendFileSync(consoleFile, line + '\\n', 'utf-8');
+    }
+  },
+});
+`;
+
 export async function writeTestFile(
   outputDir: string,
   index: number,
@@ -44,7 +83,18 @@ export async function writeTestFile(
 ): Promise<string> {
   const fileName = `test-${index}.spec.ts`;
   const filePath = path.join(outputDir, fileName);
-  await fs.writeFile(filePath, code, "utf-8");
+  const cleaned = code.replace(
+    /import\s*\{([^}]*)\}\s*from\s*['"]@playwright\/test['"];\s*\n?/g,
+    (_match, imports: string) => {
+      const kept = imports
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter((s: string) => s !== "test" && s.length > 0);
+      return kept.length > 0 ? `import { ${kept.join(", ")} } from '@playwright/test';\n` : "";
+    },
+  );
+  const wrapped = `import { test } from './msitest-fixture';\n${cleaned}`;
+  await fs.writeFile(filePath, wrapped, "utf-8");
   return filePath;
 }
 

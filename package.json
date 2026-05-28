@@ -12,7 +12,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:convex": "vitest run --config convex/vitest.config.ts",
-    "test:all": "vitest run && vitest run --config convex/vitest.config.ts"
+    "test:all": "vitest run && vitest run --config convex/vitest.config.ts && vitest run --config runner/vitest.config.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.65",

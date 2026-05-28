@@ -52,6 +52,7 @@ export const runnerWriteRunResult = action({
     console_log_file_id: v.optional(v.id("_storage")),
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
+    screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);

@@ -60,6 +60,7 @@ export class RunnerConvexClient {
     console_log_file_id?: string;
     trace_file_id?: string;
     video_file_id?: string;
+    screenshot_file_ids?: string[];
   }): Promise<void> {
     await this.client.action(api.runs.actions.runnerWriteRunResult, {
       runner_secret: this.secret,
@@ -69,6 +70,7 @@ export class RunnerConvexClient {
       console_log_file_id: args.console_log_file_id as Id<"_storage"> | undefined,
       trace_file_id: args.trace_file_id as Id<"_storage"> | undefined,
       video_file_id: args.video_file_id as Id<"_storage"> | undefined,
+      screenshot_file_ids: args.screenshot_file_ids as Id<"_storage">[] | undefined,
     });
   }
 
@@ -95,11 +97,14 @@ export class RunnerConvexClient {
   }
 
   async uploadFile(filePath: string): Promise<string> {
-    const uploadUrl = await this.generateUploadUrl();
-
     const buffer = await fs.readFile(filePath);
     const fileName = path.basename(filePath);
     const contentType = mime.getType(fileName) || "application/octet-stream";
+    return this.uploadBuffer(buffer, contentType);
+  }
+
+  async uploadBuffer(buffer: Buffer, contentType: string): Promise<string> {
+    const uploadUrl = await this.generateUploadUrl();
 
     const response = await fetch(uploadUrl, {
       method: "POST",

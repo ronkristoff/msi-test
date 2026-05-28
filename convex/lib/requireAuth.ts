@@ -47,6 +47,7 @@ export async function getOptionalOwnedWorkspace(ctx: QueryCtx | MutationCtx) {
 export async function getOwnedEntity<T extends TableNames>(
   ctx: QueryCtx | MutationCtx,
   entityId: Id<T>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _tableName: T,
 ) {
   const { user, workspace } = await getOwnedWorkspace(ctx);
@@ -59,6 +60,7 @@ export async function getOwnedEntity<T extends TableNames>(
 export async function getOptionalOwnedEntity<T extends TableNames>(
   ctx: QueryCtx | MutationCtx,
   entityId: Id<T>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _tableName: T,
 ) {
   const result = await getOptionalOwnedWorkspace(ctx);

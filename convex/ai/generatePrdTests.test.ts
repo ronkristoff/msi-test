@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "../_generated/api";
 import schema from "../schema";
 import { seedWorkspace, seedProject } from "../testHelpers";
 

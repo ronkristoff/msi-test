@@ -59,7 +59,11 @@ function CodePreview({ code }: { code: string }) {
   );
 }
 
-function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
+function TestAccordionItem({ test, environments, onRunTest }: {
+  test: Doc<"tests">;
+  environments: Doc<"environments">[] | undefined;
+  onRunTest: (testId: string, envId: string | null) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [localCode, setLocalCode] = useState<string | null>(null);
   const isDirty = localCode !== null && localCode !== test.playwright_code;
@@ -178,6 +182,19 @@ function TestAccordionItem({ test }: { test: Doc<"tests"> }) {
                 </Button>
               )}
               <div className="flex-1" />
+              {test.status === "approved" && environments && environments.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={environments.length > 1}
+                  title={environments.length > 1 ? "Use \"Run All Tests\" to select an environment" : undefined}
+                  onClick={() => {
+                    onRunTest(test._id, environments[0]._id);
+                  }}
+                >
+                  Run Test
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -498,7 +515,23 @@ export default function SuiteDetailPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {tests.map((test) => (
-              <TestAccordionItem key={test._id} test={test} />
+              <TestAccordionItem
+                key={test._id}
+                test={test}
+                environments={environments}
+                onRunTest={(testId, envId) => {
+                  setTriggeringRun(true);
+                  triggerRun({
+                    project_id: asId(params.id, "projects"),
+                    test_id: asId(testId, "tests"),
+                    environment_id: envId ? asId(envId, "environments") : undefined,
+                  })
+                    .then((runId) => {
+                      if (runId) router.push(`/runs/${runId}`);
+                    })
+                    .finally(() => setTriggeringRun(false));
+                }}
+              />
             ))}
           </div>
         )}

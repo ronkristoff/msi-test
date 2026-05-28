@@ -1,6 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
+import { getOptionalOwnedEntity } from "../lib/requireAuth";
 
 export const getSuites = query({
   args: { project_id: v.id("projects") },

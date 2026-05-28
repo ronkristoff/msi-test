@@ -61,6 +61,8 @@ export async function executeRun(
     const localArtifacts = scanArtifacts(runDir);
     const artifacts = await uploadArtifacts(client, localArtifacts, log);
 
+    const consoleLogIds = await uploadConsoleLogs(client, reporterDir, indexToResultId, log);
+
     let anyFailed = false;
     for (const result of summary) {
       const resultId = indexToResultId.get(result.file_index);
@@ -74,8 +76,10 @@ export async function executeRun(
         run_result_id: resultId,
         status: result.status,
         duration_ms: result.duration_ms,
-        trace_file_id: testArtifacts?.traceId,
-        video_file_id: testArtifacts?.videoId,
+        trace_file_id: testArtifacts?.trace_file_id,
+        video_file_id: testArtifacts?.video_file_id,
+        screenshot_file_ids: testArtifacts?.screenshot_file_ids,
+        console_log_file_id: consoleLogIds.get(result.file_index),
       });
     }
 
@@ -158,13 +162,20 @@ function readSummary(reporterDir: string): TestSummary[] {
   return JSON.parse(fsSync.readFileSync(summaryPath, "utf-8"));
 }
 
-interface TestArtifacts {
-  traceId?: string;
-  videoId?: string;
+interface LocalArtifacts {
+  tracePath?: string;
+  videoPath?: string;
+  screenshotPaths?: string[];
 }
 
-function scanArtifacts(runDir: string): Map<number, TestArtifacts> {
-  const artifacts = new Map<number, TestArtifacts>();
+interface StorageArtifacts {
+  trace_file_id?: string;
+  video_file_id?: string;
+  screenshot_file_ids?: string[];
+}
+
+function scanArtifacts(runDir: string): Map<number, LocalArtifacts> {
+  const artifacts = new Map<number, LocalArtifacts>();
   const testResultsDir = path.join(runDir, "test-results");
 
   if (!fsSync.existsSync(testResultsDir)) return artifacts;
@@ -195,9 +206,12 @@ function scanArtifacts(runDir: string): Map<number, TestArtifacts> {
     }
 
     if (entry.endsWith(".trace") || entry.endsWith("trace.zip")) {
-      existing.traceId = fullPath;
+      existing.tracePath = fullPath;
     } else if (entry.endsWith(".webm")) {
-      existing.videoId = fullPath;
+      existing.videoPath = fullPath;
+    } else if (entry.endsWith(".png")) {
+      if (!existing.screenshotPaths) existing.screenshotPaths = [];
+      existing.screenshotPaths.push(fullPath);
     }
   }
 
@@ -206,16 +220,22 @@ function scanArtifacts(runDir: string): Map<number, TestArtifacts> {
 
 async function uploadArtifacts(
   client: RunnerConvexClient,
-  artifacts: Map<number, TestArtifacts>,
+  artifacts: Map<number, LocalArtifacts>,
   log: (msg: string) => void,
-): Promise<Map<number, TestArtifacts>> {
-  const uploaded = new Map<number, TestArtifacts>();
+): Promise<Map<number, StorageArtifacts>> {
+  const uploaded = new Map<number, StorageArtifacts>();
 
-  for (const [fileIndex, arts] of artifacts) {
-    const result: TestArtifacts = {};
+  for (const [fileIndex, local] of artifacts) {
+    const result: StorageArtifacts = {};
     try {
-      if (arts.traceId) result.traceId = await client.uploadFile(arts.traceId);
-      if (arts.videoId) result.videoId = await client.uploadFile(arts.videoId);
+      if (local.tracePath) result.trace_file_id = await client.uploadFile(local.tracePath);
+      if (local.videoPath) result.video_file_id = await client.uploadFile(local.videoPath);
+      if (local.screenshotPaths && local.screenshotPaths.length > 0) {
+        result.screenshot_file_ids = [];
+        for (const p of local.screenshotPaths) {
+          result.screenshot_file_ids.push(await client.uploadFile(p));
+        }
+      }
     } catch (err) {
       log(`Error uploading artifacts for test ${fileIndex}: ${err}`);
     }
@@ -223,6 +243,33 @@ async function uploadArtifacts(
   }
 
   return uploaded;
+}
+
+async function uploadConsoleLogs(
+  client: RunnerConvexClient,
+  reporterDir: string,
+  indexToResultId: Map<number, string>,
+  log: (msg: string) => void,
+): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  const consoleFile = path.join(reporterDir, "console.jsonl");
+  if (!fsSync.existsSync(consoleFile)) return result;
+
+  const lines = fsSync.readFileSync(consoleFile, "utf-8").trim().split("\n").filter(Boolean);
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line);
+      const resultId = indexToResultId.get(entry.file_index);
+      if (!resultId) continue;
+
+      const buffer = Buffer.from(JSON.stringify(entry.logs, null, 2), "utf-8");
+      const storageId = await client.uploadBuffer(buffer, "application/json");
+      result.set(entry.file_index, storageId);
+    } catch (err) {
+      log(`Error uploading console log: ${err}`);
+    }
+  }
+  return result;
 }
 
 function runPlaywright(cwd: string, log: (msg: string) => void): Promise<number> {

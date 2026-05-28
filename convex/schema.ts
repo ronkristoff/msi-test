@@ -111,6 +111,7 @@ export default defineSchema({
     console_log_file_id: v.optional(v.id("_storage")),
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
+    screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
   })
     .index("by_run_id", ["run_id"])
     .index("by_test_id", ["test_id"]),

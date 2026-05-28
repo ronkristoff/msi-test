@@ -40,7 +40,7 @@ describe("suites queries", () => {
     const workspaceId = await seedWorkspace(t);
     const projectId = await seedProject(t, workspaceId);
 
-    const _suiteId = await t.run(async (ctx) => {
+    await t.run(async (ctx) => {
       const sId = await ctx.db.insert("suites", {
         workspace_id: workspaceId,
         project_id: projectId,

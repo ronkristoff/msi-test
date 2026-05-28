@@ -62,6 +62,7 @@ export const writeRunResult = internalMutation({
     console_log_file_id: v.optional(v.id("_storage")),
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
+    screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.run_result_id, {
@@ -70,6 +71,7 @@ export const writeRunResult = internalMutation({
       console_log_file_id: args.console_log_file_id,
       trace_file_id: args.trace_file_id,
       video_file_id: args.video_file_id,
+      screenshot_file_ids: args.screenshot_file_ids,
     });
   },
 });
