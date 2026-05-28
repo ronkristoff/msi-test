@@ -2,38 +2,9 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
+import { seedFullStack } from "./testHelpers";
 
 const modules = import.meta.glob("./**/*.ts");
-
-async function seedFullStack(t: ReturnType<typeof convexTest>, ownerId = "user1") {
-  return t.run(async (ctx) => {
-    const workspaceId = await ctx.db.insert("workspaces", {
-      name: "Test WS",
-      owner_id: ownerId,
-      ai_config: { endpoint_url: "https://api.example.com", api_key: "key123", model_name: "gpt-4" },
-    });
-    const projectId = await ctx.db.insert("projects", {
-      workspace_id: workspaceId,
-      name: "Test Project",
-      app_url: "https://example.com",
-    });
-    const suiteId = await ctx.db.insert("suites", {
-      workspace_id: workspaceId,
-      project_id: projectId,
-      name: "Test Suite",
-      source_type: "manual",
-    });
-    const testId = await ctx.db.insert("tests", {
-      workspace_id: workspaceId,
-      suite_id: suiteId,
-      name: "Test Case",
-      playwright_code: "code",
-      source_type: "prd",
-      status: "draft",
-    });
-    return { workspaceId, projectId, suiteId, testId };
-  });
-}
 
 describe("requireAuth helpers", () => {
   it("getOwnedWorkspace throws without auth (convex-test has no auth provider)", async () => {

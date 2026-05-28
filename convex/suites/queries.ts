@@ -1,15 +1,12 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getOptionalOwnedWorkspace } from "../lib/requireAuth";
+import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
 
 export const getSuites = query({
   args: { project_id: v.id("projects") },
   handler: async (ctx, args) => {
-    const result = await getOptionalOwnedWorkspace(ctx);
+    const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
     if (!result) return [];
-
-    const project = await ctx.db.get(args.project_id);
-    if (!project || project.workspace_id !== result.workspace._id) return [];
 
     const suites = await ctx.db
       .query("suites")
@@ -34,17 +31,14 @@ export const getSuites = query({
 export const getSuite = query({
   args: { suite_id: v.id("suites") },
   handler: async (ctx, args) => {
-    const result = await getOptionalOwnedWorkspace(ctx);
+    const result = await getOptionalOwnedEntity(ctx, args.suite_id, "suites");
     if (!result) return null;
-
-    const suite = await ctx.db.get(args.suite_id);
-    if (!suite || suite.workspace_id !== result.workspace._id) return null;
 
     const testCount = (await ctx.db
       .query("tests")
-      .withIndex("by_suite_id", (q) => q.eq("suite_id", suite._id))
+      .withIndex("by_suite_id", (q) => q.eq("suite_id", args.suite_id))
       .collect()).length;
 
-    return { ...suite, testCount };
+    return { ...result.entity, testCount };
   },
 });

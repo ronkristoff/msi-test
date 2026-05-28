@@ -3,18 +3,9 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { seedWorkspace } from "./testHelpers";
 
 const modules = import.meta.glob("./**/*.ts");
-
-async function seedWorkspace(t: ReturnType<typeof convexTest>, ownerId = "user1") {
-  return t.run(async (ctx) => {
-    return ctx.db.insert("workspaces", {
-      name: "Test WS",
-      owner_id: ownerId,
-      ai_config: { endpoint_url: "https://api.example.com", api_key: "key123", model_name: "gpt-4" },
-    });
-  });
-}
 
 describe("projects queries", () => {
   it("getProjects returns empty for unauthenticated user", async () => {

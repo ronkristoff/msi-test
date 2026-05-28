@@ -18,6 +18,9 @@
 - **Thread** — A persistent conversation context managed by `@convex-dev/agent`. Test Generation threads are scoped per suite (derived ID `testGen:${suiteId}`). Exploration Analysis threads are caller-managed. Failure Analysis is one-shot (no thread).
 - **Agent Tool** — A Convex query that an AI agent can invoke during generation to fetch context from the database. Five tools are defined: `readExistingTests`, `readProjectContext`, `readTestCode`, `readPreviousExplorations` (stub), `readRecentFailures` (stub).
 - **AI Error** — A structured error from AI operations. Uses `ConvexError` with `{ type: "ai_error", code, message }` where code is one of: `invalid_api_key`, `rate_limit`, `timeout`, `malformed_response`.
+- **Constraint** — A shared validation rule (e.g., name length 1-100, password min 8) defined once in `convex/lib/constraints.ts` and consumed by both frontend zod schemas and backend Convex validators. Prevents drift between client and server validation.
+- **Owned Entity** — Any database document scoped to a workspace. The ownership check (`entity.workspace_id === workspace._id`) is centralized in `getOptionalOwnedEntity` — queries and mutations use this instead of inline guards.
+- **Tool Logic** — The pure database query functions behind each Agent Tool, defined in `convex/ai/tools/logic.ts`. Tested directly without agent infrastructure. Internal queries and tool definitions are thin adapters over this layer.
 
 ## Data Hierarchy
 

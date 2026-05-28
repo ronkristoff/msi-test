@@ -1,23 +1,13 @@
+import { prependScheme, parseUrlOrNull } from "../../convex/lib/constraints";
+
 export function normalizeAppUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    new URL(withScheme);
-  } catch {
-    return trimmed;
-  }
-  return withScheme;
+  const withScheme = prependScheme(url);
+  if (!withScheme) return "";
+  return parseUrlOrNull(withScheme) ? withScheme : url.trim();
 }
 
 export function isValidAppUrl(url: string): boolean {
-  const trimmed = url.trim();
-  if (!trimmed) return false;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    new URL(withScheme);
-    return true;
-  } catch {
-    return false;
-  }
+  const withScheme = prependScheme(url);
+  if (!withScheme) return false;
+  return parseUrlOrNull(withScheme) !== null;
 }

@@ -1,6 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getOptionalOwnedWorkspace } from "../lib/requireAuth";
+import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
 
 export const getProjects = query({
   args: { workspace_id: v.id("workspaces") },
@@ -20,13 +20,8 @@ export const getProjects = query({
 export const getProject = query({
   args: { project_id: v.id("projects") },
   handler: async (ctx, args) => {
-    const result = await getOptionalOwnedWorkspace(ctx);
+    const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
     if (!result) return null;
-
-    const project = await ctx.db.get(args.project_id);
-    if (!project) return null;
-    if (project.workspace_id !== result.workspace._id) return null;
-
-    return project;
+    return result.entity;
   },
 });

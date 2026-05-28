@@ -3,43 +3,9 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { seedWorkspace, seedTestDoc } from "./testHelpers";
 
 const modules = import.meta.glob("./**/*.ts");
-
-async function seedWorkspace(t: ReturnType<typeof convexTest>, ownerId = "user1") {
-  return t.run(async (ctx) => {
-    return ctx.db.insert("workspaces", {
-      name: "Test WS",
-      owner_id: ownerId,
-      ai_config: { endpoint_url: "https://api.example.com", api_key: "key123", model_name: "gpt-4" },
-    });
-  });
-}
-
-async function seedTestDoc(t: ReturnType<typeof convexTest>, workspaceId: string, overrides?: Partial<{ name: string; status: "draft" | "approved"; source_type: "prd" | "url_exploration" | "natural_language" }>) {
-  return t.run(async (ctx) => {
-    const projectId = await ctx.db.insert("projects", {
-      workspace_id: workspaceId,
-      name: "Test Project",
-      app_url: "https://example.com",
-    });
-    const suiteId = await ctx.db.insert("suites", {
-      workspace_id: workspaceId,
-      project_id: projectId,
-      name: "Test Suite",
-      source_type: "manual",
-    });
-    const testId = await ctx.db.insert("tests", {
-      workspace_id: workspaceId,
-      suite_id: suiteId,
-      name: overrides?.name ?? "Test Case",
-      playwright_code: "import { test } from '@playwright/test';\ntest('example', async ({ page }) => {});",
-      source_type: overrides?.source_type ?? "prd",
-      status: overrides?.status ?? "draft",
-    });
-    return { projectId, suiteId, testId };
-  });
-}
 
 describe("tests mutations", () => {
   it("updateTestCode rejects unauthenticated user", async () => {

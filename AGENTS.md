@@ -46,8 +46,10 @@ Two-process system: **Next.js 16 frontend** (`src/`) + **Convex backend** (`conv
 - `docs/adr/` — architectural decision records
 - `convex/_generated/` — auto-generated Convex API types; **never edit**
 - `convex/_generated/ai/guidelines.md` — Convex API rules (validators, function registration, query patterns, etc.)
-- `convex/lib/requireAuth.ts` — shared auth helper; use `requireAuth(ctx)` instead of manual auth checks
+- `convex/lib/requireAuth.ts` — shared auth helper; use `requireAuth(ctx)` for mutations, `getOptionalOwnedEntity(ctx, id, table)` for queries
 - `convex/lib/validation.ts` — shared validators (workspace name, URL, required fields, API key masking)
+- `convex/lib/constraints.ts` — single source of truth for validation constants (name limits, password length, URL helpers); both frontend zod schemas and backend validators import from here
+- `convex/testHelpers.ts` — shared test seed functions (`seedWorkspace`, `seedProject`, `seedSuite`, `seedTestDoc`, `seedFullStack`); use in all Convex test files
 - `convex/workspaces/queries.ts` — workspace read queries + `hasWorkspace` for routing decisions
 - `convex/workspaces/mutations.ts` — workspace create/update mutations
 - `convex/users/mutations.ts` — user profile mutations (name, password)
@@ -69,9 +71,9 @@ Two-process system: **Next.js 16 frontend** (`src/`) + **Convex backend** (`conv
 #### Backend Module Organization
 
 - Convex functions organized by domain (`workspaces/`, `users/`, `logs/`), then by read/write (`queries.ts`, `mutations.ts`)
-- Shared utilities in `convex/lib/` — `requireAuth.ts` for auth, `validation.ts` for input validation and masking
+- Shared utilities in `convex/lib/` — `requireAuth.ts` for auth, `validation.ts` for input validation and masking, `constraints.ts` for shared validation constants
 - Every protected mutation uses `requireAuth(ctx)` from `convex/lib/requireAuth.ts` — never inline the auth check
-- Every public query uses `getOptionalAuthUser(ctx)` (try/catch wrapper) — `authComponent.getAuthUser()` throws on unauthenticated, never returns null
+- Every public query uses `getOptionalOwnedEntity(ctx, id, table)` for single-entity lookups, or `getOptionalOwnedWorkspace(ctx)` for collection queries — never inline the ownership check
 - Use `Doc<"tableName">` from `src/lib/convex` for frontend types — never manual type definitions
 - API key masking uses `maskApiKey()` from `convex/lib/validation.ts`, not inline in query handlers
 
@@ -104,6 +106,8 @@ Two-process system: **Next.js 16 frontend** (`src/`) + **Convex backend** (`conv
 ### Convex Testing
 
 Use `convex-test` with `vitest` and `@edge-runtime/vm`. Test files live inside `convex/`. Requires `import.meta.glob` module map pattern — see `convex/_generated/ai/guidelines.md` for the exact setup.
+
+Shared seed functions live in `convex/testHelpers.ts`. Import `seedWorkspace`, `seedProject`, `seedSuite`, `seedTestDoc`, or `seedFullStack` instead of defining local seed functions.
 
 ## Coding Guidelines
 
@@ -191,8 +195,8 @@ Before submitting any code:
 ### Known Tech Debt
 
 - `___KEEP___` sentinel value in `updateWorkspace` mutation — should be replaced with optional `api_key` field (absent = keep existing)
-- Test infrastructure installed but minimal coverage — vitest, convex-test, @testing-library/react ready to use
-- Only 1 of 11 planned schema tables exists
+- Test infrastructure installed with shared seed helpers in `convex/testHelpers.ts` — coverage still minimal but foundation is in place
+- All 11 planned schema tables exist in `convex/schema.ts`
 - Dashboard, Runs, Flakiness Map, Suites, Insights pages are placeholder empty states — need backend queries when schema tables are added
 - Settings danger zone "Delete workspace" button is disabled — needs backend mutation
 - No `max_tokens` field in workspace schema yet — needs schema migration
