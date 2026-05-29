@@ -53,6 +53,7 @@ export default function GeneratePrdTestsPage() {
           </svg>
         }
         title="Project not found"
+        description="This project may have been deleted or you don't have access."
         action={
           <Link href="/projects">
             <Button variant="secondary">Back to Projects</Button>

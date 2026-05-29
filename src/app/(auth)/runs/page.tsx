@@ -1,17 +1,46 @@
 "use client";
 
-import { EmptyState } from "@/components/ui/EmptyState";
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api, asId } from "@/lib/convex";
+import { RunsList, type StatusTab } from "@/components/RunsList";
+
+const TAB_TO_STATUS: Record<StatusTab, "running" | "passed" | "failed" | "cancelled" | "timed_out" | undefined> = {
+  all: undefined,
+  running: "running",
+  passed: "passed",
+  failed: "failed",
+  cancelled: "cancelled",
+};
 
 export default function RunsPage() {
+  const [activeTab, setActiveTab] = useState<StatusTab>("all");
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedEnvironment, setSelectedEnvironment] = useState("");
+
+  const filterOpts = useQuery(api.runs.queries.getRunFilterOptions);
+  const runs = useQuery(api.runs.queries.getWorkspaceRuns, {
+    status: TAB_TO_STATUS[activeTab],
+    branch: selectedBranch || undefined,
+    environment_id: selectedEnvironment ? asId(selectedEnvironment, "environments") : undefined,
+  });
+
+  if (runs === undefined || filterOpts === undefined) {
+    return <div className="text-[var(--muted)] text-sm">Loading...</div>;
+  }
+
   return (
-    <EmptyState
-      icon={
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>
-      }
-      title="No runs yet"
-      description="Test run history will appear here once you trigger your first suite execution."
+    <RunsList
+      runs={runs}
+      statusCounts={{}}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      branches={filterOpts.branches}
+      environments={filterOpts.environments}
+      selectedBranch={selectedBranch}
+      selectedEnvironment={selectedEnvironment}
+      onBranchChange={setSelectedBranch}
+      onEnvironmentChange={setSelectedEnvironment}
     />
   );
 }

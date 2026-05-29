@@ -71,13 +71,18 @@ export async function seedTestDoc(t: TestCtx, workspaceId: string, overrides?: T
   });
 }
 
-export async function seedEnvironment(t: TestCtx, workspaceId: string, projectId: string) {
+export async function seedEnvironment(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  overrides?: Partial<{ name: string; base_url: string }>,
+) {
   return t.run(async (ctx) => {
     return ctx.db.insert("environments", {
       workspace_id: workspaceId as Id<"workspaces">,
       project_id: projectId as Id<"projects">,
-      name: "Staging",
-      base_url: "https://staging.example.com",
+      name: overrides?.name ?? "Staging",
+      base_url: overrides?.base_url ?? "https://staging.example.com",
     });
   });
 }
@@ -87,6 +92,8 @@ type RunOverrides = Partial<{
   trigger_type: "manual" | "ci" | "rerun";
   runner_id: string;
   environment_id: string;
+  branch: string;
+  duration_ms: number;
 }>;
 
 export async function seedRun(
@@ -109,6 +116,8 @@ export async function seedRun(
       environment_id: overrides?.environment_id
         ? (overrides.environment_id as Id<"environments">)
         : undefined,
+      branch: overrides?.branch,
+      duration_ms: overrides?.duration_ms,
     });
   });
 }

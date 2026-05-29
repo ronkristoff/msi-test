@@ -244,7 +244,7 @@ export default function SuiteDetailPage() {
   });
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
   const environments = useQuery(
-    suite ? api.environments.queries.getEnvironments : "skip",
+    api.environments.queries.getEnvironments,
     suite ? { project_id: suite.project_id } : "skip",
   );
   const activeRun = useQuery(
@@ -294,6 +294,7 @@ export default function SuiteDetailPage() {
   const handleGenerateNl = async () => {
     if (!nlPrompt.trim()) return;
     setGenerateError(null);
+    if (!suite) return;
     setGenerating(true);
     try {
       await generateNlTests({
@@ -319,7 +320,7 @@ export default function SuiteDetailPage() {
       const runId = await triggerRun({
         project_id: suite.project_id,
         suite_id: suiteId,
-        environment_id: selectedEnvId ?? undefined,
+        environment_id: selectedEnvId ? asId(selectedEnvId, "environments") : undefined,
       });
       router.push(`/runs/${runId}`);
     } catch (err) {

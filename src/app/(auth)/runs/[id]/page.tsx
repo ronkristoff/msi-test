@@ -1,27 +1,21 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, asId } from "@/lib/convex";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { runStatusToVariant } from "@/lib/run-status";
 
-type RunDetail = NonNullable<Awaited<ReturnType<typeof api.runs.queries.getRunDetail.query>>>;
+type RunDetail = NonNullable<FunctionReturnType<typeof api.runs.queries.getRunDetail>>;
 type RunResult = RunDetail["results"][number];
 type Step = RunResult["steps"][number];
 
-const STATUS_VARIANT: Record<string, "success" | "danger" | "warning" | "neutral"> = {
-  passed: "success",
-  failed: "danger",
-  running: "warning",
-  cancelled: "neutral",
-  timed_out: "danger",
-};
-
-function statusToVariant(status: string): "success" | "danger" | "warning" | "neutral" {
-  return STATUS_VARIANT[status] ?? "neutral";
+function statusToVariant(status: string) {
+  return runStatusToVariant(status);
 }
 
 function StepTimeline({ steps }: { steps: Step[] }) {
@@ -32,7 +26,7 @@ function StepTimeline({ steps }: { steps: Step[] }) {
   return (
     <div className="flex flex-col gap-1 mt-2">
       {steps.map((step) => (
-        <div key={step._id} className="flex items-center gap-2 text-xs">
+        <div key={step.step_number} className="flex items-center gap-2 text-xs">
           <span className="font-[var(--font-mono)] text-[var(--muted)] w-6 text-right">{step.step_number}</span>
           <StatusPill variant={statusToVariant(step.status)} showDot={true}>
             {step.status}

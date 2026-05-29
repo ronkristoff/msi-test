@@ -1,15 +1,15 @@
 import { query, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
-import { getOptionalOwnedEntity } from "../lib/requireAuth";
+import { getOptionalOwnedEntity, getOptionalOwnedWorkspace } from "../lib/requireAuth";
 
 type StepRow = {
   step_number: number;
   command: string;
   locator: string | null;
   status: string;
+  duration_ms: number;
   error_message: string | null;
   screenshot_file_id?: string | null;
 };
@@ -62,6 +62,7 @@ async function fetchResultsWithSteps(
           command: s.command,
           locator: s.locator ?? null,
           status: s.status,
+          duration_ms: s.duration_ms,
           error_message: s.error_message ?? null,
           screenshot_file_id: s.screenshot_file_id ?? null,
         })),
@@ -70,7 +71,7 @@ async function fetchResultsWithSteps(
   );
 }
 
-export const getPendingWork = internalQuery({
+export const getPendingWork = query({
   args: {},
   handler: async (ctx) => {
     const runs = await ctx.db
@@ -139,40 +140,6 @@ export const getPendingWork = internalQuery({
   },
 });
 
-export const getRuns = query({
-  args: {
-    project_id: v.id("projects"),
-    status: v.optional(
-      v.union(
-        v.literal("running"),
-        v.literal("passed"),
-        v.literal("failed"),
-        v.literal("cancelled"),
-        v.literal("timed_out"),
-      ),
-    ),
-    paginationOpts: paginationOptsValidator,
-  },
-  handler: async (ctx, args) => {
-    const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
-    if (!result) {
-      return { page: [], isDone: true, continueCursor: "" };
-    }
-
-    const q = args.status
-      ? ctx.db
-          .query("runs")
-          .withIndex("by_project_id_and_status", (q) =>
-            q.eq("project_id", args.project_id).eq("status", args.status!),
-          )
-      : ctx.db
-          .query("runs")
-          .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id));
-
-    return q.order("desc").paginate(args.paginationOpts);
-  },
-});
-
 export const getRunDetail = query({
   args: { run_id: v.id("runs") },
   handler: async (ctx, args) => {
@@ -208,6 +175,93 @@ export const getActiveRunForSuite = query({
       .collect();
 
     return runs.find((r) => r.status === "running") ?? null;
+  },
+});
+
+type EnrichedRun = Doc<"runs"> & {
+  suite_name: string | null;
+  environment_name: string | null;
+  project_name: string | null;
+};
+
+async function enrichRun(ctx: QueryCtx, run: Doc<"runs">): Promise<EnrichedRun> {
+  const [suite, env, project] = await Promise.all([
+    run.suite_id ? ctx.db.get(run.suite_id) : null,
+    run.environment_id ? ctx.db.get(run.environment_id) : null,
+    ctx.db.get(run.project_id),
+  ]);
+  return {
+    ...run,
+    suite_name: suite?.name ?? null,
+    environment_name: env?.name ?? null,
+    project_name: project?.name ?? null,
+  };
+}
+
+const RUN_STATUS_VALIDATORS = v.union(
+  v.literal("running"),
+  v.literal("passed"),
+  v.literal("failed"),
+  v.literal("cancelled"),
+  v.literal("timed_out"),
+);
+
+export const getWorkspaceRuns = query({
+  args: {
+    status: v.optional(RUN_STATUS_VALIDATORS),
+    branch: v.optional(v.string()),
+    environment_id: v.optional(v.id("environments")),
+  },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return [];
+
+    let runs = await ctx.db
+      .query("runs")
+      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", ws.workspace._id))
+      .order("desc")
+      .collect();
+
+    if (args.status) {
+      runs = runs.filter((r) => r.status === args.status);
+    }
+    if (args.branch) {
+      runs = runs.filter((r) => r.branch === args.branch);
+    }
+    if (args.environment_id) {
+      runs = runs.filter((r) => r.environment_id === args.environment_id);
+    }
+
+    return Promise.all(runs.map((r) => enrichRun(ctx, r)));
+  },
+});
+
+export const getRunFilterOptions = query({
+  args: {},
+  handler: async (ctx) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return { branches: [] as string[], environments: [] as { _id: Id<"environments">; name: string }[] };
+
+    // TODO: O(runs) scan — replace with materialized set or dedicated index at scale
+    const runs = await ctx.db
+      .query("runs")
+      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", ws.workspace._id))
+      .collect();
+
+    const branchSet = new Set<string>();
+    for (const r of runs) {
+      if (r.branch) branchSet.add(r.branch);
+    }
+
+    const environments = await ctx.db
+      .query("environments")
+      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", ws.workspace._id))
+      .collect();
+
+    return {
+      branches: [...branchSet].sort(),
+      environments: environments.map((e) => ({ _id: e._id, name: e.name })),
+    };
   },
 });
 

@@ -1,4 +1,5 @@
 import { query } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { getOptionalOwnedWorkspace } from "../lib/requireAuth";
 
 const EMPTY_STATS = {
@@ -85,9 +86,9 @@ export const getDashboardStats = query({
 
     const perTestStatuses = new Map<string, Set<string>>();
     const failedResults: Array<{
-      test_id: string;
-      run_id: string;
-      run_result_id: string;
+      test_id: Id<"tests">;
+      run_id: Id<"runs">;
+      run_result_id: Id<"run_results">;
       created_at: number;
     }> = [];
 
@@ -199,9 +200,10 @@ export const getActiveRuns = query({
 
         let totalTests = 0;
         if (run.suite_id) {
+          const suiteId = run.suite_id;
           const tests = await ctx.db
             .query("tests")
-            .withIndex("by_suite_id", (q) => q.eq("suite_id", run.suite_id))
+            .withIndex("by_suite_id", (q) => q.eq("suite_id", suiteId))
             .collect();
           totalTests = tests.filter((t) => t.status === "approved").length;
         } else if (run.test_id) {

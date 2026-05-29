@@ -3,7 +3,8 @@ import type { FunctionReturnType } from "convex/server";
 import * as fs from "fs/promises";
 import * as path from "path";
 import mime from "mime";
-import { api, type Id } from "../../convex/_generated/api";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export class RunnerConvexClient {
   private client: ConvexHttpClient;
@@ -116,7 +117,7 @@ export class RunnerConvexClient {
     const response = await fetch(uploadUrl, {
       method: "POST",
       headers: { "Content-Type": contentType },
-      body: buffer,
+      body: new Uint8Array(buffer),
     });
 
     if (!response.ok) {
