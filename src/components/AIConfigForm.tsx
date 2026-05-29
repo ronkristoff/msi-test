@@ -11,6 +11,11 @@ type AIConfigFormProps = {
   showModelDropdown?: boolean;
 };
 
+export function presetLabel(provider: string): string {
+  if (provider === "z.ai") return "Z.AI";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
 export function AIConfigForm({
   maskedKey,
   showPresets = false,
@@ -53,7 +58,7 @@ export function AIConfigForm({
                   : "border-[var(--border)] text-[var(--fg-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
               }`}
             >
-              {provider.charAt(0).toUpperCase() + provider.slice(1)}
+              {presetLabel(provider)}
             </button>
           ))}
         </div>
@@ -73,7 +78,7 @@ export function AIConfigForm({
           {...register("endpoint_url")}
         />
         <p className="font-mono text-xs text-[var(--muted)] mt-1">
-          OpenAI-compatible base URL. Supports GLM, DeepSeek, Mistral, Ollama, and any OpenAI-compatible provider.
+          OpenAI-compatible base URL. Use the Z.AI Coding endpoint for GLM Coding Plan, or any other compatible provider.
         </p>
         {errors.endpoint_url && (
           <p className="text-xs text-[var(--danger)] mt-1">{errors.endpoint_url.message}</p>

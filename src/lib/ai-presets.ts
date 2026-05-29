@@ -1,4 +1,5 @@
 export const PRESETS: Record<string, { url: string; model: string }> = {
+  "z.ai": { url: "https://api.z.ai/api/coding/paas/v4", model: "glm-5.1" },
   openai: { url: "https://api.openai.com/v1", model: "gpt-4o" },
   azure: { url: "https://YOUR_RESOURCE.openai.azure.com/v1", model: "gpt-4o" },
   anthropic: { url: "https://api.anthropic.com/v1", model: "claude-3-5-sonnet-20241022" },
@@ -7,6 +8,11 @@ export const PRESETS: Record<string, { url: string; model: string }> = {
 };
 
 export const MODELS = [
+  "glm-5.1",
+  "glm-5",
+  "glm-5-turbo",
+  "glm-4.7",
+  "glm-4.5-air",
   "gpt-4o",
   "gpt-4o-mini",
   "gpt-4-turbo",
