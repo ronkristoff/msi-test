@@ -1,7 +1,8 @@
 # 014 — URL Exploration Flow
 
 **Type**: HITL — needs human to verify Runner exploration against a real app
-**Blocked by**: 005, 009
+**Status**: Implemented (pending HITL verification)
+**Blocked by**: 005, 009 ✅
 
 ## What to build
 
@@ -11,18 +12,18 @@ End-to-end: User navigates to `/projects/[id]/explore` → enters URL → Runner
 
 ## Acceptance criteria
 
-- [ ] `/projects/[id]/explore` page has URL input and "Start Exploration" button
-- [ ] Runner renders target app URL with Playwright, capturing SPA content after hydration
-- [ ] DOM snapshots and screenshots captured from each visited page
-- [ ] Real-time progress indicator shows which page is being rendered
-- [ ] Captured structure sent to Convex where Exploration Analysis Agent proposes testable scenarios
-- [ ] Proposed scenarios displayed as selectable cards: name, description, flow summary
-- [ ] User can select specific scenarios via checkboxes
-- [ ] "Generate Tests from Selected" button triggers Test Generation Agent for selected scenarios
-- [ ] Generated tests stored with `source_type: "url_exploration"`, status `draft`
-- [ ] Auto-creates a new Suite with descriptive name (e.g., "Exploration — May 24")
-- [ ] `exploreApp` Convex action manages the exploration flow with real-time progress mutations
-- [ ] Runner does not click or navigate autonomously — renders and captures only
+- [x] `/projects/[id]/explore` page has URL input and "Start Exploration" button
+- [x] Runner renders target app URL with Playwright, capturing SPA content after hydration
+- [ ] DOM snapshots and screenshots captured from each visited page *(DOM snapshots captured; screenshot upload not yet wired — `screenshot_storage_id` removed from schema pending future implementation)*
+- [x] Real-time progress indicator shows which page is being rendered
+- [x] Captured structure sent to Convex where Exploration Analysis Agent proposes testable scenarios
+- [x] Proposed scenarios displayed as selectable cards: name, description, flow summary
+- [x] User can select specific scenarios via checkboxes
+- [x] "Generate Tests from Selected" button triggers Test Generation Agent for selected scenarios
+- [x] Generated tests stored with `source_type: "url_exploration"`, status `draft`
+- [x] Auto-creates a new Suite with descriptive name (e.g., "Exploration — May 24")
+- [x] `exploreApp` Convex action manages the exploration flow with real-time progress mutations
+- [x] Runner does not click or navigate autonomously — renders and captures only
 
 ## Blocked by
 
