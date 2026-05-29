@@ -169,6 +169,33 @@ export async function seedFullStack(t: TestCtx, ownerId = "user1") {
   return { workspaceId, projectId, suiteId, testId };
 }
 
+type ExplorationOverrides = Partial<{
+  status: "pending" | "capturing" | "captured" | "analyzing" | "analyzed" | "completed" | "failed";
+  url: string;
+  runner_id: string;
+  progress_message: string;
+  pages_captured: number;
+}>;
+
+export async function seedExploration(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  overrides?: ExplorationOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("explorations", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      url: overrides?.url ?? "https://example.com",
+      status: overrides?.status ?? "pending",
+      runner_id: overrides?.runner_id,
+      progress_message: overrides?.progress_message,
+      pages_captured: overrides?.pages_captured,
+    });
+  });
+}
+
 export async function seedRunWithTwoTests(t: TestCtx) {
   const workspaceId = await seedWorkspace(t);
   const projectId = await seedProject(t, workspaceId);

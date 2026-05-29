@@ -10,6 +10,7 @@
 
 import type * as ai_agents from "../ai/agents.js";
 import type * as ai_errors from "../ai/errors.js";
+import type * as ai_exploreApp from "../ai/exploreApp.js";
 import type * as ai_generateNlTests from "../ai/generateNlTests.js";
 import type * as ai_generatePrdTests from "../ai/generatePrdTests.js";
 import type * as ai_model from "../ai/model.js";
@@ -22,10 +23,15 @@ import type * as crons from "../crons.js";
 import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as environments_mutations from "../environments/mutations.js";
 import type * as environments_queries from "../environments/queries.js";
+import type * as explorations_actions from "../explorations/actions.js";
+import type * as explorations_internal from "../explorations/internal.js";
+import type * as explorations_mutations from "../explorations/mutations.js";
+import type * as explorations_queries from "../explorations/queries.js";
 import type * as files_actions from "../files/actions.js";
 import type * as http from "../http.js";
 import type * as lib_constraints from "../lib/constraints.js";
 import type * as lib_requireAuth from "../lib/requireAuth.js";
+import type * as lib_runner from "../lib/runner.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as logs_mutations from "../logs/mutations.js";
 import type * as projects_mutations from "../projects/mutations.js";
@@ -52,6 +58,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
   "ai/errors": typeof ai_errors;
+  "ai/exploreApp": typeof ai_exploreApp;
   "ai/generateNlTests": typeof ai_generateNlTests;
   "ai/generatePrdTests": typeof ai_generatePrdTests;
   "ai/model": typeof ai_model;
@@ -64,10 +71,15 @@ declare const fullApi: ApiFromModules<{
   "dashboard/queries": typeof dashboard_queries;
   "environments/mutations": typeof environments_mutations;
   "environments/queries": typeof environments_queries;
+  "explorations/actions": typeof explorations_actions;
+  "explorations/internal": typeof explorations_internal;
+  "explorations/mutations": typeof explorations_mutations;
+  "explorations/queries": typeof explorations_queries;
   "files/actions": typeof files_actions;
   http: typeof http;
   "lib/constraints": typeof lib_constraints;
   "lib/requireAuth": typeof lib_requireAuth;
+  "lib/runner": typeof lib_runner;
   "lib/validation": typeof lib_validation;
   "logs/mutations": typeof logs_mutations;
   "projects/mutations": typeof projects_mutations;

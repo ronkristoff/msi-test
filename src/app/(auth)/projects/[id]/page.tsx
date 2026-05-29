@@ -87,6 +87,9 @@ export default function ProjectDetailPage() {
             </a>
           </div>
           <div className="flex items-center gap-2">
+            <Link href={`/projects/${project._id}/explore`}>
+              <Button variant="secondary" size="sm">Explore</Button>
+            </Link>
             <Link href={`/projects/${project._id}/environments`}>
               <Button variant="secondary" size="sm">Environments</Button>
             </Link>

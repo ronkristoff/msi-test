@@ -127,4 +127,54 @@ export class RunnerConvexClient {
     const { storageId } = await response.json();
     return storageId;
   }
+
+  async getPendingExplorations(): Promise<
+    FunctionReturnType<typeof api.explorations.queries.getPendingExplorations>
+  > {
+    return this.client.query(api.explorations.queries.getPendingExplorations, {});
+  }
+
+  async claimExploration(explorationId: string, runnerId: string): Promise<void> {
+    await this.client.action(api.explorations.actions.runnerClaimExploration, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+      runner_id: runnerId,
+    });
+  }
+
+  async updateExplorationProgress(
+    explorationId: string,
+    progressMessage: string,
+    pagesCaptured: number,
+  ): Promise<void> {
+    await this.client.action(api.explorations.actions.runnerUpdateExplorationProgress, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+      progress_message: progressMessage,
+      pages_captured: pagesCaptured,
+    });
+  }
+
+  async completeExploration(
+    explorationId: string,
+    capturedPages: Array<{
+      url: string;
+      title: string;
+      structure_text: string;
+    }>,
+  ): Promise<void> {
+    await this.client.action(api.explorations.actions.runnerCompleteExploration, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+      captured_pages: capturedPages,
+    });
+  }
+
+  async failExploration(explorationId: string, errorMessage: string): Promise<void> {
+    await this.client.action(api.explorations.actions.runnerFailExploration, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+      error_message: errorMessage,
+    });
+  }
 }

@@ -1,5 +1,6 @@
 import { RunnerConvexClient } from "./convex-client";
 import { executeRun } from "./executor";
+import { executeExploration } from "./explorer";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 const RUNNER_SECRET = process.env.RUNNER_SECRET;
@@ -18,7 +19,12 @@ if (!RUNNER_SECRET) {
 
 const client = new RunnerConvexClient(CONVEX_URL, RUNNER_SECRET);
 
-let activeRunId: string | null = null;
+type ActiveWork =
+  | { kind: "run"; id: string }
+  | { kind: "exploration"; id: string }
+  | null;
+
+let activeWork: ActiveWork = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let shuttingDown = false;
@@ -32,61 +38,112 @@ function cleanupSession() {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
   }
-  activeRunId = null;
+  activeWork = null;
+}
+
+async function forceCleanupWork(work: ActiveWork) {
+  if (!work) return;
+  cleanupSession();
+  if (work.kind === "run") {
+    log(`Cancelling active run ${work.id}`);
+    try {
+      await client.forceCompleteRun(work.id, "cancelled");
+    } catch (err) {
+      log(`Failed to cancel run ${work.id}: ${err}`);
+    }
+  } else {
+    log(`Failing active exploration ${work.id}`);
+    try {
+      await client.failExploration(work.id, "Runner shutting down");
+    } catch (err) {
+      log(`Failed to fail exploration ${work.id}: ${err}`);
+    }
+  }
 }
 
 async function poll() {
-  if (shuttingDown || activeRunId) return;
+  if (shuttingDown || activeWork) return;
 
   try {
-    const pending = await client.getPendingWork();
-    if (pending.length === 0) return;
+    const [pendingRuns, pendingExplorations] = await Promise.all([
+      client.getPendingWork(),
+      client.getPendingExplorations(),
+    ]);
 
-    const work = pending[0];
-
-    try {
-      await client.claimRun(work.run_id, RUNNER_ID);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("already claimed")) {
-        log(`Run ${work.run_id} was claimed by another runner, skipping`);
-        return;
-      }
-      throw err;
+    if (pendingExplorations.length > 0) {
+      await handleExploration(pendingExplorations[0]);
+      return;
     }
 
-    activeRunId = work.run_id;
-    log(`Claimed run ${work.run_id} (${work.tests.length} tests)`);
+    if (pendingRuns.length === 0) return;
 
-    heartbeatTimer = setInterval(async () => {
-      if (!activeRunId) return;
-      try {
-        await client.sendHeartbeat(activeRunId);
-      } catch (err) {
-        log(`Heartbeat failed for run ${activeRunId}: ${err}`);
-      }
-    }, HEARTBEAT_INTERVAL_MS);
-
-    try {
-      await client.sendHeartbeat(work.run_id);
-    } catch (err) {
-      log(`Initial heartbeat failed: ${err}`);
-    }
-
-    await executeRun(client, work, log);
-
-    cleanupSession();
-    log("Ready for next run");
+    await handleRun(pendingRuns[0]);
   } catch (err) {
     log(`Poll error: ${err}`);
-    if (activeRunId) {
-      try {
-        await client.forceCompleteRun(activeRunId, "failed");
-      } catch {
-        // best effort
-      }
-      cleanupSession();
+    await forceCleanupWork(activeWork);
+  }
+}
+
+async function handleRun(work: { run_id: string; tests: unknown[] }) {
+  if (!(await claimWithRetry(
+    () => client.claimRun(work.run_id, RUNNER_ID),
+    work.run_id,
+  ))) return;
+
+  activeWork = { kind: "run", id: work.run_id };
+  log(`Claimed run ${work.run_id} (${work.tests.length} tests)`);
+
+  heartbeatTimer = setInterval(async () => {
+    if (!activeWork || activeWork.kind !== "run") return;
+    try {
+      await client.sendHeartbeat(activeWork.id);
+    } catch (err) {
+      log(`Heartbeat failed for run ${activeWork.id}: ${err}`);
     }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  try {
+    await client.sendHeartbeat(work.run_id);
+  } catch (err) {
+    log(`Initial heartbeat failed: ${err}`);
+  }
+
+  await executeRun(client, work as Parameters<typeof executeRun>[1], log);
+
+  cleanupSession();
+  log("Ready for next work");
+}
+
+async function handleExploration(exploration: { _id: string; url: string }) {
+  if (!(await claimWithRetry(
+    () => client.claimExploration(exploration._id, RUNNER_ID),
+    exploration._id,
+  ))) return;
+
+  activeWork = { kind: "exploration", id: exploration._id };
+  log(`Claimed exploration ${exploration._id} (${exploration.url})`);
+
+  await executeExploration(
+    client,
+    { exploration_id: exploration._id, url: exploration.url },
+    log,
+  );
+
+  cleanupSession();
+  log("Ready for next work");
+}
+
+async function claimWithRetry(claim: () => Promise<void>, id: string): Promise<boolean> {
+  try {
+    await claim();
+    return true;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("already claimed")) {
+      log(`${id} was claimed by another runner, skipping`);
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -100,17 +157,7 @@ async function shutdown() {
     pollTimer = null;
   }
 
-  if (activeRunId) {
-    const runId = activeRunId;
-    cleanupSession();
-    log(`Cancelling active run ${runId}`);
-    try {
-      await client.forceCompleteRun(runId, "cancelled");
-      log(`Run ${runId} cancelled`);
-    } catch (err) {
-      log(`Failed to cancel run ${runId}: ${err}`);
-    }
-  }
+  await forceCleanupWork(activeWork);
 
   process.exit(0);
 }

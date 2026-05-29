@@ -2,18 +2,12 @@
 
 import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { ConvexError } from "convex/values";
 import { internal } from "../_generated/api";
 import { createFailureAnalysisAgent, failureAnalysisSchema } from "../ai/agents";
 import { getWorkspaceModel } from "../ai/model";
 import type { Id } from "../_generated/dataModel";
 import type { AiConfig } from "../ai/model";
-
-function validateRunnerSecret(secret: string) {
-  const expected = process.env.RUNNER_SECRET;
-  if (!expected) throw new ConvexError("RUNNER_SECRET not configured");
-  if (secret !== expected) throw new ConvexError("Invalid runner secret");
-}
+import { validateRunnerSecret } from "../lib/runner";
 
 function stripSecret<T extends { runner_secret: string }>(
   args: T,

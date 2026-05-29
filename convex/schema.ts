@@ -179,4 +179,44 @@ export default defineSchema({
     run_id: v.id("runs"),
     last_heartbeat_at: v.number(),
   }).index("by_run_id", ["run_id"]),
+
+  explorations: defineTable({
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    url: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("capturing"),
+      v.literal("captured"),
+      v.literal("analyzing"),
+      v.literal("analyzed"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    progress_message: v.optional(v.string()),
+    pages_captured: v.optional(v.number()),
+    runner_id: v.optional(v.string()),
+    captured_pages: v.optional(
+      v.array(
+        v.object({
+          url: v.string(),
+          title: v.string(),
+          structure_text: v.string(),
+        }),
+      ),
+    ),
+    proposed_scenarios: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          description: v.string(),
+          flow_summary: v.string(),
+        }),
+      ),
+    ),
+    error_message: v.optional(v.string()),
+  })
+    .index("by_project_id", ["project_id"])
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_status", ["status"]),
 });

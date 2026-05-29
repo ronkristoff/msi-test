@@ -1,0 +1,109 @@
+import { internalMutation, internalQuery } from "../_generated/server";
+import { v } from "convex/values";
+
+export const claimExploration = internalMutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    runner_id: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const exploration = await ctx.db.get(args.exploration_id);
+    if (!exploration) throw new Error("Exploration not found");
+    if (exploration.runner_id) throw new Error("Exploration already claimed");
+    if (exploration.status !== "pending") throw new Error("Exploration is not in pending status");
+
+    await ctx.db.patch(args.exploration_id, {
+      runner_id: args.runner_id,
+      status: "capturing",
+      progress_message: "Starting exploration...",
+      pages_captured: 0,
+    });
+  },
+});
+
+export const updateExplorationProgress = internalMutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    progress_message: v.string(),
+    pages_captured: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.exploration_id, {
+      progress_message: args.progress_message,
+      pages_captured: args.pages_captured,
+    });
+  },
+});
+
+export const completeExplorationCapture = internalMutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    captured_pages: v.array(
+      v.object({
+        url: v.string(),
+        title: v.string(),
+        structure_text: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.exploration_id, {
+      status: "captured",
+      captured_pages: args.captured_pages,
+      pages_captured: args.captured_pages.length,
+      progress_message: "Capture complete, starting analysis...",
+    });
+  },
+});
+
+export const storeProposedScenarios = internalMutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    scenarios: v.array(
+      v.object({
+        name: v.string(),
+        description: v.string(),
+        flow_summary: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.exploration_id, {
+      status: "analyzed",
+      proposed_scenarios: args.scenarios,
+      progress_message: "Analysis complete. Review proposed scenarios.",
+    });
+  },
+});
+
+export const updateExplorationStatus = internalMutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    status: v.union(
+      v.literal("analyzing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    progress_message: v.optional(v.string()),
+    error_message: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, unknown> = { status: args.status };
+    if (args.progress_message !== undefined) patch.progress_message = args.progress_message;
+    if (args.error_message !== undefined) patch.error_message = args.error_message;
+    await ctx.db.patch(args.exploration_id, patch);
+  },
+});
+
+export const getExplorationForAnalysis = internalQuery({
+  args: { exploration_id: v.id("explorations") },
+  handler: async (ctx, args) => {
+    const exploration = await ctx.db.get(args.exploration_id);
+    if (!exploration) return null;
+    return {
+      workspace_id: exploration.workspace_id,
+      url: exploration.url,
+      captured_pages: exploration.captured_pages ?? [],
+    };
+  },
+});
