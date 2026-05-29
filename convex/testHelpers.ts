@@ -94,6 +94,9 @@ type RunOverrides = Partial<{
   environment_id: string;
   branch: string;
   duration_ms: number;
+  pass_count: number;
+  fail_count: number;
+  skip_count: number;
 }>;
 
 export async function seedRun(
@@ -118,6 +121,9 @@ export async function seedRun(
         : undefined,
       branch: overrides?.branch,
       duration_ms: overrides?.duration_ms,
+      pass_count: overrides?.pass_count,
+      fail_count: overrides?.fail_count,
+      skip_count: overrides?.skip_count,
     });
   });
 }

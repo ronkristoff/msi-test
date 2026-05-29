@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { runStatusToVariant } from "@/lib/run-status";
+import { formatDuration, formatRelativeTime } from "@/lib/format";
 
 export type RunItem = {
   _id: string;
@@ -21,39 +24,22 @@ export type RunItem = {
   started_at?: number;
 };
 
-export type StatusTab = "all" | "running" | "passed" | "failed" | "cancelled";
+export type StatusTab = "all" | "running" | "passed" | "failed" | "flaky" | "cancelled";
+
+export type SortField = "recency" | "duration" | "fail_count" | "flakiness";
+export type SortOrder = "asc" | "desc";
 
 const STATUS_TABS: { key: StatusTab; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "failed", label: "Failed" },
+  { key: "flaky", label: "Flaky" },
   { key: "running", label: "Running" },
   { key: "passed", label: "Passed" },
-  { key: "failed", label: "Failed" },
   { key: "cancelled", label: "Cancelled" },
 ];
 
-const SELECT_CLASS =
+const INPUT_BASE =
   "font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-[6px] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]";
-
-function formatDuration(ms: number | undefined): string {
-  if (ms == null || ms === 0) return "—";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 function StatusTabs({
   active,
@@ -92,50 +78,23 @@ function StatusTabs({
   );
 }
 
-function FilterBar({
-  branches,
-  environments,
-  selectedBranch,
-  selectedEnvironment,
-  onBranchChange,
-  onEnvironmentChange,
-}: {
-  branches: string[];
-  environments: { _id: string; name: string }[];
-  selectedBranch: string;
-  selectedEnvironment: string;
-  onBranchChange: (val: string) => void;
-  onEnvironmentChange: (val: string) => void;
-}) {
-  if (branches.length === 0 && environments.length === 0) return null;
-
-  return (
-    <div className="flex gap-3 mb-4">
-      {branches.length > 0 && (
-        <select
-          value={selectedBranch}
-          onChange={(e) => onBranchChange(e.target.value)}
-          className={SELECT_CLASS}
-        >
-          <option value="">All branches</option>
-          {branches.map((b) => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-        </select>
-      )}
-      {environments.length > 0 && (
-        <select
-          value={selectedEnvironment}
-          onChange={(e) => onEnvironmentChange(e.target.value)}
-          className={SELECT_CLASS}
-        >
-          <option value="">All environments</option>
-          {environments.map((env) => (
-            <option key={env._id} value={env._id}>{env.name}</option>
-          ))}
-        </select>
-      )}
-    </div>
+function SortIcon({ field, currentSort, currentOrder }: { field: SortField; currentSort: SortField; currentOrder: SortOrder }) {
+  if (currentSort !== field) {
+    return (
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="inline ml-1 opacity-30">
+        <path d="M5 1L8 4H2L5 1Z" fill="currentColor" />
+        <path d="M5 9L2 6H8L5 9Z" fill="currentColor" />
+      </svg>
+    );
+  }
+  return currentOrder === "desc" ? (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="inline ml-1 text-[var(--accent)]">
+      <path d="M5 1L8 4H2L5 1Z" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="inline ml-1 text-[var(--accent)]">
+      <path d="M5 9L2 6H8L5 9Z" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -173,25 +132,44 @@ function RunRowItem({ run }: { run: RunItem }) {
           : "—"}
       </span>
       <span className="text-xs text-[var(--muted)]">
-        {formatTime(run._creationTime)}
+        {formatRelativeTime(run._creationTime)}
       </span>
     </Link>
   );
 }
 
-function TableHeader() {
+function TableHeader({
+  sortField,
+  sortOrder,
+  onSort,
+}: {
+  sortField: SortField;
+  sortOrder: SortOrder;
+  onSort: (field: SortField) => void;
+}) {
+  const headerBase = "cursor-pointer select-none hover:text-[var(--fg)] transition-colors";
   return (
     <div className={`grid ${GRID_COLS} items-center gap-2 px-4 py-2 border-b border-[var(--border)] font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]`}>
-      <span>Suite</span>
+      <span className={headerBase} onClick={() => onSort("recency")}>
+        Suite <SortIcon field="recency" currentSort={sortField} currentOrder={sortOrder} />
+      </span>
       <span>Status</span>
       <span>Trigger</span>
       <span>Environment</span>
-      <span>Duration</span>
-      <span>Results</span>
-      <span>Time</span>
+      <span className={headerBase} onClick={() => onSort("duration")}>
+        Duration <SortIcon field="duration" currentSort={sortField} currentOrder={sortOrder} />
+      </span>
+      <span className={headerBase} onClick={() => onSort("fail_count")}>
+        Results <SortIcon field="fail_count" currentSort={sortField} currentOrder={sortOrder} />
+      </span>
+      <span className={headerBase} onClick={() => onSort("recency")}>
+        Time <SortIcon field="recency" currentSort={sortField} currentOrder={sortOrder} />
+      </span>
     </div>
   );
 }
+
+const PAGE_SIZE = 20;
 
 export function RunsList({
   runs,
@@ -204,6 +182,11 @@ export function RunsList({
   selectedEnvironment,
   onBranchChange,
   onEnvironmentChange,
+  searchTerm,
+  onSearchChange,
+  sortField,
+  sortOrder,
+  onSort,
 }: {
   runs: RunItem[];
   statusCounts: Record<string, number>;
@@ -215,19 +198,58 @@ export function RunsList({
   selectedEnvironment: string;
   onBranchChange: (val: string) => void;
   onEnvironmentChange: (val: string) => void;
+  searchTerm: string;
+  onSearchChange: (val: string) => void;
+  sortField: SortField;
+  sortOrder: SortOrder;
+  onSort: (field: SortField) => void;
 }) {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleRuns = runs.slice(0, visibleCount);
+  const hasMore = visibleCount < runs.length;
+
   return (
     <div>
       <StatusTabs active={activeTab} onChange={onTabChange} counts={statusCounts} />
 
-      <FilterBar
-        branches={branches}
-        environments={environments}
-        selectedBranch={selectedBranch}
-        selectedEnvironment={selectedEnvironment}
-        onBranchChange={onBranchChange}
-        onEnvironmentChange={onEnvironmentChange}
-      />
+      <div className="flex gap-3 mb-4 items-center flex-wrap">
+        <input
+          type="text"
+          placeholder="Search by name, ID..."
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className={`${INPUT_BASE} w-full max-w-[280px]`}
+        />
+
+        {(branches.length > 0 || environments.length > 0) && (
+          <>
+            {branches.length > 0 && (
+              <select
+                value={selectedBranch}
+                onChange={(e) => onBranchChange(e.target.value)}
+                className={INPUT_BASE}
+              >
+                <option value="">All branches</option>
+                {branches.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            )}
+            {environments.length > 0 && (
+              <select
+                value={selectedEnvironment}
+                onChange={(e) => onEnvironmentChange(e.target.value)}
+                className={INPUT_BASE}
+              >
+                <option value="">All environments</option>
+                {environments.map((env) => (
+                  <option key={env._id} value={env._id}>{env.name}</option>
+                ))}
+              </select>
+            )}
+          </>
+        )}
+      </div>
 
       {runs.length === 0 ? (
         <EmptyState
@@ -240,12 +262,25 @@ export function RunsList({
           description="Test run history will appear here once you trigger your first suite execution."
         />
       ) : (
-        <div className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
-          <TableHeader />
-          {runs.map((run) => (
-            <RunRowItem key={run._id} run={run} />
-          ))}
-        </div>
+        <>
+          <div className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
+            <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
+            {visibleRuns.map((run) => (
+              <RunRowItem key={run._id} run={run} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <Button
+                variant="secondary"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

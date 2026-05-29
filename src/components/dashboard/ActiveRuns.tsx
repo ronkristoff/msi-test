@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { SectionPanel } from "./SectionHeader";
 import type { ActiveRun } from "@/lib/dashboard-types";
+import { formatElapsedTime } from "@/lib/format";
 
 function ProgressBar({ completed, total }: { completed: number; total: number }) {
   const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -14,14 +15,6 @@ function ProgressBar({ completed, total }: { completed: number; total: number })
       />
     </div>
   );
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
 }
 
 function RunCard({ run, now }: { run: ActiveRun; now: number }) {
@@ -50,7 +43,7 @@ function RunCard({ run, now }: { run: ActiveRun; now: number }) {
         </span>
         {elapsed > 0 && (
           <span className="font-[var(--font-mono)] text-[11px] text-[var(--muted)]">
-            Running for {formatDuration(elapsed)}
+            Running for {formatElapsedTime(elapsed)}
           </span>
         )}
       </div>

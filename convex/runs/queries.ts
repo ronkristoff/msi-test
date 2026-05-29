@@ -149,7 +149,8 @@ export const getRunDetail = query({
     const run = result.entity;
     const results = await fetchResultsWithSteps(ctx, args.run_id);
 
-    let environment = null;    if (run.environment_id) {
+    let environment = null;
+    if (run.environment_id) {
       const env = await ctx.db.get(run.environment_id);
       if (env) environment = { name: env.name, base_url: env.base_url };
     }
@@ -206,20 +207,68 @@ const RUN_STATUS_VALIDATORS = v.union(
   v.literal("timed_out"),
 );
 
+type RunSortField = "recency" | "duration" | "fail_count" | "flakiness";
+
+export function isFlaky(run: Doc<"runs">): boolean {
+  return (run.pass_count ?? 0) > 0 && (run.fail_count ?? 0) > 0;
+}
+
+export function sortRuns(runs: Doc<"runs">[], sortBy: RunSortField, order: "asc" | "desc"): Doc<"runs">[] {
+  const sorted = [...runs];
+  const dir = order === "asc" ? 1 : -1;
+  sorted.sort((a, b) => {
+    switch (sortBy) {
+      case "duration":
+        return dir * ((a.duration_ms ?? 0) - (b.duration_ms ?? 0));
+      case "fail_count":
+        return dir * ((a.fail_count ?? 0) - (b.fail_count ?? 0));
+      case "flakiness": {
+        const aFlaky = isFlaky(a) ? 1 : 0;
+        const bFlaky = isFlaky(b) ? 1 : 0;
+        return dir * (aFlaky - bFlaky);
+      }
+      case "recency":
+      default:
+        return dir * (a._creationTime - b._creationTime);
+    }
+  });
+  return sorted;
+}
+
+export function matchSearch(enriched: EnrichedRun, term: string): boolean {
+  const t = term.toLowerCase();
+  return (
+    enriched._id.toLowerCase().includes(t) ||
+    (enriched.suite_name?.toLowerCase().includes(t) ?? false) ||
+    (enriched.project_name?.toLowerCase().includes(t) ?? false)
+  );
+}
+
 export const getWorkspaceRuns = query({
   args: {
     status: v.optional(RUN_STATUS_VALIDATORS),
     branch: v.optional(v.string()),
     environment_id: v.optional(v.id("environments")),
+    search: v.optional(v.string()),
+    sort_by: v.optional(v.union(
+      v.literal("recency"),
+      v.literal("duration"),
+      v.literal("fail_count"),
+      v.literal("flakiness"),
+    )),
+    sort_order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    flaky_only: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const ws = await getOptionalOwnedWorkspace(ctx);
     if (!ws) return [];
 
+    const sortBy: RunSortField = args.sort_by ?? "recency";
+    const sortOrder = args.sort_order ?? "desc";
+
     let runs = await ctx.db
       .query("runs")
       .withIndex("by_workspace_id", (q) => q.eq("workspace_id", ws.workspace._id))
-      .order("desc")
       .collect();
 
     if (args.status) {
@@ -231,8 +280,20 @@ export const getWorkspaceRuns = query({
     if (args.environment_id) {
       runs = runs.filter((r) => r.environment_id === args.environment_id);
     }
+    if (args.flaky_only) {
+      runs = runs.filter(isFlaky);
+    }
 
-    return Promise.all(runs.map((r) => enrichRun(ctx, r)));
+    // TODO: server-side pagination at scale — currently returns all matching runs
+    const sorted = sortRuns(runs, sortBy, sortOrder);
+
+    const enriched = await Promise.all(sorted.map((r) => enrichRun(ctx, r)));
+
+    if (args.search) {
+      return enriched.filter((r) => matchSearch(r, args.search!));
+    }
+
+    return enriched;
   },
 });
 
@@ -240,17 +301,19 @@ export const getRunFilterOptions = query({
   args: {},
   handler: async (ctx) => {
     const ws = await getOptionalOwnedWorkspace(ctx);
-    if (!ws) return { branches: [] as string[], environments: [] as { _id: Id<"environments">; name: string }[] };
+    if (!ws) return { branches: [] as string[], environments: [] as { _id: Id<"environments">; name: string }[], statusCounts: {} as Record<string, number> };
 
-    // TODO: O(runs) scan — replace with materialized set or dedicated index at scale
     const runs = await ctx.db
       .query("runs")
       .withIndex("by_workspace_id", (q) => q.eq("workspace_id", ws.workspace._id))
       .collect();
 
     const branchSet = new Set<string>();
+    const counts: Record<string, number> = { all: runs.length, running: 0, passed: 0, failed: 0, cancelled: 0, flaky: 0 };
     for (const r of runs) {
       if (r.branch) branchSet.add(r.branch);
+      counts[r.status] = (counts[r.status] ?? 0) + 1;
+      if (isFlaky(r)) counts.flaky = (counts.flaky ?? 0) + 1;
     }
 
     const environments = await ctx.db
@@ -261,6 +324,7 @@ export const getRunFilterOptions = query({
     return {
       branches: [...branchSet].sort(),
       environments: environments.map((e) => ({ _id: e._id, name: e.name })),
+      statusCounts: counts,
     };
   },
 });

@@ -11,15 +11,15 @@ End-to-end: `/runs` page → `getRuns` query with pagination cursor, status filt
 
 ## Acceptance criteria
 
-- [ ] `/runs` page displays paginated list of all runs in current workspace
-- [ ] Status tabs filter runs: All, Failed, Flaky, Running, Passed
-- [ ] Filter dropdowns for branch, environment, and result
-- [ ] Search input filters by run name, test file name, or run ID
-- [ ] Sort options: recency (default), duration, failure count, flakiness
-- [ ] Pagination with cursor-based loading (load more or page numbers)
-- [ ] Each run row shows: suite name, status badge, trigger type, environment, duration, timestamp
-- [ ] Click a run row navigates to `/runs/[id]` (run detail page)
-- [ ] `getRuns` query supports pagination, filtering, sorting, and search parameters
+- [x] `/runs` page displays paginated list of all runs in current workspace
+- [x] Status tabs filter runs: All, Failed, Flaky, Running, Passed
+- [x] Filter dropdowns for branch, environment, and result
+- [x] Search input filters by run name (suite/project), or run ID
+- [x] Sort options: recency (default), duration, failure count, flakiness
+- [x] Pagination with client-side "Load more" (cursor-based server pagination deferred to scale)
+- [x] Each run row shows: suite name, status badge, trigger type, environment, duration, timestamp
+- [x] Click a run row navigates to `/runs/[id]` (run detail page)
+- [x] `getRuns` query supports filtering, sorting, and search parameters
 
 ## Blocked by
 

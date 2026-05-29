@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { RunsList, type RunItem } from "./RunsList";
+import { RunsList, type RunItem, type SortField, type SortOrder } from "./RunsList";
 
 const makeRun = (overrides: Partial<RunItem> = {}): RunItem => ({
   _id: "run1",
@@ -20,19 +20,24 @@ const makeRun = (overrides: Partial<RunItem> = {}): RunItem => ({
   ...overrides,
 });
 
-describe("RunsList", () => {
-  const defaultProps = {
-    statusCounts: { all: 3, passed: 2, failed: 1, running: 0, cancelled: 0 },
-    activeTab: "all" as const,
-    onTabChange: vi.fn(),
-    branches: ["main", "develop"],
-    environments: [{ _id: "env1", name: "Staging" }],
-    selectedBranch: "",
-    selectedEnvironment: "",
-    onBranchChange: vi.fn(),
-    onEnvironmentChange: vi.fn(),
-  };
+const defaultProps = {
+  statusCounts: { all: 3, passed: 2, failed: 1, running: 0, flaky: 0, cancelled: 0 },
+  activeTab: "all" as const,
+  onTabChange: vi.fn(),
+  branches: ["main", "develop"],
+  environments: [{ _id: "env1", name: "Staging" }],
+  selectedBranch: "",
+  selectedEnvironment: "",
+  onBranchChange: vi.fn(),
+  onEnvironmentChange: vi.fn(),
+  searchTerm: "",
+  onSearchChange: vi.fn(),
+  sortField: "recency" as SortField,
+  sortOrder: "desc" as SortOrder,
+  onSort: vi.fn(),
+};
 
+describe("RunsList", () => {
   it("renders empty state when no runs", () => {
     render(<RunsList {...defaultProps} runs={[]} />);
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
@@ -48,12 +53,13 @@ describe("RunsList", () => {
     expect(screen.getByText("Suite B")).toBeInTheDocument();
   });
 
-  it("renders status tabs", () => {
+  it("renders status tabs including flaky", () => {
     render(<RunsList {...defaultProps} runs={[]} />);
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText("Running")).toBeInTheDocument();
     expect(screen.getByText("Passed")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(screen.getByText("Flaky")).toBeInTheDocument();
     expect(screen.getByText("Cancelled")).toBeInTheDocument();
   });
 
@@ -63,6 +69,14 @@ describe("RunsList", () => {
 
     await userEvent.click(screen.getByText("Failed"));
     expect(onTabChange).toHaveBeenCalledWith("failed");
+  });
+
+  it("calls onTabChange when flaky tab clicked", async () => {
+    const onTabChange = vi.fn();
+    render(<RunsList {...defaultProps} runs={[]} onTabChange={onTabChange} />);
+
+    await userEvent.click(screen.getByText("Flaky"));
+    expect(onTabChange).toHaveBeenCalledWith("flaky");
   });
 
   it("renders filter dropdowns", () => {
@@ -145,12 +159,72 @@ describe("RunsList", () => {
       <RunsList
         {...defaultProps}
         runs={[]}
-        statusCounts={{ all: 10, passed: 5, failed: 3, running: 2, cancelled: 0 }}
+        statusCounts={{ all: 10, passed: 5, failed: 3, running: 2, flaky: 1, cancelled: 0 }}
       />,
     );
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("renders search input", () => {
+    render(<RunsList {...defaultProps} runs={[]} />);
+    expect(screen.getByPlaceholderText("Search by name, ID...")).toBeInTheDocument();
+  });
+
+  it("calls onSearchChange when typing in search input", async () => {
+    const onSearchChange = vi.fn();
+    render(<RunsList {...defaultProps} runs={[]} onSearchChange={onSearchChange} />);
+
+    await userEvent.type(screen.getByPlaceholderText("Search by name, ID..."), "login");
+    expect(onSearchChange).toHaveBeenCalled();
+  });
+
+  it("shows search input with current value", () => {
+    render(<RunsList {...defaultProps} runs={[]} searchTerm="login" />);
+    expect(screen.getByPlaceholderText("Search by name, ID...")).toHaveValue("login");
+  });
+
+  it("calls onSort when clicking sortable column header", async () => {
+    const onSort = vi.fn();
+    render(<RunsList {...defaultProps} runs={[makeRun()]} onSort={onSort} />);
+
+    const headers = screen.getAllByText((content, el) => {
+      return el?.tagName === "SPAN" && content.startsWith("Duration");
+    });
+    await userEvent.click(headers[0]);
+    expect(onSort).toHaveBeenCalledWith("duration");
+  });
+
+  it("renders load more button when runs exceed page size", () => {
+    const manyRuns = Array.from({ length: 25 }, (_, i) =>
+      makeRun({ _id: `r${i}`, suite_name: `Suite ${i}` })
+    );
+    render(<RunsList {...defaultProps} runs={manyRuns} />);
+    expect(screen.getByText("Load more")).toBeInTheDocument();
+  });
+
+  it("does not render load more when runs fit in one page", () => {
+    const fewRuns = Array.from({ length: 5 }, (_, i) =>
+      makeRun({ _id: `r${i}`, suite_name: `Suite ${i}` })
+    );
+    render(<RunsList {...defaultProps} runs={fewRuns} />);
+    expect(screen.queryByText("Load more")).not.toBeInTheDocument();
+  });
+
+  it("loads more runs when clicking load more", async () => {
+    const manyRuns = Array.from({ length: 25 }, (_, i) =>
+      makeRun({ _id: `r${i}`, suite_name: `Suite ${i}` })
+    );
+    render(<RunsList {...defaultProps} runs={manyRuns} />);
+
+    expect(screen.getByText("Suite 19")).toBeInTheDocument();
+    expect(screen.queryByText("Suite 20")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText("Load more"));
+
+    expect(screen.getByText("Suite 20")).toBeInTheDocument();
   });
 });
