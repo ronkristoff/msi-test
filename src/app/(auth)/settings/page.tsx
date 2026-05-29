@@ -139,10 +139,12 @@ function SettingsForm({
         <Alert variant={message.type} className="mb-5">{message.text}</Alert>
       )}
 
-      <div className="flex items-center gap-1 mb-5 border-b border-[var(--border)]">
+      <div role="tablist" className="flex items-center gap-1 mb-5 border-b border-[var(--border)]">
         {TABS.map((tab) => (
           <button
             key={tab.value}
+            role="tab"
+            aria-selected={activeTab === tab.value}
             onClick={() => setActiveTab(tab.value)}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors duration-[var(--motion-fast)] cursor-pointer ${
               activeTab === tab.value

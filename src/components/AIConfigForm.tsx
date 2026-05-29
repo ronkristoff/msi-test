@@ -1,8 +1,7 @@
 "use client";
 
 import { useFormContext } from "react-hook-form";
-import { PRESETS, MODELS } from "@/lib/ai-presets";
-import { useState } from "react";
+import { PRESETS, findPresetByUrl } from "@/lib/ai-presets";
 import type { AIConfigFormValues } from "@/lib/schemas";
 
 type AIConfigFormProps = {
@@ -10,11 +9,6 @@ type AIConfigFormProps = {
   showPresets?: boolean;
   showModelDropdown?: boolean;
 };
-
-export function presetLabel(provider: string): string {
-  if (provider === "z.ai") return "Z.AI";
-  return provider.charAt(0).toUpperCase() + provider.slice(1);
-}
 
 export function AIConfigForm({
   maskedKey,
@@ -25,12 +19,9 @@ export function AIConfigForm({
   const endpoint = watch("endpoint_url");
   const modelName = watch("model_name");
 
-  const [activePreset, setActivePreset] = useState(
-    endpoint ? Object.entries(PRESETS).find(([, p]) => p.url === endpoint)?.[0] ?? "openai" : "openai",
-  );
+  const activePreset = findPresetByUrl(endpoint);
 
   const handlePreset = (provider: string) => {
-    setActivePreset(provider);
     const p = PRESETS[provider];
     if (p) {
       setValue("endpoint_url", p.url, { shouldValidate: true });
@@ -43,22 +34,24 @@ export function AIConfigForm({
       hasError ? "border-[var(--danger)]" : "border-[var(--border)]"
     }`;
 
+  const presetModels = activePreset ? PRESETS[activePreset].models : [];
+
   return (
     <>
       {showPresets && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {Object.keys(PRESETS).map((provider) => (
+          {Object.entries(PRESETS).map(([key, preset]) => (
             <button
-              key={provider}
+              key={key}
               type="button"
-              onClick={() => handlePreset(provider)}
+              onClick={() => handlePreset(key)}
               className={`px-3 py-[5px] border rounded-[var(--radius-pill)] font-mono text-[11px] cursor-pointer transition-all duration-150 ${
-                activePreset === provider
+                activePreset === key
                   ? "bg-[var(--accent)] text-[var(--accent-on)] border-[var(--accent)]"
                   : "border-[var(--border)] text-[var(--fg-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
               }`}
             >
-              {presetLabel(provider)}
+              {preset.label}
             </button>
           ))}
         </div>
@@ -96,9 +89,10 @@ export function AIConfigForm({
             className="flex-1 border-none bg-transparent font-inherit text-[var(--fg)] outline-none cursor-pointer"
             {...register("model_name")}
           >
-            {MODELS.map((m) => (
-              <option key={m} value={m}>{m === "custom" ? "Custom..." : m}</option>
+            {presetModels.map((m) => (
+              <option key={m} value={m}>{m}</option>
             ))}
+            <option value="__custom__">Custom...</option>
           </select>
         </div>
       )}

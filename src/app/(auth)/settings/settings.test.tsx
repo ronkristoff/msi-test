@@ -49,8 +49,8 @@ const defaultWorkspace = {
   },
 };
 
-function getTabBar() {
-  return screen.getByRole("button", { name: /ai provider/i }).parentElement!;
+function getTabList() {
+  return screen.getByRole("tablist");
 }
 
 describe("SettingsPage", () => {
@@ -81,10 +81,18 @@ describe("SettingsPage", () => {
     mockUser = defaultUser;
     mockWorkspace = defaultWorkspace;
     await setup();
-    const tabBar = getTabBar();
-    expect(within(tabBar).getByText("AI Provider")).toBeInTheDocument();
-    expect(within(tabBar).getByText("Profile")).toBeInTheDocument();
-    expect(within(tabBar).getByText("Workspace")).toBeInTheDocument();
+    const tabList = getTabList();
+    expect(within(tabList).getByText("AI Provider")).toBeInTheDocument();
+    expect(within(tabList).getByText("Profile")).toBeInTheDocument();
+    expect(within(tabList).getByText("Workspace")).toBeInTheDocument();
+  });
+
+  it("marks AI Provider tab as selected by default", async () => {
+    mockUser = defaultUser;
+    mockWorkspace = defaultWorkspace;
+    await setup();
+    const aiTab = within(getTabList()).getByText("AI Provider");
+    expect(aiTab).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows AI Provider tab content by default", async () => {
@@ -100,7 +108,7 @@ describe("SettingsPage", () => {
     mockWorkspace = defaultWorkspace;
     await setup();
 
-    await user.click(within(getTabBar()).getByText("Profile"));
+    await user.click(within(getTabList()).getByText("Profile"));
     expect(screen.getByRole("button", { name: /update profile/i })).toBeInTheDocument();
     expect(screen.getByText("Change Password")).toBeInTheDocument();
   });
@@ -111,7 +119,7 @@ describe("SettingsPage", () => {
     mockWorkspace = defaultWorkspace;
     await setup();
 
-    await user.click(within(getTabBar()).getByText("Workspace"));
+    await user.click(within(getTabList()).getByText("Workspace"));
     expect(screen.getByRole("button", { name: /update workspace/i })).toBeInTheDocument();
   });
 
@@ -121,7 +129,7 @@ describe("SettingsPage", () => {
     mockWorkspace = defaultWorkspace;
     await setup();
 
-    await user.click(within(getTabBar()).getByText("Workspace"));
+    await user.click(within(getTabList()).getByText("Workspace"));
     expect(screen.getByText("Danger Zone")).toBeInTheDocument();
     expect(screen.getByText("Delete workspace")).toBeInTheDocument();
   });
@@ -151,7 +159,7 @@ describe("SettingsPage", () => {
     mockWorkspace = defaultWorkspace;
     await setup();
 
-    await user.click(within(getTabBar()).getByText("Workspace"));
+    await user.click(within(getTabList()).getByText("Workspace"));
     await user.click(screen.getByRole("button", { name: /update workspace/i }));
     expect(mockUpdateWorkspace).toHaveBeenCalledWith({ name: "My Workspace" });
   });
