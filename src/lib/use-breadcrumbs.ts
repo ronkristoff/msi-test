@@ -23,6 +23,14 @@ function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
     ];
   }
 
+  const runDetailMatch = pathname.match(/^\/runs\/([^/]+)$/);
+  if (runDetailMatch) {
+    return [
+      { label: "Runs", href: "/runs" },
+      { label: runDetailMatch[1] },
+    ];
+  }
+
   const settingsMatch = pathname.match(/^\/projects\/([^/]+)\/settings$/);
   if (settingsMatch) {
     const id = settingsMatch[1];

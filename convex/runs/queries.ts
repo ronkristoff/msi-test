@@ -19,6 +19,7 @@ type ResultWithSteps = {
   test_id: string;
   status: string;
   duration_ms: number;
+  retries: number;
   console_log_file_id?: string | null;
   trace_file_id?: string | null;
   video_file_id?: string | null;
@@ -51,6 +52,7 @@ async function fetchResultsWithSteps(
         test_id: rr.test_id,
         status: rr.status,
         duration_ms: rr.duration_ms,
+        retries: rr.retries,
         console_log_file_id: rr.console_log_file_id ?? null,
         trace_file_id: rr.trace_file_id ?? null,
         video_file_id: rr.video_file_id ?? null,
@@ -326,6 +328,62 @@ export const getRunFilterOptions = query({
       environments: environments.map((e) => ({ _id: e._id, name: e.name })),
       statusCounts: counts,
     };
+  },
+});
+
+export const getSameFailureHistory = query({
+  args: { test_id: v.id("tests"), exclude_run_id: v.id("runs") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return [];
+
+    const results = await ctx.db
+      .query("run_results")
+      .withIndex("by_test_id", (q) => q.eq("test_id", args.test_id))
+      .collect();
+
+    const failed = results
+      .filter((r) => r.status === "failed" && r.run_id !== args.exclude_run_id)
+      .slice(0, 5);
+
+    return Promise.all(
+      failed.map(async (r) => {
+        const run = await ctx.db.get(r.run_id);
+        return {
+          run_id: r.run_id,
+          run_status: run?.status ?? null,
+          duration_ms: r.duration_ms,
+          _creationTime: r._creationTime,
+        };
+      }),
+    );
+  },
+});
+
+export const getStepScreenshotUrl = query({
+  args: { storage_id: v.id("_storage"), run_result_id: v.id("run_results") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return null;
+
+    const rr = await ctx.db.get(args.run_result_id);
+    if (!rr || rr.workspace_id !== ws.workspace._id) return null;
+
+    return ctx.storage.getUrl(args.storage_id);
+  },
+});
+
+export const getConsoleLogUrl = query({
+  args: { run_result_id: v.id("run_results") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return null;
+
+    const rr = await ctx.db.get(args.run_result_id);
+    if (!rr || rr.workspace_id !== ws.workspace._id) return null;
+
+    if (!rr.console_log_file_id) return null;
+    return ctx.storage.getUrl(rr.console_log_file_id);
   },
 });
 

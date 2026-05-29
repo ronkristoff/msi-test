@@ -5,3 +5,4 @@ export { Alert } from "./Alert";
 export { Topbar } from "./Topbar";
 export { StatCard } from "./StatCard";
 export { EmptyState } from "./EmptyState";
+export { Card } from "./Card";
