@@ -9,7 +9,7 @@ export const triggerRun = mutation({
     project_id: v.id("projects"),
     suite_id: v.optional(v.id("suites")),
     test_id: v.optional(v.id("tests")),
-    environment_id: v.optional(v.id("environments")),
+    environment_id: v.id("environments"),
     trigger_type: v.optional(
       v.union(v.literal("manual"), v.literal("ci"), v.literal("rerun")),
     ),
@@ -64,7 +64,7 @@ export const triggerRun = mutation({
         workspace_id: workspace._id,
         run_id: runId,
         test_id: testId,
-        status: "passed",
+        status: "pending",
         duration_ms: 0,
         retries: 0,
       });
@@ -115,7 +115,7 @@ export const rerunTest = mutation({
         workspace_id: workspace._id,
         run_id: runId,
         test_id: testId,
-        status: "passed",
+        status: "pending",
         duration_ms: 0,
         retries: 0,
       });

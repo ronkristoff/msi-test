@@ -105,6 +105,7 @@ export default defineSchema({
     run_id: v.id("runs"),
     test_id: v.id("tests"),
     status: v.union(
+      v.literal("pending"),
       v.literal("passed"),
       v.literal("failed"),
       v.literal("skipped"),

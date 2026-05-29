@@ -98,10 +98,15 @@ async function aggregateAndFinalize(
   let total_duration_ms = 0;
 
   for (const r of results) {
-    total_duration_ms += r.duration_ms;
-    if (r.status === "passed") pass_count++;
-    else if (r.status === "failed") fail_count++;
-    else skip_count++;
+    if (r.status === "pending") {
+      await ctx.db.patch(r._id, { status: "failed" });
+      fail_count++;
+    } else {
+      total_duration_ms += r.duration_ms;
+      if (r.status === "passed") pass_count++;
+      else if (r.status === "failed") fail_count++;
+      else skip_count++;
+    }
   }
 
   const status = statusOverride ?? (fail_count > 0 ? "failed" as const : "passed" as const);

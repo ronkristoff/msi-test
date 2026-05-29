@@ -1,6 +1,7 @@
 type StatusVariant = "success" | "danger" | "warn" | "neutral" | "running";
 
 const RUN_STATUS_VARIANT: Record<string, StatusVariant> = {
+  pending: "running",
   passed: "success",
   failed: "danger",
   running: "running",

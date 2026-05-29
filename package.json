@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npx convex dev\" \"next dev --turbopack\" \"npx tsx runner/src/index.ts\"",
+    "dev": "concurrently \"npx convex dev\" \"next dev --turbopack\" \"npx tsx --env-file=.env.local runner/src/index.ts\"",
     "dev:next": "next dev --turbopack",
     "dev:convex": "npx convex dev",
-    "dev:runner": "npx tsx runner/src/index.ts",
+    "dev:runner": "npx tsx --env-file=.env.local runner/src/index.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

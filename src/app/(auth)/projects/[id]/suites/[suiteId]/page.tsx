@@ -313,14 +313,14 @@ export default function SuiteDetailPage() {
   };
 
   const handleTriggerRun = async () => {
-    if (!suite) return;
+    if (!suite || !selectedEnvId) return;
     setTriggerError(null);
     setTriggeringRun(true);
     try {
       const runId = await triggerRun({
         project_id: suite.project_id,
         suite_id: suiteId,
-        environment_id: selectedEnvId ? asId(selectedEnvId, "environments") : undefined,
+        environment_id: asId(selectedEnvId, "environments"),
       });
       router.push(`/runs/${runId}`);
     } catch (err) {
@@ -432,14 +432,14 @@ export default function SuiteDetailPage() {
               onChange={(e) => setSelectedEnvId(e.target.value || null)}
               className="font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             >
-              <option value="">Default URL</option>
+              <option value="">Select environment...</option>
               {environments?.map((env) => (
                 <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
               ))}
             </select>
             <Button
               onClick={handleTriggerRun}
-              disabled={triggeringRun}
+              disabled={triggeringRun || !selectedEnvId}
             >
               {triggeringRun ? (
                 <>
@@ -521,11 +521,12 @@ export default function SuiteDetailPage() {
                 test={test}
                 environments={environments}
                 onRunTest={(testId, envId) => {
+                  if (!envId) return;
                   setTriggeringRun(true);
                   triggerRun({
                     project_id: asId(params.id, "projects"),
                     test_id: asId(testId, "tests"),
-                    environment_id: envId ? asId(envId, "environments") : undefined,
+                    environment_id: asId(envId, "environments"),
                   })
                     .then((runId) => {
                       if (runId) router.push(`/runs/${runId}`);
