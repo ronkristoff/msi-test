@@ -7,7 +7,20 @@ export const getExploration = query({
   handler: async (ctx, args) => {
     const result = await getOptionalOwnedEntity(ctx, args.exploration_id, "explorations");
     if (!result) return null;
-    return result.entity;
+
+    const exploration = result.entity;
+
+    if (!exploration.captured_pages) return exploration;
+
+    const resolvedPages = await Promise.all(
+      exploration.captured_pages.map(async (page) => {
+        if (!page.screenshot_storage_id) return { ...page, screenshot_url: null };
+        const url = await ctx.storage.getUrl(page.screenshot_storage_id);
+        return { ...page, screenshot_url: url };
+      }),
+    );
+
+    return { ...exploration, captured_pages: resolvedPages };
   },
 });
 

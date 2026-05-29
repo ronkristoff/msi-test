@@ -42,6 +42,7 @@ export const completeExplorationCapture = internalMutation({
       v.object({
         url: v.string(),
         title: v.string(),
+        screenshot_storage_id: v.optional(v.id("_storage")),
         structure_text: v.string(),
       }),
     ),

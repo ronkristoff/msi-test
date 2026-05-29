@@ -160,13 +160,17 @@ export class RunnerConvexClient {
     capturedPages: Array<{
       url: string;
       title: string;
+      screenshot_storage_id?: string;
       structure_text: string;
     }>,
   ): Promise<void> {
     await this.client.action(api.explorations.actions.runnerCompleteExploration, {
       runner_secret: this.secret,
       exploration_id: explorationId as Id<"explorations">,
-      captured_pages: capturedPages,
+      captured_pages: capturedPages.map((p) => ({
+        ...p,
+        screenshot_storage_id: p.screenshot_storage_id as Id<"_storage"> | undefined,
+      })),
     });
   }
 

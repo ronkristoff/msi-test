@@ -10,6 +10,7 @@ interface CapturedPage {
   url: string;
   title: string;
   structure_text: string;
+  screenshot_storage_id?: string;
 }
 
 const MAX_PAGES = 15;
@@ -46,7 +47,18 @@ export async function executeExploration(
         const result = await capturePage(page, normalized, log);
 
         if (result) {
-          capturedPages.push(result.page);
+          let screenshotStorageId: string | undefined;
+          try {
+            const screenshotBuffer = await page.screenshot({ type: "png", fullPage: false });
+            screenshotStorageId = await client.uploadBuffer(screenshotBuffer, "image/png");
+          } catch (err) {
+            log(`Exploration ${work.exploration_id}: screenshot failed for ${normalized}: ${err}`);
+          }
+
+          capturedPages.push({
+            ...result.page,
+            screenshot_storage_id: screenshotStorageId,
+          });
 
           await client.updateExplorationProgress(
             work.exploration_id,

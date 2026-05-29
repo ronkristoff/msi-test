@@ -16,6 +16,14 @@ interface Scenario {
   flow_summary: string;
 }
 
+interface CapturedPageWithUrl {
+  url: string;
+  title: string;
+  structure_text: string;
+  screenshot_storage_id?: string;
+  screenshot_url: string | null;
+}
+
 export default function ExplorePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -196,6 +204,41 @@ export default function ExplorePage() {
 
         {showScenarios && (
           <div className="mb-5">
+            {exploration.captured_pages && exploration.captured_pages.length > 0 && (
+              <div className="mb-4">
+                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                  Captured Pages ({exploration.captured_pages.length})
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {(exploration.captured_pages as CapturedPageWithUrl[]).map((page, i) =>
+                    page.screenshot_url ? (
+                      <a
+                        key={i}
+                        href={page.screenshot_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden hover:border-[var(--border-strong)] transition-colors"
+                      >
+                        <img
+                          src={page.screenshot_url}
+                          alt={page.title}
+                          className="w-full h-auto"
+                          loading="lazy"
+                        />
+                        <div className="px-2 py-1 text-[10px] text-[var(--muted)] truncate">{page.title}</div>
+                      </a>
+                    ) : (
+                      <div
+                        key={i}
+                        className="flex items-center justify-center h-20 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]"
+                      >
+                        <span className="text-[10px] text-[var(--muted)] truncate px-2">{page.title}</span>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
             <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-3">
               Proposed Scenarios ({exploration.proposed_scenarios!.length})
             </div>

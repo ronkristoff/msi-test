@@ -126,7 +126,7 @@ describe("explorations internal mutations", () => {
     expect(exploration!.pages_captured).toBe(2);
   });
 
-  it("completeExplorationCapture stores captured pages", async () => {
+  it("completeExplorationCapture stores captured pages with optional screenshots", async () => {
     const t = convexTest(schema, modules);
     const workspaceId = await seedWorkspace(t);
     const projectId = await seedProject(t, workspaceId);
@@ -154,6 +154,8 @@ describe("explorations internal mutations", () => {
     expect(exploration!.status).toBe("captured");
     expect(exploration!.captured_pages).toHaveLength(2);
     expect(exploration!.captured_pages![0].title).toBe("Home");
+    expect(exploration!.captured_pages![0].screenshot_storage_id).toBeUndefined();
+    expect(exploration!.captured_pages![1].screenshot_storage_id).toBeUndefined();
     expect(exploration!.pages_captured).toBe(2);
   });
 
