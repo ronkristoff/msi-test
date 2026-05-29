@@ -11,15 +11,15 @@ End-to-end: `/flakiness-map` page → `getFlakinessMap` query computes per-test 
 
 ## Acceptance criteria
 
-- [ ] `/flakiness-map` page displays a heatmap grid: rows are tests, columns are runs
-- [ ] Cells color-coded with 5-step scale: stable (green) → critical (red) based on flakiness
-- [ ] Flakiness percentage shown per test row
-- [ ] Filter toggle: show only flaky tests, only stable tests, or all
-- [ ] AI flakiness cluster analysis identifies groups of tests that fail together (shared root cause)
-- [ ] Cluster analysis displayed as annotations or grouped sections on the heatmap
-- [ ] Click a test row to open a detail panel with: test name, flakiness trend sparkline, recent run history
-- [ ] "Export CSV" button downloads flakiness data as a CSV file
-- [ ] `getFlakinessMap` query computes flakiness scores from run history efficiently
+- [x] `/flakiness-map` page displays a heatmap grid: rows are tests, columns are runs
+- [x] Cells color-coded with 5-step scale: stable (green) → critical (red) based on flakiness
+- [x] Flakiness percentage shown per test row
+- [x] Filter toggle: show only flaky tests, only stable tests, or all
+- [x] AI flakiness cluster analysis identifies groups of tests that fail together (shared root cause)
+- [x] Cluster analysis displayed as annotations or grouped sections on the heatmap
+- [x] Click a test row to open a detail panel with: test name, flakiness trend sparkline, recent run history
+- [x] "Export CSV" button downloads flakiness data as a CSV file
+- [x] `getFlakinessMap` query computes flakiness scores from run history efficiently
 
 ## Blocked by
 

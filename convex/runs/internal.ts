@@ -208,13 +208,17 @@ export const storeAiInsight = internalMutation({
     analysis_text: v.string(),
     suggested_fix: v.optional(v.string()),
     confidence_score: v.number(),
+    type: v.optional(v.union(
+      v.literal("root_cause"),
+      v.literal("flakiness_cluster"),
+    )),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("ai_insights", {
       workspace_id: args.workspace_id,
       test_id: args.test_id,
       run_id: args.run_id,
-      type: "root_cause",
+      type: args.type ?? "root_cause",
       analysis_text: args.analysis_text,
       suggested_fix: args.suggested_fix,
       confidence_score: args.confidence_score,

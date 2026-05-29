@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { createFailureAnalysisAgent, failureAnalysisSchema } from "../ai/agents";
 import { getWorkspaceModel } from "../ai/model";
+import { extractJsonFromAiResponse } from "../ai/parse";
 import type { Id } from "../_generated/dataModel";
 import type { AiConfig } from "../ai/model";
 import { validateRunnerSecret } from "../lib/runner";
@@ -152,7 +153,7 @@ Error: ${result.error_message ?? "See step errors above"}`;
         const message = await thread.generateText({ prompt });
         const text = message.text ?? "";
 
-        const parsed = extractFailureAnalysis(text);
+        const parsed = extractJsonFromAiResponse(text, failureAnalysisSchema);
         if (!parsed) {
           console.warn(`[analyzeFailures] Could not parse AI response for test ${result.test_id}: ${text.slice(0, 200)}`);
           continue;
@@ -173,16 +174,3 @@ Error: ${result.error_message ?? "See step errors above"}`;
   },
 });
 
-function extractFailureAnalysis(text: string) {
-  const codeFenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-  const jsonSource = codeFenceMatch?.[1] ?? text;
-
-  const objectMatch = jsonSource.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-  if (!objectMatch) return null;
-
-  try {
-    return failureAnalysisSchema.parse(JSON.parse(objectMatch[0]));
-  } catch {
-    return null;
-  }
-}
