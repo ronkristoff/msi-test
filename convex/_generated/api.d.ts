@@ -32,6 +32,7 @@ import type * as files_actions from "../files/actions.js";
 import type * as flakiness_actions from "../flakiness/actions.js";
 import type * as flakiness_queries from "../flakiness/queries.js";
 import type * as http from "../http.js";
+import type * as insights_queries from "../insights/queries.js";
 import type * as lib_constraints from "../lib/constraints.js";
 import type * as lib_requireAuth from "../lib/requireAuth.js";
 import type * as lib_runner from "../lib/runner.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   "flakiness/actions": typeof flakiness_actions;
   "flakiness/queries": typeof flakiness_queries;
   http: typeof http;
+  "insights/queries": typeof insights_queries;
   "lib/constraints": typeof lib_constraints;
   "lib/requireAuth": typeof lib_requireAuth;
   "lib/runner": typeof lib_runner;

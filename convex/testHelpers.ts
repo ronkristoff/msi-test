@@ -169,6 +169,33 @@ export async function seedFullStack(t: TestCtx, ownerId = "user1") {
   return { workspaceId, projectId, suiteId, testId };
 }
 
+type AIInsightOverrides = Partial<{
+  type: "root_cause" | "flakiness_cluster";
+  analysis_text: string;
+  suggested_fix: string;
+  confidence_score: number;
+}>;
+
+export async function seedAIInsight(
+  t: TestCtx,
+  workspaceId: string,
+  testId: string,
+  runId: string,
+  overrides?: AIInsightOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("ai_insights", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      test_id: testId as Id<"tests">,
+      run_id: runId as Id<"runs">,
+      type: overrides?.type ?? "root_cause",
+      analysis_text: overrides?.analysis_text ?? "Element not visible",
+      suggested_fix: overrides?.suggested_fix,
+      confidence_score: overrides?.confidence_score ?? 0.85,
+    });
+  });
+}
+
 type ExplorationOverrides = Partial<{
   status: "pending" | "capturing" | "captured" | "analyzing" | "analyzed" | "completed" | "failed";
   url: string;

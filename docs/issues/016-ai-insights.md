@@ -2,6 +2,7 @@
 
 **Type**: AFK
 **Blocked by**: 010
+**Status**: Done
 
 ## What to build
 
@@ -11,12 +12,12 @@ End-to-end: `/insights` page → `getAIInsights` query returns all insights for 
 
 ## Acceptance criteria
 
-- [ ] `/insights` page displays consolidated list of all AI insights for the workspace
-- [ ] Each insight card shows: severity level, frequency (how many runs this issue appeared in), root cause summary, confidence score
-- [ ] Insights sorted by severity and frequency (most critical first)
-- [ ] Click an insight navigates to the related test failure in run detail (`/runs/[id]`)
-- [ ] Filter by insight type: root_cause, flakiness_cluster
-- [ ] `getAIInsights` query returns insights scoped to workspace, sorted by recency and severity
+- [x] `/insights` page displays consolidated list of all AI insights for the workspace
+- [x] Each insight card shows: severity level, frequency (how many runs this issue appeared in), root cause summary, confidence score
+- [x] Insights sorted by severity and frequency (most critical first)
+- [x] Click an insight navigates to the related test failure in run detail (`/runs/[id]`)
+- [x] Filter by insight type: root_cause, flakiness_cluster
+- [x] `getAIInsights` query returns insights scoped to workspace, sorted by recency and severity
 
 ## Blocked by
 
