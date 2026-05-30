@@ -58,6 +58,7 @@ export const runnerWriteRunResult = action({
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
     screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
+    error_message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
@@ -90,12 +91,14 @@ export const runnerForceCompleteRun = action({
       v.literal("cancelled"),
       v.literal("timed_out"),
     ),
+    error_message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
     await ctx.runMutation(internal.runs.internal.forceCompleteRun, {
       run_id: args.run_id,
       forced_status: args.forced_status,
+      error_message: args.error_message,
     });
     if (args.forced_status === "failed") {
       await ctx.runAction(internal.runs.actions.analyzeFailures, {

@@ -13,6 +13,7 @@ import { runStatusToVariant } from "@/lib/run-status";
 import { TestList } from "@/components/RunDetail/TestList";
 import { StepTimeline } from "@/components/RunDetail/StepTimeline";
 import { ScreenshotViewer } from "@/components/RunDetail/ScreenshotViewer";
+import { ArtifactViewer } from "@/components/RunDetail/ArtifactViewer";
 import { ConsoleOutput } from "@/components/RunDetail/ConsoleOutput";
 import { SameFailureHistory } from "@/components/RunDetail/SameFailureHistory";
 import { TestMetadata } from "@/components/RunDetail/TestMetadata";
@@ -62,17 +63,28 @@ export default function RunDetailPage() {
     : null;
 
   function handleDownloadLog() {
+    const parts: string[] = [];
+
+    if (runDetail.error_message) {
+      parts.push(`=== RUNNER ERROR ===`);
+      parts.push(runDetail.error_message);
+      parts.push("");
+    }
+
     const logText = results
       .map((r) => {
         const header = `=== ${r.test_name} (${r.status}, ${r.duration_ms}ms) ===`;
+        const errSection = r.error_message ? `  ERROR: ${r.error_message}` : "";
         const steps = r.steps
           .map((s) => `  [${s.step_number}] ${s.status.toUpperCase()} ${s.command}${s.locator ? ` (${s.locator})` : ""}${s.error_message ? `\n       ERROR: ${s.error_message}` : ""} (${s.duration_ms}ms)`)
           .join("\n");
-        return `${header}\n${steps}`;
+        return [header, errSection, steps].filter(Boolean).join("\n");
       })
       .join("\n\n");
 
-    const blob = new Blob([logText], { type: "text/plain" });
+    parts.push(logText);
+
+    const blob = new Blob([parts.join("\n\n")], { type: "text/plain" });
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = blobUrl;
@@ -107,7 +119,7 @@ export default function RunDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleDownloadLog} disabled={results.length === 0}>
+            <Button variant="ghost" size="sm" onClick={handleDownloadLog} disabled={results.length === 0 && !runDetail.error_message}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
               </svg>
@@ -122,6 +134,20 @@ export default function RunDetailPage() {
           </div>
         </div>
       </Card>
+
+      {runDetail.error_message && (
+        <Card className="p-4">
+          <div className="flex items-start gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger-text)" strokeWidth="2" className="shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--danger-text)] mb-1">Runner Error</h4>
+              <p className="text-sm text-[var(--fg)] font-[var(--font-mono)] break-all">{runDetail.error_message}</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {results.length === 0 ? (
         <EmptyState
@@ -174,6 +200,13 @@ export default function RunDetailPage() {
                     selectedIndex={selectedStepIndex}
                     onSelect={setSelectedStepIndex}
                   />
+                  {selectedResult.error_message && (
+                    <div className="mt-3 px-3 py-2 bg-[rgba(220,38,38,0.06)] border border-[rgba(220,38,38,0.2)] rounded-[var(--radius-sm)]">
+                      <span className="text-xs font-[var(--font-mono)] text-[var(--danger-text)] whitespace-pre-wrap break-all">
+                        {selectedResult.error_message}
+                      </span>
+                    </div>
+                  )}
                 </Card>
 
                 {selectedStep && (
@@ -204,6 +237,15 @@ export default function RunDetailPage() {
                     )}
                   </Card>
                 )}
+
+                <Card className="p-4">
+                  <ArtifactViewer
+                    runResultId={selectedResult._id}
+                    screenshotFileIds={selectedResult.screenshot_file_ids ?? null}
+                    videoFileId={selectedResult.video_file_id ?? null}
+                    traceFileId={selectedResult.trace_file_id ?? null}
+                  />
+                </Card>
 
                 <Card>
                   <ConsoleOutput runResultId={selectedResult._id} />

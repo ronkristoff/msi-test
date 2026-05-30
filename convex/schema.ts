@@ -93,6 +93,7 @@ export default defineSchema({
     pass_count: v.optional(v.number()),
     fail_count: v.optional(v.number()),
     skip_count: v.optional(v.number()),
+    error_message: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
@@ -116,6 +117,7 @@ export default defineSchema({
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
     screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
+    error_message: v.optional(v.string()),
   })
     .index("by_run_id", ["run_id"])
     .index("by_test_id", ["test_id"]),

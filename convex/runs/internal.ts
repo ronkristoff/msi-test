@@ -65,6 +65,7 @@ export const writeRunResult = internalMutation({
     trace_file_id: v.optional(v.id("_storage")),
     video_file_id: v.optional(v.id("_storage")),
     screenshot_file_ids: v.optional(v.array(v.id("_storage"))),
+    error_message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.run_result_id, {
@@ -74,6 +75,7 @@ export const writeRunResult = internalMutation({
       trace_file_id: args.trace_file_id,
       video_file_id: args.video_file_id,
       screenshot_file_ids: args.screenshot_file_ids,
+      error_message: args.error_message,
     });
   },
 });
@@ -82,6 +84,7 @@ async function aggregateAndFinalize(
   ctx: MutationCtx,
   run_id: Id<"runs">,
   statusOverride?: "failed" | "cancelled" | "timed_out",
+  errorMessage?: string,
 ) {
   const now = Date.now();
   const run = await ctx.db.get(run_id);
@@ -118,6 +121,7 @@ async function aggregateAndFinalize(
     pass_count,
     fail_count,
     skip_count,
+    ...(errorMessage !== undefined && { error_message: errorMessage }),
   });
 
   const heartbeat = await ctx.db
@@ -146,9 +150,10 @@ export const forceCompleteRun = internalMutation({
       v.literal("cancelled"),
       v.literal("timed_out"),
     ),
+    error_message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await aggregateAndFinalize(ctx, args.run_id, args.forced_status);
+    await aggregateAndFinalize(ctx, args.run_id, args.forced_status, args.error_message);
   },
 });
 

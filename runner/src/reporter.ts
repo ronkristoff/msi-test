@@ -53,6 +53,8 @@ export default class MsiTestReporter implements Reporter {
   }
 
   onStepEnd(test: TestCase, step: { title: string; duration: number; error?: { message?: string } }) {
+    if (!step.title) return;
+
     const fileIndex = this.fileIndexMap.get(test.id);
     if (fileIndex === undefined) return;
 
@@ -100,8 +102,7 @@ export default class MsiTestReporter implements Reporter {
   }
 
   private extractFileIndex(test: TestCase): number {
-    const filePaths = test.titlePath();
-    const fileName = filePaths[0] || "";
+    const fileName = test.location.file;
     const match = fileName.match(/test-(\d+)\.spec\.ts/);
     return match ? parseInt(match[1], 10) : 0;
   }

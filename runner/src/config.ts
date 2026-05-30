@@ -21,6 +21,7 @@ export default defineConfig({
   outputDir: '${outputDir}/test-results',
   use: {
     baseURL: '${baseURL}',
+    testIdAttribute: 'data-test',
     screenshot: 'on',
     video: 'on',
     trace: 'on',

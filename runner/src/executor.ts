@@ -41,51 +41,87 @@ export async function executeRun(
       await writeTestFile(runDir, i, work.tests[i].playwright_code);
     }
 
-    const reporterModulePath = path.resolve(__dirname, "reporter.js");
+    const reporterModulePath = path.resolve(__dirname, "reporter.ts");
     await generatePlaywrightConfig(work.base_url, runDir, reporterModulePath);
 
     log(`Run ${work.run_id}: starting Playwright execution against ${work.base_url}`);
 
     fsSync.mkdirSync(reporterDir, { recursive: true });
 
-    const exitCode = await runPlaywright(runDir, log);
+    const { exitCode, output: pwOutput } = await runPlaywright(runDir, log);
 
     log(`Run ${work.run_id}: Playwright exited with code ${exitCode}`);
 
     const indexToResultId = buildIndexMapping(work);
 
+    log(`Run ${work.run_id}: index mapping built:`);
+    for (const [idx, rid] of indexToResultId) {
+      log(`  file_index=${idx} → run_result_id=${rid}`);
+    }
+
     await processStepResults(client, work, reporterDir, indexToResultId, log);
 
     const summary = readSummary(reporterDir);
+
+    log(`Run ${work.run_id}: summary has ${summary.length} entries:`);
+    for (const entry of summary) {
+      log(`  file_index=${entry.file_index} name="${entry.test_name}" status=${entry.status} duration=${entry.duration_ms}ms`);
+    }
 
     const localArtifacts = scanArtifacts(runDir);
     const artifacts = await uploadArtifacts(client, localArtifacts, log);
 
     const consoleLogIds = await uploadConsoleLogs(client, reporterDir, indexToResultId, log);
 
-    for (const result of summary) {
-      const resultId = indexToResultId.get(result.file_index);
-      if (!resultId) continue;
+    if (summary.length === 0 && work.tests.length > 0) {
+      const pwError = pwOutput.trim().slice(-2000) || `Playwright exited with code ${exitCode}, no test results produced.`;
+      log(`Run ${work.run_id}: no summary results, writing fallback errors`);
 
-      const testArtifacts = artifacts.get(result.file_index);
+      for (const test of work.tests) {
+        const resultEntry = work.run_result_ids.find((r) => r.test_id === test._id);
+        if (!resultEntry) continue;
 
-      await client.writeRunResult({
-        run_result_id: resultId,
-        status: result.status,
-        duration_ms: result.duration_ms,
-        trace_file_id: testArtifacts?.trace_file_id,
-        video_file_id: testArtifacts?.video_file_id,
-        screenshot_file_ids: testArtifacts?.screenshot_file_ids,
-        console_log_file_id: consoleLogIds.get(result.file_index),
-      });
+        await client.writeRunResult({
+          run_result_id: resultEntry._id,
+          status: "failed",
+          duration_ms: 0,
+          error_message: `Playwright produced no results (exit code ${exitCode}). Output:\n${pwError}`,
+        });
+      }
+    } else {
+      const aggregated = aggregateSummary(summary);
+      log(`Run ${work.run_id}: aggregated into ${aggregated.size} groups:`);
+      for (const [fileIndex, agg] of aggregated) {
+        const resultId = indexToResultId.get(fileIndex);
+        log(`  file_index=${fileIndex} → resultId=${resultId ?? "MISSING"} status=${agg.status} duration=${agg.duration_ms}ms`);
+      }
+
+      for (const [fileIndex, agg] of aggregated) {
+        const resultId = indexToResultId.get(fileIndex);
+        if (!resultId) continue;
+
+        const testArtifacts = artifacts.get(fileIndex);
+
+        await client.writeRunResult({
+          run_result_id: resultId,
+          status: agg.status,
+          duration_ms: agg.duration_ms,
+          trace_file_id: testArtifacts?.trace_file_id,
+          video_file_id: testArtifacts?.video_file_id,
+          screenshot_file_ids: testArtifacts?.screenshot_file_ids,
+          console_log_file_id: consoleLogIds.get(fileIndex),
+          error_message: agg.error_message,
+        });
+      }
     }
 
     await client.completeRun(work.run_id);
     log(`Run ${work.run_id}: completed`);
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     log(`Run ${work.run_id}: execution error: ${err}`);
     try {
-      await client.forceCompleteRun(work.run_id, "failed");
+      await client.forceCompleteRun(work.run_id, "failed", errMsg);
     } catch {
       log(`Run ${work.run_id}: failed to mark run as failed`);
     }
@@ -156,6 +192,38 @@ function readSummary(reporterDir: string): TestSummary[] {
   const summaryPath = path.join(reporterDir, "summary.json");
   if (!fsSync.existsSync(summaryPath)) return [];
   return JSON.parse(fsSync.readFileSync(summaryPath, "utf-8"));
+}
+
+interface AggregatedResult {
+  status: "passed" | "failed" | "skipped";
+  duration_ms: number;
+  error_message?: string;
+}
+
+function aggregateSummary(summary: TestSummary[]): Map<number, AggregatedResult> {
+  const grouped = new Map<number, TestSummary[]>();
+  for (const entry of summary) {
+    const existing = grouped.get(entry.file_index) ?? [];
+    existing.push(entry);
+    grouped.set(entry.file_index, existing);
+  }
+
+  const result = new Map<number, AggregatedResult>();
+  for (const [fileIndex, entries] of grouped) {
+    const totalDuration = entries.reduce((sum, e) => sum + e.duration_ms, 0);
+    const hasFailed = entries.some((e) => e.status === "failed");
+    const errors = entries
+      .filter((e) => e.error_message)
+      .map((e) => `${e.test_name}: ${e.error_message}`)
+      .join("\n");
+
+    result.set(fileIndex, {
+      status: hasFailed ? "failed" : "passed",
+      duration_ms: totalDuration,
+      error_message: errors || undefined,
+    });
+  }
+  return result;
 }
 
 interface LocalArtifacts {
@@ -268,37 +336,46 @@ async function uploadConsoleLogs(
   return result;
 }
 
-function runPlaywright(cwd: string, log: (msg: string) => void): Promise<number> {
+function runPlaywright(cwd: string, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
+  const projectRoot = path.resolve(__dirname, "../..");
+
   return new Promise((resolve) => {
     const proc = spawn(
-      "npx",
-      ["playwright", "test", "--config=playwright.config.ts"],
+      path.join(projectRoot, "node_modules", ".bin", "playwright"),
+      ["test", "--config=playwright.config.ts"],
       {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
+          NODE_PATH: path.join(projectRoot, "node_modules"),
           MSITEST_REPORTER_DIR: path.join(cwd, "reporter"),
         },
       },
     );
 
+    const chunks: string[] = [];
+
     proc.stdout?.on("data", (data: Buffer) => {
-      for (const line of data.toString().split("\n").filter(Boolean)) {
+      const text = data.toString();
+      chunks.push(text);
+      for (const line of text.split("\n").filter(Boolean)) {
         log(`  [pw stdout] ${line}`);
       }
     });
 
     proc.stderr?.on("data", (data: Buffer) => {
-      for (const line of data.toString().split("\n").filter(Boolean)) {
+      const text = data.toString();
+      chunks.push(text);
+      for (const line of text.split("\n").filter(Boolean)) {
         log(`  [pw stderr] ${line}`);
       }
     });
 
-    proc.on("close", (code) => resolve(code ?? 1));
+    proc.on("close", (code) => resolve({ exitCode: code ?? 1, output: chunks.join("") }));
     proc.on("error", (err) => {
       log(`Playwright process error: ${err}`);
-      resolve(1);
+      resolve({ exitCode: 1, output: chunks.join("") + `\nProcess error: ${err.message}` });
     });
   });
 }

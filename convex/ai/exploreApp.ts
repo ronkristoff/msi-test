@@ -54,7 +54,7 @@ export const analyzeExploration = internalAction({
         })
         .join("\n\n");
 
-      const result = await thread.generateObject({
+      const result = await thread.generateText({
         prompt: `Analyze the following web application pages captured from ${exploration.url}.
 
 Identify the most testable user scenarios. For each scenario provide a name, description, and step-by-step flow summary.
@@ -62,11 +62,22 @@ Identify the most testable user scenarios. For each scenario provide a name, des
 Captured pages:
 ${pagesDescription}
 
-Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.`,
-        schema: explorationScenarioSchema.array(),
+Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
+
+IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
+- "name": string — concise scenario name
+- "description": string — what the scenario tests
+- "flowSummary": string — step-by-step flow summary`,
       });
 
-      scenarios = result.object.map((s) => ({
+      const text = result.text.trim();
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("AI response did not contain a JSON array");
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+      const validated = explorationScenarioSchema.array().parse(parsed);
+      scenarios = validated.map((s) => ({
         name: s.name,
         description: s.description,
         flow_summary: s.flowSummary,
@@ -117,7 +128,7 @@ export const generateExplorationTests = action({
     });
 
     const pagesContext = (exploration.captured_pages ?? [])
-      .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 1000)}`)
+      .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 3000)}`)
       .join("\n\n");
 
     const allTestBlocks: { name: string; code: string }[] = [];
@@ -132,7 +143,7 @@ export const generateExplorationTests = action({
         });
 
         const result = await thread.generateText({
-          prompt: `Generate Playwright tests for the following scenario.
+          prompt: `Generate a single Playwright test for the following scenario.
 
 Application URL: ${exploration.url}
 
@@ -143,7 +154,15 @@ Flow: ${scenario.flow_summary}
 Page structure context:
 ${pagesContext}
 
-Generate complete, runnable Playwright tests. Each test should be in its own markdown code fence with the "typescript" language tag.`,
+Generate a single, self-contained Playwright test. Rules:
+- Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
+- Navigate to ${exploration.url} at the start using page.goto()
+- Use semantic locators first (getByRole, getByLabel, getByPlaceholder, getByText), then getByTestId for data-test attributes shown in the page context
+- NEVER use raw CSS selectors (page.locator('.class')) or guess selectors not shown in the context
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+- Only interact with elements and assert on values explicitly shown in the page context — do NOT invent or guess selectors
+- Wrap the test in a single markdown code fence with language "typescript"`,
         });
 
         const blocks = extractMultipleTests(result.text);

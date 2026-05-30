@@ -62,6 +62,7 @@ export class RunnerConvexClient {
     trace_file_id?: string;
     video_file_id?: string;
     screenshot_file_ids?: string[];
+    error_message?: string;
   }): Promise<void> {
     await this.client.action(api.runs.actions.runnerWriteRunResult, {
       runner_secret: this.secret,
@@ -72,6 +73,7 @@ export class RunnerConvexClient {
       trace_file_id: args.trace_file_id as Id<"_storage"> | undefined,
       video_file_id: args.video_file_id as Id<"_storage"> | undefined,
       screenshot_file_ids: args.screenshot_file_ids as Id<"_storage">[] | undefined,
+      error_message: args.error_message,
     });
   }
 
@@ -85,11 +87,13 @@ export class RunnerConvexClient {
   async forceCompleteRun(
     runId: string,
     status: "failed" | "cancelled" | "timed_out",
+    errorMessage?: string,
   ): Promise<void> {
     await this.client.action(api.runs.actions.runnerForceCompleteRun, {
       runner_secret: this.secret,
       run_id: runId as Id<"runs">,
       forced_status: status,
+      error_message: errorMessage,
     });
   }
 
@@ -101,7 +105,9 @@ export class RunnerConvexClient {
   }
 
   async generateUploadUrl(): Promise<string> {
-    return this.client.action(api.files.actions.generateUploadUrl, {});
+    return this.client.action(api.files.actions.runnerGenerateUploadUrl, {
+      runner_secret: this.secret,
+    });
   }
 
   async uploadFile(filePath: string): Promise<string> {

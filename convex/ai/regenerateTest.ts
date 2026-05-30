@@ -65,7 +65,15 @@ Existing test code:
 ${test.playwright_code}
 \`\`\`
 
-Generate an improved version of this test as a single Playwright test in a markdown code fence with the "typescript" language tag. The test should be self-contained with its own imports.`,
+Generate an improved version as a single Playwright test. Rules:
+- Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
+- Navigate to ${project.app_url} using page.goto() at the start
+- Use semantic locators first (getByRole, getByLabel, getByPlaceholder, getByText), then getByTestId for data-test attributes
+- NEVER use raw CSS selectors or guess selectors not shown in context
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+- Only interact with elements and assert on values explicitly shown — do NOT invent or guess selectors
+- Wrap the test in a single markdown code fence with language "typescript"`,
       });
       responseText = result.text;
     } catch (err: unknown) {

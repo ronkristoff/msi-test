@@ -24,6 +24,7 @@ type ResultWithSteps = {
   trace_file_id?: string | null;
   video_file_id?: string | null;
   screenshot_file_ids?: string[] | null;
+  error_message?: string | null;
   test_name: string;
   playwright_code: string | null;
   steps: StepRow[];
@@ -57,6 +58,7 @@ async function fetchResultsWithSteps(
         trace_file_id: rr.trace_file_id ?? null,
         video_file_id: rr.video_file_id ?? null,
         screenshot_file_ids: rr.screenshot_file_ids ?? null,
+        error_message: rr.error_message ?? null,
         test_name: test?.name ?? "Unknown test",
         playwright_code: test?.playwright_code ?? null,
         steps: steps.map((s) => ({
@@ -384,6 +386,25 @@ export const getConsoleLogUrl = query({
 
     if (!rr.console_log_file_id) return null;
     return ctx.storage.getUrl(rr.console_log_file_id);
+  },
+});
+
+export const getResultArtifactUrls = query({
+  args: { run_result_id: v.id("run_results") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return { screenshots: [] as (string | null)[], video: null as string | null, trace: null as string | null };
+
+    const rr = await ctx.db.get(args.run_result_id);
+    if (!rr || rr.workspace_id !== ws.workspace._id) return { screenshots: [] as (string | null)[], video: null as string | null, trace: null as string | null };
+
+    const screenshots = rr.screenshot_file_ids
+      ? await Promise.all(rr.screenshot_file_ids.map((id) => ctx.storage.getUrl(id)))
+      : [];
+    const video = rr.video_file_id ? await ctx.storage.getUrl(rr.video_file_id) : null;
+    const trace = rr.trace_file_id ? await ctx.storage.getUrl(rr.trace_file_id) : null;
+
+    return { screenshots, video, trace };
   },
 });
 

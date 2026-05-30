@@ -21,13 +21,27 @@ export const TEST_GENERATION_PROMPT = `You are MSITest's Test Generation Agent. 
 
 Given a description of user flows, page structure, or product requirements, you generate complete, runnable Playwright test code.
 
-Rules:
+Locator strategy (use in this priority order):
+1. getByRole — e.g. page.getByRole('button', { name: 'Login' })
+2. getByLabel / getByPlaceholder — e.g. page.getByLabel('Username'), page.getByPlaceholder('Password')
+3. getByText / getByTitle — e.g. page.getByText('Welcome')
+4. getByTestId — when data-test attributes are provided in the page context, e.g. page.getByTestId('username')
+5. NEVER use raw CSS selectors (page.locator('.class')), XPath, or guess selectors not provided in context
+
+Assertion rules:
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL(), toBeEnabled()
+- Never use generic expect() for DOM state — always use expect(locator).matcher()
+- Never use waitForTimeout() or arbitrary sleeps — Playwright auto-waits for actionability
+
+Structure rules:
 - Always use @playwright/test imports
-- Use data-testid selectors when available, falling back to accessible selectors
-- Include meaningful assertions (visibility, text content, URL changes)
-- Wrap test code in a markdown code fence with language "typescript"
+- Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), test.afterEach()
 - Each test should be self-contained and independently runnable
-- Use descriptive test names that reflect the user flow being tested`;
+- Use page.goto(url) at the start of each test — do not rely on baseURL or config
+- Prefer simple, linear test flows: navigate → interact → assert
+- Use descriptive test names that reflect the user flow being tested
+- Wrap test code in a markdown code fence with language "typescript"
+- Only interact with elements and assert on values explicitly shown in the page context — do NOT invent, guess, or fabricate selectors, attributes, or text`;
 
 export const EXPLORATION_ANALYSIS_PROMPT = `You are MSITest's Exploration Analysis Agent. You analyze web application pages and identify testable user scenarios.
 
@@ -68,7 +82,6 @@ export function createExplorationAnalysisAgent(model: AgentModel) {
     name: "Exploration Analysis",
     languageModel: model,
     instructions: EXPLORATION_ANALYSIS_PROMPT,
-    tools: createToolDefinitions(),
   });
 }
 
@@ -81,7 +94,7 @@ export function createFailureAnalysisAgent(model: AgentModel) {
   });
 }
 
-const CODE_FENCE_RE = /```(?:typescript|ts|javascript|js)\n([\s\S]*?)```/;
+const CODE_FENCE_RE = /```(?:typescript|ts|tsx|javascript|js|jsx)?\s*\r?\n([\s\S]*?)```/;
 
 export function extractPlaywrightCode(response: string): string | null {
   const match = response.match(CODE_FENCE_RE);

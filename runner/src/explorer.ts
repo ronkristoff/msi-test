@@ -137,35 +137,6 @@ async function capturePage(
       }))
       .filter((l) => l.href && l.href.startsWith("http"));
 
-    const forms = Array.from(document.querySelectorAll("form"))
-      .map((form) => ({
-        action: form.action || "",
-        method: form.method || "GET",
-        inputs: Array.from(form.querySelectorAll("input, select, textarea"))
-          .map((el) => {
-            const input = el as HTMLInputElement;
-            return {
-              name: input.name || input.id || "",
-              type: input.type || input.tagName.toLowerCase(),
-              label:
-                input.labels?.[0]?.textContent?.trim() ??
-                input.getAttribute("placeholder") ??
-                input.getAttribute("aria-label") ??
-                "",
-            };
-          }),
-        buttons: Array.from(form.querySelectorAll("button, input[type='submit']"))
-          .map((btn) => btn.textContent?.trim() ?? btn.getAttribute("value") ?? "")
-          .filter(Boolean),
-      }));
-
-    const standaloneButtons = Array.from(
-      document.querySelectorAll("button:not(form button), [role='button']:not(form [role='button'])"),
-    )
-      .map((btn) => btn.textContent?.trim() ?? "")
-      .filter(Boolean)
-      .slice(0, 20);
-
     const navElements = Array.from(document.querySelectorAll("nav, [role='navigation']"))
       .map((nav) =>
         Array.from(nav.querySelectorAll("a"))
@@ -177,7 +148,24 @@ async function capturePage(
     const metaDescription =
       document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
 
-    return { headings, links, forms, standaloneButtons, navElements, metaDescription };
+    const elements = Array.from(
+      document.querySelectorAll("input, select, textarea, button, [role='button'], [data-test], [data-testid]"),
+    ).slice(0, 50)
+      .map((el) => {
+        const input = el as HTMLInputElement;
+        const tag = el.tagName.toLowerCase();
+        const testId = el.getAttribute("data-test") ?? el.getAttribute("data-testid") ?? "";
+        const role = el.getAttribute("role") ?? "";
+        const type = input.type ?? "";
+        const ariaLabel = el.getAttribute("aria-label") ?? "";
+        const placeholder = input.getAttribute("placeholder") ?? "";
+        const label = input.labels?.[0]?.textContent?.trim() ?? "";
+        const text = (el.textContent?.trim() ?? el.getAttribute("value") ?? "").slice(0, 60);
+        const href = (el as HTMLAnchorElement).href ?? "";
+        return { tag, type, testId, role, ariaLabel, placeholder, label, text, href };
+      });
+
+    return { headings, links, navElements, metaDescription, elements };
   });
 
   const structureText = buildStructureText(url, title, structure);
@@ -188,21 +176,47 @@ async function capturePage(
   };
 }
 
+interface ElementInfo {
+  tag: string;
+  type: string;
+  testId: string;
+  role: string;
+  ariaLabel: string;
+  placeholder: string;
+  label: string;
+  text: string;
+  href: string;
+}
+
+function generateLocator(el: ElementInfo): string {
+  if (el.testId) return `page.getByTestId('${el.testId}')`;
+  if (el.role === "button" || el.tag === "button") {
+    const name = el.text || el.ariaLabel;
+    return name ? `page.getByRole('button', { name: '${escape(name)}' })` : "page.getByRole('button')";
+  }
+  if (el.tag === "a" && el.text) return `page.getByRole('link', { name: '${escape(el.text)}' })`;
+  if (el.tag === "input" || el.tag === "select" || el.tag === "textarea") {
+    if (el.label) return `page.getByLabel('${escape(el.label)}')`;
+    if (el.placeholder) return `page.getByPlaceholder('${escape(el.placeholder)}')`;
+    if (el.ariaLabel) return `page.getByLabel('${escape(el.ariaLabel)}')`;
+  }
+  if (el.text) return `page.getByText('${escape(el.text.slice(0, 40))}')`;
+  return "";
+}
+
+function escape(s: string): string {
+  return s.replace(/'/g, "\\'").replace(/\n/g, " ").trim();
+}
+
 function buildStructureText(
   url: string,
   title: string,
   structure: {
     headings: string[];
     links: { text: string; href: string }[];
-    forms: {
-      action: string;
-      method: string;
-      inputs: { name: string; type: string; label: string }[];
-      buttons: string[];
-    }[];
-    standaloneButtons: string[];
     navElements: string[];
     metaDescription: string;
+    elements: ElementInfo[];
   },
 ): string {
   const parts: string[] = [];
@@ -221,19 +235,19 @@ function buildStructureText(
     parts.push(`\nNavigation:\n${structure.navElements.map((n) => `  ${n}`).join("\n")}`);
   }
 
-  if (structure.forms.length > 0) {
-    parts.push("\nForms:");
-    for (const form of structure.forms) {
-      const inputList = form.inputs
-        .map((i) => `${i.type}[${i.name || "unnamed"}]${i.label ? ` (${i.label})` : ""}`)
-        .join(", ");
-      const buttonList = form.buttons.join(", ");
-      parts.push(`  ${form.method} ${form.action || "(same page)"} → inputs: ${inputList || "none"} | buttons: ${buttonList || "none"}`);
-    }
-  }
+  const locators = structure.elements
+    .map((el) => {
+      const locator = generateLocator(el);
+      if (!locator) return null;
+      const desc = el.label || el.placeholder || el.ariaLabel || el.text;
+      const descPart = desc ? ` — ${el.tag}, "${desc}"` : ` — ${el.tag}`;
+      return `  ${locator}${descPart}`;
+    })
+    .filter(Boolean);
 
-  if (structure.standaloneButtons.length > 0) {
-    parts.push(`\nButtons: ${structure.standaloneButtons.join(", ")}`);
+  if (locators.length > 0) {
+    parts.push("\nPlaywright locators (use these in tests):");
+    parts.push(locators.join("\n"));
   }
 
   const linkTexts = structure.links

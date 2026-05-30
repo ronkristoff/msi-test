@@ -56,7 +56,18 @@ URL: ${project.app_url}
 Product Requirements:
 ${prdContent}
 
-Generate complete, runnable Playwright tests. Each test should be in its own markdown code fence with the "typescript" language tag. Each test should be self-contained with its own imports.`,
+Generate complete, runnable Playwright tests. Each test must be in its own markdown code fence with the "typescript" language tag. Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach(). Each test should navigate to ${project.app_url} using page.goto() at the start.
+
+Locator strategy (priority order):
+1. Semantic locators first: getByRole, getByLabel, getByPlaceholder, getByText
+2. getByTestId for data-test/data-testid attributes
+3. NEVER use raw CSS selectors or XPath
+
+Assertion rules:
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+
+Only interact with elements and assert on values explicitly described in the requirements — do NOT invent or guess selectors.`,
       });
       responseText = result.text;
     } catch (err: unknown) {

@@ -47,7 +47,7 @@ async function forceCleanupWork(work: ActiveWork) {
   if (work.kind === "run") {
     log(`Cancelling active run ${work.id}`);
     try {
-      await client.forceCompleteRun(work.id, "cancelled");
+      await client.forceCompleteRun(work.id, "cancelled", "Runner shutting down");
     } catch (err) {
       log(`Failed to cancel run ${work.id}: ${err}`);
     }
