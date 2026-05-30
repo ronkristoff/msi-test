@@ -9,6 +9,7 @@ export const explorationScenarioSchema = z.object({
   name: z.string(),
   description: z.string(),
   flowSummary: z.string(),
+  area: z.string(),
 });
 
 export const failureAnalysisSchema = z.object({
@@ -49,6 +50,7 @@ Given a URL or page description, you produce a list of distinct test scenarios. 
 - A clear, concise name
 - A description of what the scenario tests
 - A step-by-step flow summary a test would follow
+- An area label categorizing which part of the app this scenario belongs to (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation", "User Profile", etc.)
 
 Focus on critical user flows, edge cases, and error states. Prioritize by business impact.`;
 

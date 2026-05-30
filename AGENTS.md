@@ -259,3 +259,17 @@ NEVER write implementation code before a test exists for it. The only exception 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 **PR workflow:** Analyze full commit history → draft comprehensive summary → include test plan → push with `-u` flag.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as markdown files in `docs/issues/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default triage label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.

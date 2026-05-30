@@ -8,7 +8,7 @@ import hljs from "highlight.js/lib/core";
 import javascript from "highlight.js/lib/languages/javascript";
 import "highlight.js/styles/github-dark.css";
 import { api, asId } from "@/lib/convex";
-import type { Doc } from "@/lib/convex";
+import type { Doc, Id } from "@/lib/convex";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -17,6 +17,7 @@ import { Alert } from "@/components/ui/Alert";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { useErrorLogger } from "@/lib/error-logger";
 import { hasAiConfig } from "@/lib/ai-presets";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 
 hljs.registerLanguage("javascript", javascript);
 
@@ -51,7 +52,7 @@ function CodePreview({ code }: { code: string }) {
   }, [code]);
 
   return (
-    <pre className="bg-[#0d1117] rounded-[var(--radius-sm)] p-4 overflow-x-auto text-sm">
+    <pre className="bg-[#0d1117] rounded-[var(--radius-sm)] p-4 overflow-x-auto text-sm text-[#e6edf3]">
       <code ref={codeRef} className="language-javascript">
         {code}
       </code>
@@ -59,10 +60,11 @@ function CodePreview({ code }: { code: string }) {
   );
 }
 
-function TestAccordionItem({ test, environments, onRunTest }: {
+function TestAccordionItem({ test, environments, onRunTest, workspace }: {
   test: Doc<"tests">;
   environments: Doc<"environments">[] | undefined;
   onRunTest: (testId: string, envId: string | null) => void;
+  workspace: { ai_config?: { endpoint_url: string; api_key: string; model_name: string } } | null | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [localCode, setLocalCode] = useState<string | null>(null);
@@ -73,9 +75,19 @@ function TestAccordionItem({ test, environments, onRunTest }: {
   const updateTestStatus = useMutation(api.tests.mutations.updateTestStatus);
   const deleteTest = useMutation(api.tests.mutations.deleteTest);
   const regenerateTest = useAction(api.ai.regenerateTest.regenerateTest);
+  const healTestAction = useAction(api.ai.healTest.healTest);
   const { logError } = useErrorLogger();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [healing, setHealing] = useState(false);
+  const [healSuccess, setHealSuccess] = useState(false);
+
+  const latestFailure = useQuery(
+    api.runs.queries.getLatestFailureForTest,
+    expanded ? { test_id: test._id } : "skip",
+  );
+
+  const aiConfigReady = hasAiConfig(workspace);
 
   const handleSave = async () => {
     await updateTestCode({ test_id: test._id, playwright_code: localCode! });
@@ -103,12 +115,26 @@ function TestAccordionItem({ test, environments, onRunTest }: {
     }
   };
 
+  const handleHeal = async () => {
+    setHealing(true);
+    setHealSuccess(false);
+    try {
+      await healTestAction({ test_id: test._id as Id<"tests"> });
+      setHealSuccess(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Healing failed";
+      logError(msg, { severity: "error", context: { source: "TestAccordionItem.handleHeal" } });
+    } finally {
+      setHealing(false);
+    }
+  };
+
   return (
     <>
       <div className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-[var(--surface)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] text-left"
+          className="w-full flex items-center justify-between px-5 py-4 bg-[var(--surface)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] text-left"
         >
           <div className="flex items-center gap-3 min-w-0">
             <svg
@@ -130,7 +156,7 @@ function TestAccordionItem({ test, environments, onRunTest }: {
         </button>
 
         {expanded && (
-          <div className="border-t border-[var(--border)] p-4 bg-[var(--surface)]">
+          <div className="border-t border-[var(--border)] p-5 bg-[var(--surface)]">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
@@ -139,7 +165,7 @@ function TestAccordionItem({ test, environments, onRunTest }: {
                 <textarea
                   value={displayCode}
                   onChange={(e) => setLocalCode(e.target.value)}
-                  className="w-full min-h-[200px] font-[var(--font-mono)] text-sm bg-[#0d1117] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  className="w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                   spellCheck={false}
                 />
               </div>
@@ -168,6 +194,27 @@ function TestAccordionItem({ test, environments, onRunTest }: {
                   </>
                 ) : "Regenerate"}
               </Button>
+              {aiConfigReady && latestFailure && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleHeal}
+                  disabled={healing}
+                >
+                  {healing ? (
+                    <>
+                      <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Healing...
+                    </>
+                  ) : "AI Heal"}
+                </Button>
+              )}
+              {healSuccess && (
+                <span className="text-xs text-[var(--success-text)]">Saved as draft</span>
+              )}
               <Button
                 variant="primary"
                 size="sm"
@@ -186,8 +233,6 @@ function TestAccordionItem({ test, environments, onRunTest }: {
                 <Button
                   variant="secondary"
                   size="sm"
-                  disabled={environments.length > 1}
-                  title={environments.length > 1 ? "Use \"Run All Tests\" to select an environment" : undefined}
                   onClick={() => {
                     onRunTest(test._id, environments[0]._id);
                   }}
@@ -242,6 +287,10 @@ export default function SuiteDetailPage() {
   const tests = useQuery(api.tests.queries.getTests, {
     suite_id: suiteId,
   });
+  const regressionMembers = useQuery(
+    api.suites.queries.getRegressionMembers,
+    suite?.suite_type === "regression" ? { suite_id: suiteId } : "skip",
+  );
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
   const environments = useQuery(
     api.environments.queries.getEnvironments,
@@ -254,8 +303,14 @@ export default function SuiteDetailPage() {
 
   const updateSuite = useMutation(api.suites.mutations.updateSuite);
   const deleteSuite = useMutation(api.suites.mutations.deleteSuite);
+  const addSuiteMember = useMutation(api.suites.mutations.addSuiteMember);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
   const triggerRun = useMutation(api.runs.mutations.triggerRun);
+
+  const regressionSuites = useQuery(
+    api.suites.queries.getSuites,
+    suite ? { project_id: suite.project_id } : "skip",
+  );
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState("");
@@ -269,9 +324,23 @@ export default function SuiteDetailPage() {
   const [triggeringRun, setTriggeringRun] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
 
+  const [showAddToRegression, setShowAddToRegression] = useState(false);
+  const [addToRegError, setAddToRegError] = useState<string | null>(null);
+
   const aiConfigReady = hasAiConfig(workspace);
 
   const approvedCount = tests?.filter((t) => t.status === "approved").length ?? 0;
+
+  const regressionApprovedCount = regressionMembers
+    ? regressionMembers.suiteRefs.reduce(
+        (sum, ref) => sum + ref.tests.filter((t) => t.status === "approved").length,
+        0,
+      ) + regressionMembers.individualTests.filter((t) => t.status === "approved").length
+    : 0;
+
+  const effectiveApprovedCount = suite?.suite_type === "regression"
+    ? regressionApprovedCount
+    : approvedCount;
 
   const handleStartEditName = () => {
     if (!suite) return;
@@ -333,7 +402,7 @@ export default function SuiteDetailPage() {
   };
 
   if (suite === undefined || tests === undefined || workspace === undefined || environments === undefined) {
-    return <div className="text-[var(--muted)] text-sm">Loading...</div>;
+    return <PageSkeleton />;
   }
 
   return (
@@ -395,6 +464,15 @@ export default function SuiteDetailPage() {
             <StatusPill variant="neutral" showDot={false}>
               {SOURCE_TYPE_LABELS[suite.source_type] ?? suite.source_type}
             </StatusPill>
+            {suite.suite_type !== "regression" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowAddToRegression(true); setAddToRegError(null); }}
+              >
+                Add Suite to Regression
+              </Button>
+            )}
             <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               Delete Suite
             </Button>
@@ -420,10 +498,10 @@ export default function SuiteDetailPage() {
         </div>
       )}
 
-      {!activeRun && approvedCount > 0 && (
+      {!activeRun && effectiveApprovedCount > 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
           <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Run Tests ({approvedCount} approved)
+            Run Tests ({effectiveApprovedCount} approved)
           </div>
           {triggerError && <Alert variant="error" className="mb-3">{triggerError}</Alert>}
           <div className="flex gap-3 items-center">
@@ -455,89 +533,165 @@ export default function SuiteDetailPage() {
         </div>
       )}
 
-      {!aiConfigReady ? (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
-          <Alert variant="error">
-            AI provider not configured.{" "}
-            <Link href="/settings" className="underline font-medium">
-              Configure AI settings
-            </Link>{" "}
-            to generate tests from descriptions.
-          </Alert>
-        </div>
-      ) : (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Describe a Test
-          </div>
-          {generateError && <Alert variant="error" className="mb-3">{generateError}</Alert>}
-          <div className="flex gap-3">
-            <textarea
-              value={nlPrompt}
-              onChange={(e) => setNlPrompt(e.target.value)}
-              placeholder={"e.g., Test that login works with valid credentials"}
-              className="flex-1 min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-              disabled={generating}
-            />
-            <Button
-              onClick={handleGenerateNl}
-              disabled={generating || !nlPrompt.trim()}
-              className="self-end shrink-0"
-            >
-              {generating ? (
-                <>
-                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      {suite.suite_type !== "regression" && (
+        <>
+          {!aiConfigReady ? (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+              <Alert variant="error">
+                AI provider not configured.{" "}
+                <Link href="/settings" className="underline font-medium">
+                  Configure AI settings
+                </Link>{" "}
+                to generate tests from descriptions.
+              </Alert>
+            </div>
+          ) : (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                Describe a Test
+              </div>
+              {generateError && <Alert variant="error" className="mb-3">{generateError}</Alert>}
+              <div className="flex gap-3">
+                <textarea
+                  value={nlPrompt}
+                  onChange={(e) => setNlPrompt(e.target.value)}
+                  placeholder={"e.g., Test that login works with valid credentials"}
+                  className="flex-1 min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  disabled={generating}
+                />
+                <Button
+                  onClick={handleGenerateNl}
+                  disabled={generating || !nlPrompt.trim()}
+                  className="self-end shrink-0"
+                >
+                  {generating ? (
+                    <>
+                      <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Generating...
+                    </>
+                  ) : "Generate Tests"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
+              Tests
+            </h3>
+
+            {tests.length === 0 ? (
+              <EmptyState
+                icon={
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                   </svg>
-                  Generating...
-                </>
-              ) : "Generate Tests"}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
-          Tests
-        </h3>
-
-        {tests.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-            }
-            title="No tests yet"
-            description="Tests will appear here when they are generated from exploration, PRD, or natural language."
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {tests.map((test) => (
+                }
+                title="No tests yet"
+                description="Tests will appear here when they are generated from exploration, PRD, or natural language."
+              />
+            ) : (
+              <div className="flex flex-col gap-4">
+                {tests.map((test) => (
               <TestAccordionItem
                 key={test._id}
                 test={test}
                 environments={environments}
+                workspace={workspace}
                 onRunTest={(testId, envId) => {
-                  if (!envId) return;
-                  setTriggeringRun(true);
-                  triggerRun({
-                    project_id: asId(params.id, "projects"),
-                    test_id: asId(testId, "tests"),
-                    environment_id: asId(envId, "environments"),
-                  })
-                    .then((runId) => {
-                      if (runId) router.push(`/runs/${runId}`);
-                    })
-                    .finally(() => setTriggeringRun(false));
-                }}
-              />
-            ))}
+                      if (!envId) return;
+                      setTriggeringRun(true);
+                      triggerRun({
+                        project_id: asId(params.id, "projects"),
+                        test_id: asId(testId, "tests"),
+                        environment_id: asId(envId, "environments"),
+                      })
+                        .then((runId) => {
+                          if (runId) router.push(`/runs/${runId}`);
+                        })
+                        .finally(() => setTriggeringRun(false));
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {suite.suite_type === "regression" && (
+        <div>
+          <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
+            Included Tests
+          </h3>
+
+          {!regressionMembers || (regressionMembers.suiteRefs.length === 0 && regressionMembers.individualTests.length === 0) ? (
+            <EmptyState
+              icon={
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              }
+              title="No suites or tests added yet"
+              description="Add functional suites or individual tests to this regression suite from the project page."
+            />
+          ) : (
+            <div className="space-y-4">
+              {regressionMembers.suiteRefs.map((ref) => (
+                <div key={ref.suite._id} className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
+                  <div className="px-4 py-3 bg-[var(--surface)] border-b border-[var(--border-soft)]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-[var(--fg)]">{ref.suite.name}</div>
+                        {ref.suite.description && (
+                          <div className="text-xs text-[var(--muted)] mt-0.5">{ref.suite.description}</div>
+                        )}
+                      </div>
+                      <span className="text-xs text-[var(--muted)]">
+                        {ref.tests.length} {ref.tests.length === 1 ? "test" : "tests"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[var(--border-soft)]">
+                    {ref.tests.map((test) => (
+                      <div key={test._id} className="px-4 py-2 flex items-center justify-between">
+                        <span className="text-sm text-[var(--fg)]">{test.name}</span>
+                        <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
+                          {test.status}
+                        </StatusPill>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {regressionMembers.individualTests.length > 0 && (
+                <div className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
+                  <div className="px-4 py-3 bg-[var(--surface)] border-b border-[var(--border-soft)]">
+                    <div className="text-sm font-medium text-[var(--fg)]">Individual Tests</div>
+                  </div>
+                  <div className="divide-y divide-[var(--border-soft)]">
+                    {regressionMembers.individualTests.map((test) => (
+                      <div key={test._id} className="px-4 py-2 flex items-center justify-between">
+                        <div>
+                          <span className="text-sm text-[var(--fg)]">{test.name}</span>
+                          <span className="text-xs text-[var(--muted)] ml-2">from {test.source_suite_name}</span>
+                        </div>
+                        <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
+                          {test.status}
+                        </StatusPill>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <ConfirmDialog
@@ -546,6 +700,51 @@ export default function SuiteDetailPage() {
           onConfirm={handleDeleteSuite}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+
+      {showAddToRegression && regressionSuites && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAddToRegression(false)}>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 max-w-[400px] w-full shadow-[var(--elev-raised)]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
+              Add to Regression Suite
+            </h3>
+            {addToRegError && <Alert variant="error" className="mb-3">{addToRegError}</Alert>}
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {regressionSuites
+                .filter((s) => s.suite_type === "regression")
+                .map((regSuite) => (
+                  <Button
+                    key={regSuite._id}
+                    variant="secondary"
+                    size="sm"
+                    className="w-full text-left"
+                    onClick={async () => {
+                      try {
+                        await addSuiteMember({
+                          regression_suite_id: regSuite._id as Id<"suites">,
+                          member_suite_id: suiteId as Id<"suites">,
+                        });
+                        setShowAddToRegression(false);
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Failed to add";
+                        setAddToRegError(msg);
+                      }
+                    }}
+                  >
+                    {regSuite.name}
+                  </Button>
+                ))}
+              {regressionSuites.filter((s) => s.suite_type === "regression").length === 0 && (
+                <p className="text-sm text-[var(--muted)]">No regression suites yet. Create one from the project page.</p>
+              )}
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button variant="ghost" size="sm" onClick={() => setShowAddToRegression(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
       )}

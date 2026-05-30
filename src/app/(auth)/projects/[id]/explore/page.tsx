@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useErrorLogger } from "@/lib/error-logger";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 
 interface Scenario {
   name: string;
   description: string;
   flow_summary: string;
+  area: string;
 }
 
 interface CapturedPageWithUrl {
@@ -38,6 +40,9 @@ export default function ExplorePage() {
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
 
+  const [goal, setGoal] = useState("");
+  const [additionalUrlInput, setAdditionalUrlInput] = useState("");
+
   const url = project?.app_url ?? "";
 
   const createExploration = useMutation(api.explorations.mutations.createExploration);
@@ -53,8 +58,14 @@ export default function ExplorePage() {
     setSelectedScenarios(new Set());
     setExplorationId(null);
     try {
+      const additionalUrls = additionalUrlInput
+        .split("\n")
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0);
       const id = await createExploration({
         project_id: projectId,
+        goal: goal.trim() || undefined,
+        additional_urls: additionalUrls.length > 0 ? additionalUrls : undefined,
       });
       setExplorationId(id);
     } catch (err) {
@@ -62,7 +73,7 @@ export default function ExplorePage() {
       setError(msg);
       logError(msg, { severity: "error", context: { source: "ExplorePage" } });
     }
-  }, [createExploration, projectId, logError]);
+  }, [createExploration, projectId, goal, additionalUrlInput, logError]);
 
   const handleToggleScenario = useCallback((index: number) => {
     setSelectedScenarios((prev) => {
@@ -83,11 +94,11 @@ export default function ExplorePage() {
     setGenerating(true);
     setError(null);
     try {
-      const result = await generateTests({
+      await generateTests({
         exploration_id: asId(explorationId!, "explorations"),
         selected_scenarios: selected,
       });
-      router.push(`/projects/${params.id}/suites/${result.suiteId}`);
+      router.push(`/projects/${params.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Test generation failed";
       setError(msg);
@@ -98,7 +109,7 @@ export default function ExplorePage() {
   }, [exploration, selectedScenarios, generateTests, explorationId, router, params.id, logError]);
 
   if (project === undefined) {
-    return <div className="text-[var(--muted)] text-sm">Loading...</div>;
+    return <PageSkeleton />;
   }
 
   if (!project) {
@@ -133,10 +144,10 @@ export default function ExplorePage() {
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
         <div className="mb-5 pb-4 border-b border-[var(--border-soft)]">
           <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)]">
-            Explore App URL
+            Explore & Generate Tests
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Runner will render pages, capture structure, and AI will propose testable scenarios.
+            Crawl the site, identify testable scenarios, and generate Playwright tests from your selections.
           </p>
         </div>
 
@@ -155,6 +166,31 @@ export default function ExplorePage() {
               URL to Explore
             </div>
             <div className="text-sm text-[var(--fg)] mb-4">{url || project.app_url}</div>
+
+            <div className="mb-4">
+              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                Goal / Focus (optional)
+              </div>
+              <textarea
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder={"e.g., Focus on checkout and payment flows"}
+                className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            </div>
+
+            <div className="mb-4">
+              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                Additional URLs (optional)
+              </div>
+              <textarea
+                value={additionalUrlInput}
+                onChange={(e) => setAdditionalUrlInput(e.target.value)}
+                placeholder={"One URL per line — pages the crawler might miss\nhttps://example.com/cart\nhttps://example.com/checkout"}
+                className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            </div>
+
             <div className="flex gap-3">
               <Button onClick={handleStartExploration} disabled={!url}>
                 Start Exploration
@@ -173,10 +209,10 @@ export default function ExplorePage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              {exploration?.status === "pending" && "Waiting for Runner..."}
-              {exploration?.status === "capturing" && (exploration.progress_message || "Capturing pages...")}
-              {exploration?.status === "captured" && "Capture complete, starting AI analysis..."}
-              {exploration?.status === "analyzing" && "AI is analyzing captured pages..."}
+              {exploration?.status === "pending" && "Queuing exploration..."}
+              {exploration?.status === "capturing" && (exploration.progress_message || "Crawling pages...")}
+              {exploration?.status === "captured" && "Crawl complete. Preparing analysis..."}
+              {exploration?.status === "analyzing" && "Analyzing pages and identifying scenarios..."}
             </div>
             {exploration?.pages_captured != null && exploration.pages_captured > 0 && (
               <div className="text-xs text-[var(--muted)]">
@@ -188,9 +224,9 @@ export default function ExplorePage() {
 
         {exploration?.status === "failed" && (
           <div className="mb-5">
-            <Alert variant="error">
-              Exploration failed: {exploration.error_message || "Unknown error"}
-            </Alert>
+              <Alert variant="error">
+                Exploration failed: {exploration.error_message || "Unknown error. Try again or check your AI configuration."}
+              </Alert>
             <div className="flex gap-3 mt-4">
               <Button onClick={() => { setExplorationId(null); setError(null); }}>
                 Try Again
@@ -259,7 +295,12 @@ export default function ExplorePage() {
                     className="mt-0.5 accent-[var(--accent)]"
                   />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-[var(--fg)]">{scenario.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-medium text-[var(--fg)]">{scenario.name}</div>
+                      <span className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--accent)]">
+                        {scenario.area}
+                      </span>
+                    </div>
                     <div className="text-xs text-[var(--muted)] mt-1">{scenario.description}</div>
                     <div className="text-xs text-[var(--muted)] mt-1 font-[var(--font-mono)] whitespace-pre-wrap">
                       {scenario.flow_summary}
@@ -282,6 +323,8 @@ export default function ExplorePage() {
                 onClick={() => {
                   setExplorationId(null);
                   setSelectedScenarios(new Set());
+                  setGoal("");
+                  setAdditionalUrlInput("");
                 }}
               >
                 New Exploration

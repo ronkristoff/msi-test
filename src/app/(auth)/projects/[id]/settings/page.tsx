@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
 import { api, asId } from "@/lib/convex";
-import { Input } from "@/components/ui/FormField";
+import { Input, Select } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,6 +15,26 @@ import { projectSettingsSchema, type ProjectSettingsValues } from "@/lib/schemas
 import { useFileUpload, type PRDMode } from "@/lib/use-file-upload";
 import { normalizeAppUrl } from "@/lib/urls";
 import Link from "next/link";
+
+const KEEP_SENTINEL = "___KEEP___";
+
+interface ProjectWithAuth {
+  _id: string;
+  name: string;
+  app_url: string;
+  prd_text?: string;
+  prd_file_id?: string;
+  explore_auth_mode?: "none" | "form" | "cookie";
+  explore_login_url?: string;
+  explore_username?: string;
+  explore_password?: string;
+  explore_cookie_name?: string;
+  explore_cookie_value?: string;
+}
+
+function asProjectWithAuth(p: unknown): ProjectWithAuth {
+  return p as ProjectWithAuth;
+}
 
 export default function ProjectSettingsPage() {
   const params = useParams<{ id: string }>();
@@ -31,6 +51,11 @@ export default function ProjectSettingsPage() {
   const [prdMode, setPrdMode] = useState<PRDMode>("text");
   const [prdFile, setPrdFile] = useState<File | null>(null);
   const [prdText, setPrdText] = useState("");
+
+  const [authMode, setAuthMode] = useState<"none" | "form" | "cookie">("none");
+  const [authSaving, setAuthSaving] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const form = useForm<ProjectSettingsValues>({
     resolver: zodResolver(projectSettingsSchema),
@@ -64,9 +89,13 @@ export default function ProjectSettingsPage() {
   }
 
   if (!form.formState.isDirty && form.getValues("name") === "" && project) {
-    form.reset({ name: project.name, app_url: project.app_url });
-    setPrdText(project.prd_text ?? "");
-    setPrdMode(project.prd_file_id ? "file" : "text");
+    const p = asProjectWithAuth(project);
+    form.reset({ name: p.name, app_url: p.app_url });
+    setPrdText(p.prd_text ?? "");
+    setPrdMode(p.prd_file_id ? "file" : "text");
+    if (p.explore_auth_mode === "form" || p.explore_auth_mode === "cookie") {
+      setAuthMode(p.explore_auth_mode);
+    }
   }
 
   const handleSave = form.handleSubmit(async (data) => {
@@ -87,7 +116,7 @@ export default function ProjectSettingsPage() {
         updates.prd_file_id = asId(storageId, "_storage");
       }
 
-      await updateProject({ project_id: project!._id, ...updates });
+      await updateProject({ project_id: asProjectWithAuth(project)._id as Parameters<typeof updateProject>[0]["project_id"], ...updates });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -96,6 +125,47 @@ export default function ProjectSettingsPage() {
       setSaving(false);
     }
   });
+
+  const handleSaveAuth = async () => {
+    setAuthError(null);
+    setAuthSuccess(false);
+    setAuthSaving(true);
+    try {
+      const updates: Record<string, unknown> = {
+        project_id: asProjectWithAuth(project)._id,
+        explore_auth_mode: authMode,
+      };
+
+      if (authMode === "form") {
+        const loginUrl = (document.getElementById("explore_login_url") as HTMLInputElement)?.value ?? "";
+        const username = (document.getElementById("explore_username") as HTMLInputElement)?.value ?? "";
+        const password = (document.getElementById("explore_password") as HTMLInputElement)?.value ?? "";
+        updates.explore_login_url = loginUrl;
+        updates.explore_username = username;
+        updates.explore_password = password || KEEP_SENTINEL;
+      } else if (authMode === "cookie") {
+        const cookieName = (document.getElementById("explore_cookie_name") as HTMLInputElement)?.value ?? "";
+        const cookieValue = (document.getElementById("explore_cookie_value") as HTMLInputElement)?.value ?? "";
+        updates.explore_cookie_name = cookieName;
+        updates.explore_cookie_value = cookieValue || KEEP_SENTINEL;
+      }
+
+      await updateProject(updates as Parameters<typeof updateProject>[0]);
+      setAuthSuccess(true);
+      setTimeout(() => setAuthSuccess(false), 3000);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Failed to save auth config");
+    } finally {
+      setAuthSaving(false);
+    }
+  };
+
+  const p = asProjectWithAuth(project);
+  const maskedPassword = p.explore_password;
+  const maskedCookieValue = p.explore_cookie_value;
+  const storedLoginUrl = p.explore_login_url;
+  const storedUsername = p.explore_username;
+  const storedCookieName = p.explore_cookie_name;
 
   return (
     <div className="max-w-[720px]">
@@ -129,11 +199,95 @@ export default function ProjectSettingsPage() {
           onTextChange={setPrdText}
           file={prdFile}
           onFileChange={setPrdFile}
-          hasExistingFile={!!project?.prd_file_id}
+          hasExistingFile={!!asProjectWithAuth(project).prd_file_id}
         />
 
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)] mb-5">
+        <h2 className="font-[var(--font-display)] text-xl font-bold mb-1 pb-4 border-b border-[var(--border-soft)]">
+          Exploration Authentication
+        </h2>
+        <p className="text-sm text-[var(--muted)] mb-5">
+          Configure how the explorer authenticates to reach inner pages behind login.
+        </p>
+
+        {authError && <Alert variant="error" className="mb-5">{authError}</Alert>}
+        {authSuccess && <Alert variant="success" className="mb-5">Auth config saved</Alert>}
+
+        <Select
+          label="Authentication Mode"
+          value={authMode}
+          onChange={(e) => setAuthMode(e.target.value as "none" | "form" | "cookie")}
+        >
+          <option value="none">None — public pages only</option>
+          <option value="form">Form Fill — auto-fill login form</option>
+          <option value="cookie">Cookie Injection — inject session cookie</option>
+        </Select>
+
+        {authMode === "form" && (
+          <>
+            <Input
+              id="explore_login_url"
+              label="Login Page URL"
+              placeholder="/login"
+              hint="Defaults to the app URL if not set"
+              defaultValue={storedLoginUrl ?? ""}
+            />
+            <Input
+              id="explore_username"
+              label="Username / Email"
+              required
+              defaultValue={storedUsername ?? ""}
+            />
+            <Input
+              id="explore_password"
+              label="Password"
+              type="password"
+              togglePassword
+              required
+              placeholder={maskedPassword ? "Leave blank to keep current" : undefined}
+              defaultValue=""
+            />
+            {maskedPassword && (
+              <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
+                Current: <span className="font-[var(--font-mono)]">{maskedPassword}</span>
+              </p>
+            )}
+          </>
+        )}
+
+        {authMode === "cookie" && (
+          <>
+            <Input
+              id="explore_cookie_name"
+              label="Cookie Name"
+              required
+              placeholder="session_id"
+              defaultValue={storedCookieName ?? ""}
+            />
+            <Input
+              id="explore_cookie_value"
+              label="Cookie Value"
+              type="password"
+              togglePassword
+              required
+              placeholder={maskedCookieValue ? "Leave blank to keep current" : undefined}
+              defaultValue=""
+            />
+            {maskedCookieValue && (
+              <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
+                Current: <span className="font-[var(--font-mono)]">{maskedCookieValue}</span>
+              </p>
+            )}
+          </>
+        )}
+
+        <Button onClick={handleSaveAuth} disabled={authSaving}>
+          {authSaving ? "Saving..." : "Save Auth Config"}
         </Button>
       </div>
     </div>

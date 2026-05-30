@@ -169,6 +169,7 @@ describe("Agent zod schemas", () => {
       name: "Login Flow",
       description: "User logs in",
       flowSummary: "Navigate → Enter → Submit",
+      area: "Authentication",
     };
     expect(explorationScenarioSchema.safeParse(valid).success).toBe(true);
   });

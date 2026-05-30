@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api, asId } from "@/lib/convex";
 import { RunsList, type StatusTab, type SortField, type SortOrder } from "@/components/RunsList";
+import { RunDetailSkeleton } from "@/components/ui/Skeleton";
 
 const TAB_CONFIG: Record<
   StatusTab,
@@ -56,7 +57,7 @@ export default function RunsPage() {
   );
 
   if (runs === undefined || filterOpts === undefined) {
-    return <div className="text-[var(--muted)] text-sm">Loading...</div>;
+    return <RunDetailSkeleton />;
   }
 
   return (

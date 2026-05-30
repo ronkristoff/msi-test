@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import { ConvexError } from "convex/values";
 import { getOwnedWorkspace, getOwnedEntity } from "../lib/requireAuth";
 import { validateRequiredField } from "../lib/validation";
 
@@ -35,6 +36,7 @@ export const createSuite = mutation({
       project_id: project._id,
       name,
       description: args.description?.trim() || undefined,
+      suite_type: "functional",
       source_type: args.source_type ?? "manual",
     });
   },
@@ -74,9 +76,171 @@ export const deleteSuite = mutation({
       .collect();
 
     for (const test of tests) {
+      const testMembers = await ctx.db
+        .query("suite_members")
+        .withIndex("by_member_test_id", (q) => q.eq("member_test_id", test._id))
+        .collect();
+      for (const m of testMembers) {
+        await ctx.db.delete(m._id);
+      }
       await ctx.db.delete(test._id);
     }
 
+    const membersOfRegression = await ctx.db
+      .query("suite_members")
+      .withIndex("by_regression_suite_id", (q) => q.eq("regression_suite_id", args.suite_id))
+      .collect();
+    for (const member of membersOfRegression) {
+      await ctx.db.delete(member._id);
+    }
+
+    const referencedByRegression = await ctx.db
+      .query("suite_members")
+      .withIndex("by_member_suite_id", (q) => q.eq("member_suite_id", args.suite_id))
+      .collect();
+    for (const member of referencedByRegression) {
+      await ctx.db.delete(member._id);
+    }
+
     await ctx.db.delete(args.suite_id);
+  },
+});
+
+export const createRegressionSuite = mutation({
+  args: {
+    project_id: v.id("projects"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    auto_include_all: v.optional(v.boolean()),
+    member_suite_ids: v.optional(v.array(v.id("suites"))),
+  },
+  handler: async (ctx, args) => {
+    const { workspace } = await getOwnedWorkspace(ctx);
+    const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
+
+    const name = validateRequiredField(args.name, "Suite name");
+
+    const suiteId = await ctx.db.insert("suites", {
+      workspace_id: workspace._id,
+      project_id: project._id,
+      name,
+      description: args.description?.trim() || undefined,
+      suite_type: "regression",
+      auto_include_all: args.auto_include_all ?? false,
+      source_type: "manual",
+    });
+
+    if (args.member_suite_ids?.length) {
+      for (const memberSuiteId of args.member_suite_ids) {
+        const memberSuite = await ctx.db.get(memberSuiteId);
+        if (!memberSuite || memberSuite.project_id !== project._id) {
+          throw new ConvexError(`Suite ${memberSuiteId} not found in this project`);
+        }
+        if (memberSuite.suite_type === "regression") {
+          throw new ConvexError("Cannot nest regression suites");
+        }
+        await ctx.db.insert("suite_members", {
+          workspace_id: workspace._id,
+          regression_suite_id: suiteId,
+          member_suite_id: memberSuiteId,
+        });
+      }
+    }
+
+    return suiteId;
+  },
+});
+
+export const addSuiteMember = mutation({
+  args: {
+    regression_suite_id: v.id("suites"),
+    member_suite_id: v.optional(v.id("suites")),
+    member_test_id: v.optional(v.id("tests")),
+  },
+  handler: async (ctx, args) => {
+    const { entity: regression } = await getOwnedEntity(ctx, args.regression_suite_id, "suites");
+    if (regression.suite_type !== "regression") {
+      throw new ConvexError("Can only add members to regression suites");
+    }
+    if (!args.member_suite_id && !args.member_test_id) {
+      throw new ConvexError("Must provide either member_suite_id or member_test_id");
+    }
+    if (args.member_suite_id && args.member_test_id) {
+      throw new ConvexError("Cannot provide both member_suite_id and member_test_id");
+    }
+
+    if (args.member_suite_id) {
+      const memberSuite = await ctx.db.get(args.member_suite_id);
+      if (!memberSuite || memberSuite.project_id !== regression.project_id) {
+        throw new ConvexError("Member suite not found in this project");
+      }
+      if (memberSuite.suite_type === "regression") {
+        throw new ConvexError("Cannot nest regression suites");
+      }
+
+      const existing = await ctx.db
+        .query("suite_members")
+        .withIndex("by_regression_suite_id", (q) =>
+          q.eq("regression_suite_id", args.regression_suite_id),
+        )
+        .collect();
+      if (existing.some((m) => m.member_suite_id === args.member_suite_id)) {
+        throw new ConvexError("Suite is already a member of this regression");
+      }
+    }
+
+    if (args.member_test_id) {
+      const test = await ctx.db.get(args.member_test_id);
+      if (!test || test.workspace_id !== regression.workspace_id) {
+        throw new ConvexError("Test not found in this workspace");
+      }
+
+      const existing = await ctx.db
+        .query("suite_members")
+        .withIndex("by_regression_suite_id", (q) =>
+          q.eq("regression_suite_id", args.regression_suite_id),
+        )
+        .collect();
+      if (existing.some((m) => m.member_test_id === args.member_test_id)) {
+        throw new ConvexError("Test is already a member of this regression");
+      }
+    }
+
+    await ctx.db.insert("suite_members", {
+      workspace_id: regression.workspace_id,
+      regression_suite_id: args.regression_suite_id,
+      member_suite_id: args.member_suite_id,
+      member_test_id: args.member_test_id,
+    });
+  },
+});
+
+export const removeSuiteMember = mutation({
+  args: {
+    regression_suite_id: v.id("suites"),
+    member_suite_id: v.optional(v.id("suites")),
+    member_test_id: v.optional(v.id("tests")),
+  },
+  handler: async (ctx, args) => {
+    await getOwnedEntity(ctx, args.regression_suite_id, "suites");
+
+    const existing = await ctx.db
+      .query("suite_members")
+      .withIndex("by_regression_suite_id", (q) =>
+        q.eq("regression_suite_id", args.regression_suite_id),
+      )
+      .collect();
+
+    const match = existing.find((m) => {
+      if (args.member_suite_id) return m.member_suite_id === args.member_suite_id;
+      if (args.member_test_id) return m.member_test_id === args.member_test_id;
+      return false;
+    });
+
+    if (!match) {
+      throw new ConvexError("Member not found in this regression suite");
+    }
+
+    await ctx.db.delete(match._id);
   },
 });

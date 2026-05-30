@@ -13,6 +13,7 @@ import type * as ai_errors from "../ai/errors.js";
 import type * as ai_exploreApp from "../ai/exploreApp.js";
 import type * as ai_generateNlTests from "../ai/generateNlTests.js";
 import type * as ai_generatePrdTests from "../ai/generatePrdTests.js";
+import type * as ai_healTest from "../ai/healTest.js";
 import type * as ai_model from "../ai/model.js";
 import type * as ai_parse from "../ai/parse.js";
 import type * as ai_regenerateTest from "../ai/regenerateTest.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   "ai/exploreApp": typeof ai_exploreApp;
   "ai/generateNlTests": typeof ai_generateNlTests;
   "ai/generatePrdTests": typeof ai_generatePrdTests;
+  "ai/healTest": typeof ai_healTest;
   "ai/model": typeof ai_model;
   "ai/parse": typeof ai_parse;
   "ai/regenerateTest": typeof ai_regenerateTest;

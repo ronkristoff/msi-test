@@ -72,3 +72,22 @@ export const environmentSchema = z.object({
 });
 
 export type EnvironmentValues = z.infer<typeof environmentSchema>;
+
+export const exploreAuthSchema = z.discriminatedUnion("explore_auth_mode", [
+  z.object({
+    explore_auth_mode: z.literal("none"),
+  }),
+  z.object({
+    explore_auth_mode: z.literal("form"),
+    explore_login_url: z.string().min(1, "Login URL is required").refine(isValidAppUrl, "Please enter a valid URL"),
+    explore_username: z.string().min(1, "Username/email is required"),
+    explore_password: z.string().min(1, "Password is required"),
+  }),
+  z.object({
+    explore_auth_mode: z.literal("cookie"),
+    explore_cookie_name: z.string().min(1, "Cookie name is required"),
+    explore_cookie_value: z.string().min(1, "Cookie value is required"),
+  }),
+]);
+
+export type ExploreAuthValues = z.infer<typeof exploreAuthSchema>;

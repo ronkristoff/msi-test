@@ -17,6 +17,7 @@ type StepRow = {
 type ResultWithSteps = {
   _id: string;
   test_id: string;
+  suite_id: string | null;
   status: string;
   duration_ms: number;
   retries: number;
@@ -51,6 +52,7 @@ async function fetchResultsWithSteps(
       return {
         _id: rr._id,
         test_id: rr.test_id,
+        suite_id: test?.suite_id ?? null,
         status: rr.status,
         duration_ms: rr.duration_ms,
         retries: rr.retries,
@@ -159,9 +161,21 @@ export const getRunDetail = query({
       if (env) environment = { name: env.name, base_url: env.base_url };
     }
 
+    let suite = null;
+    if (run.suite_id) {
+      const suiteDoc = await ctx.db.get(run.suite_id);
+      if (suiteDoc) suite = { _id: suiteDoc._id, name: suiteDoc.name };
+    }
+
+    let project = null;
+    const projectDoc = await ctx.db.get(run.project_id);
+    if (projectDoc) project = { _id: projectDoc._id, name: projectDoc.name, app_url: projectDoc.app_url };
+
     return {
       ...run,
       environment,
+      suite,
+      project,
       results,
     };
   },
@@ -405,6 +419,43 @@ export const getResultArtifactUrls = query({
     const trace = rr.trace_file_id ? await ctx.storage.getUrl(rr.trace_file_id) : null;
 
     return { screenshots, video, trace };
+  },
+});
+
+export const getLatestFailureForTest = query({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return null;
+
+    const results = await ctx.db
+      .query("run_results")
+      .withIndex("by_test_id", (q) => q.eq("test_id", args.test_id))
+      .collect();
+
+    const failed = results
+      .filter((r) => r.status === "failed" && r.error_message)
+      .sort((a, b) => b._creationTime - a._creationTime);
+
+    if (failed.length === 0) return null;
+
+    const latest = failed[0];
+    const stepErrors = await ctx.db
+      .query("steps")
+      .withIndex("by_run_result_id", (q) => q.eq("run_result_id", latest._id))
+      .collect();
+
+    const failedSteps = stepErrors
+      .filter((s) => s.error_message)
+      .map((s) => `Step ${s.step_number} (${s.command}): ${s.error_message}`)
+      .join("\n");
+
+    return {
+      error_message: latest.error_message ?? null,
+      step_errors: failedSteps || null,
+      run_id: latest.run_id,
+      _creationTime: latest._creationTime,
+    };
   },
 });
 

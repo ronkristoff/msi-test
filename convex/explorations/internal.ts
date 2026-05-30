@@ -65,6 +65,7 @@ export const storeProposedScenarios = internalMutation({
         name: v.string(),
         description: v.string(),
         flow_summary: v.string(),
+        area: v.string(),
       }),
     ),
   },
@@ -96,6 +97,24 @@ export const updateExplorationStatus = internalMutation({
   },
 });
 
+export const getExplorationAuthConfig = internalQuery({
+  args: { exploration_id: v.id("explorations") },
+  handler: async (ctx, args) => {
+    const exploration = await ctx.db.get(args.exploration_id);
+    if (!exploration) return null;
+    const project = await ctx.db.get(exploration.project_id);
+    if (!project) return null;
+    return {
+      auth_mode: project.explore_auth_mode ?? "none",
+      login_url: project.explore_login_url,
+      username: project.explore_username,
+      password: project.explore_password,
+      cookie_name: project.explore_cookie_name,
+      cookie_value: project.explore_cookie_value,
+    };
+  },
+});
+
 export const getExplorationForAnalysis = internalQuery({
   args: { exploration_id: v.id("explorations") },
   handler: async (ctx, args) => {
@@ -104,6 +123,7 @@ export const getExplorationForAnalysis = internalQuery({
     return {
       workspace_id: exploration.workspace_id,
       url: exploration.url,
+      goal: exploration.goal,
       captured_pages: exploration.captured_pages ?? [],
     };
   },

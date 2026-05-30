@@ -1,9 +1,16 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { RunnerConvexClient } from "./convex-client";
 
 interface ExplorationWorkItem {
   exploration_id: string;
   url: string;
+  auth_mode: "none" | "form" | "cookie";
+  login_url?: string;
+  username?: string;
+  password?: string;
+  cookie_name?: string;
+  cookie_value?: string;
+  additional_urls?: string[];
 }
 
 interface CapturedPage {
@@ -16,6 +23,7 @@ interface CapturedPage {
 const MAX_PAGES = 15;
 const PAGE_TIMEOUT_MS = 30_000;
 const HYDRATION_WAIT_MS = 2_000;
+const LOGIN_TIMEOUT_MS = 15_000;
 
 export async function executeExploration(
   client: RunnerConvexClient,
@@ -29,9 +37,64 @@ export async function executeExploration(
     browser = await chromium.launch({ headless: true });
 
     const baseUrl = new URL(work.url);
-    const visited = new Set<string>();
-    const toVisit = [work.url];
+    const context = await browser.newContext();
     const capturedPages: CapturedPage[] = [];
+    const page = await context.newPage();
+
+    let postLoginUrl: string | undefined;
+
+    if (work.auth_mode === "form" && work.username && work.password) {
+      const loginUrl = work.login_url || work.url;
+
+      log(`Exploration ${work.exploration_id}: capturing login page ${loginUrl}`);
+      const loginPageResult = await capturePage(page, loginUrl, log);
+      if (loginPageResult) {
+        const screenshotBuffer = await page.screenshot({ type: "png", fullPage: false });
+        const screenshotStorageId = await client.uploadBuffer(screenshotBuffer, "image/png");
+        capturedPages.push({
+          ...loginPageResult.page,
+          screenshot_storage_id: screenshotStorageId,
+        });
+        await client.updateExplorationProgress(
+          work.exploration_id,
+          `Captured login page: ${loginPageResult.page.title}`,
+          capturedPages.length,
+        );
+      }
+
+      log(`Exploration ${work.exploration_id}: performing form login at ${loginUrl}`);
+      const loginResult = await performFormLogin(context, loginUrl, work.username, work.password, log);
+      if (loginResult.success) {
+        postLoginUrl = loginResult.postLoginUrl;
+      } else {
+        log(`Exploration ${work.exploration_id}: login may have failed, continuing anyway`);
+      }
+    } else if (work.auth_mode === "cookie" && work.cookie_name && work.cookie_value) {
+      log(`Exploration ${work.exploration_id}: injecting cookie ${work.cookie_name}`);
+      await context.addCookies([{
+        name: work.cookie_name,
+        value: work.cookie_value,
+        domain: baseUrl.hostname,
+        path: "/",
+      }]);
+    }
+
+    const visited = new Set<string>();
+    if (postLoginUrl) {
+      visited.add(normalizeUrl(work.login_url || work.url, baseUrl.origin) ?? "");
+    }
+
+    const startUrl = postLoginUrl ?? work.url;
+    const toVisit = [startUrl];
+
+    if (work.additional_urls?.length) {
+      for (const extraUrl of work.additional_urls) {
+        const normalized = normalizeUrl(extraUrl, baseUrl.origin);
+        if (normalized && isSameOrigin(normalized, baseUrl.origin) && !isFileUrl(normalized)) {
+          toVisit.push(normalized);
+        }
+      }
+    }
 
     while (toVisit.length > 0 && capturedPages.length < MAX_PAGES) {
       const currentUrl = toVisit.shift()!;
@@ -42,7 +105,6 @@ export async function executeExploration(
 
       log(`Exploration ${work.exploration_id}: capturing ${normalized}`);
 
-      const page = await browser.newPage();
       try {
         const result = await capturePage(page, normalized, log);
 
@@ -77,11 +139,23 @@ export async function executeExploration(
               toVisit.push(linkNormalized);
             }
           }
+
+          const dynamicUrls = await discoverDynamicUrls(page, normalized, baseUrl.origin, visited, log);
+          for (const dynUrl of dynamicUrls) {
+            const dynNormalized = normalizeUrl(dynUrl, baseUrl.origin);
+            if (
+              dynNormalized &&
+              !visited.has(dynNormalized) &&
+              !toVisit.includes(dynNormalized) &&
+              isSameOrigin(dynNormalized, baseUrl.origin) &&
+              !isFileUrl(dynNormalized)
+            ) {
+              toVisit.push(dynNormalized);
+            }
+          }
         }
       } catch (err) {
         log(`Exploration ${work.exploration_id}: error capturing ${normalized}: ${err}`);
-      } finally {
-        await page.close().catch(() => {});
       }
     }
 
@@ -97,6 +171,60 @@ export async function executeExploration(
     );
   } finally {
     if (browser) await browser.close().catch(() => {});
+  }
+}
+
+async function performFormLogin(
+  context: BrowserContext,
+  loginUrl: string,
+  username: string,
+  password: string,
+  log: (msg: string) => void,
+): Promise<{ success: boolean; postLoginUrl?: string }> {
+  const page = await context.newPage();
+  try {
+    await page.goto(loginUrl, { waitUntil: "networkidle", timeout: PAGE_TIMEOUT_MS });
+    await page.waitForTimeout(HYDRATION_WAIT_MS);
+
+    const emailInput = page.locator(
+      'input[type="email"], input[name="email"], input[name="username"], input[autocomplete="email"], input[autocomplete="username"], input[placeholder*="email" i], input[placeholder*="user" i]'
+    ).first();
+    const passwordInput = page.locator(
+      'input[type="password"]'
+    ).first();
+
+    if (!(await emailInput.count()) || !(await passwordInput.count())) {
+      log("  Could not find email/password fields on login page");
+      return { success: false };
+    }
+
+    await emailInput.fill(username);
+    await passwordInput.fill(password);
+
+    const submitButton = page.locator(
+      'button[type="submit"], input[type="submit"], button:has-text("Sign in"), button:has-text("Log in"), button:has-text("Login"), button:has-text("Sign up")'
+    ).first();
+
+    if (await submitButton.count()) {
+      await submitButton.click();
+    } else {
+      await passwordInput.press("Enter");
+    }
+
+    await page.waitForURL(
+      (url) => url.toString() !== loginUrl,
+      { timeout: LOGIN_TIMEOUT_MS }
+    ).catch(() => {});
+
+    await page.waitForTimeout(HYDRATION_WAIT_MS);
+    const postLoginUrl = page.url();
+    log(`  Login navigation completed, current URL: ${postLoginUrl}`);
+    return { success: true, postLoginUrl };
+  } catch (err) {
+    log(`  Form login error: ${err}`);
+    return { success: false };
+  } finally {
+    await page.close().catch(() => {});
   }
 }
 
@@ -259,6 +387,117 @@ function buildStructureText(
   }
 
   return parts.join("\n");
+}
+
+const MAX_DYNAMIC_CLICKS = 5;
+const NAV_CLICK_TIMEOUT_MS = 5_000;
+
+async function discoverDynamicUrls(
+  page: Page,
+  currentUrl: string,
+  origin: string,
+  visited: Set<string>,
+  log: (msg: string) => void,
+): Promise<string[]> {
+  const discovered: string[] = [];
+
+  try {
+    const toggleButtons = page.locator(
+      [
+        'button[aria-label*="menu" i]',
+        'button[aria-label*="sidebar" i]',
+        'button[aria-label*="nav" i]',
+        '[data-test*="menu" i]',
+        '[data-test*="sidebar" i]',
+        'button.menu-toggle',
+        'button.hamburger',
+        '.bm-burger-button',
+        '#react-burger-menu-btn',
+      ].join(", "),
+    );
+
+    for (let i = 0; i < await toggleButtons.count(); i++) {
+      try {
+        const btn = toggleButtons.nth(i);
+        if (await btn.isVisible()) {
+          await btn.click();
+          await page.waitForTimeout(500);
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    const navLinks = await page.evaluate(() => {
+      const selectors = [
+        "nav a[href]",
+        "[role='navigation'] a[href]",
+        ".nav a[href]",
+        ".menu a[href]",
+        ".sidebar a[href]",
+        "#menu a[href]",
+        ".bm-menu a[href]",
+        "[class*='nav'] a[href]",
+        "[class*='menu'] a[href]",
+        "[class*='sidebar'] a[href]",
+      ];
+      const seen = new Set<string>();
+      const results: { text: string; href: string }[] = [];
+
+      for (const sel of selectors) {
+        for (const el of document.querySelectorAll<HTMLAnchorElement>(sel)) {
+          const href = el.href;
+          if (!href || !href.startsWith("http") || seen.has(href)) continue;
+          seen.add(href);
+          results.push({ text: el.textContent?.trim() ?? "", href });
+        }
+      }
+
+      return results;
+    });
+
+    for (const link of navLinks) {
+      const normalized = normalizeUrl(link.href, origin);
+      if (!normalized || visited.has(normalized)) continue;
+
+      try {
+        const currentNormalized = normalizeUrl(page.url(), origin);
+
+        const navItem = page.locator(`a[href="${new URL(link.href).pathname}"]`).first();
+        if (!(await navItem.count())) continue;
+
+        await navItem.click();
+        await page.waitForURL((u) => u.toString() !== currentUrl, {
+          timeout: NAV_CLICK_TIMEOUT_MS,
+        }).catch(() => {});
+
+        const newUrl = page.url();
+        const newNormalized = normalizeUrl(newUrl, origin);
+
+        if (newNormalized && newNormalized !== currentNormalized && !visited.has(newNormalized)) {
+          log(`  Dynamic nav discovered: ${link.text || "unnamed"} → ${newNormalized}`);
+          discovered.push(newNormalized);
+        }
+
+        await page.goto(currentUrl, { waitUntil: "domcontentloaded", timeout: PAGE_TIMEOUT_MS });
+        await page.waitForTimeout(HYDRATION_WAIT_MS);
+      } catch {
+        try {
+          await page.goto(currentUrl, { waitUntil: "domcontentloaded", timeout: PAGE_TIMEOUT_MS });
+          await page.waitForTimeout(HYDRATION_WAIT_MS);
+        } catch {
+          break;
+        }
+      }
+
+      if (discovered.length >= MAX_DYNAMIC_CLICKS) break;
+    }
+  } catch (err) {
+    log(`  Dynamic nav discovery error: ${err}`);
+  }
+
+  return discovered;
 }
 
 function normalizeUrl(raw: string, origin: string): string | null {

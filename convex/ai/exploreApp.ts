@@ -38,7 +38,7 @@ export const analyzeExploration = internalAction({
       workspace_id: exploration.workspace_id,
     });
 
-    let scenarios: { name: string; description: string; flow_summary: string }[];
+    let scenarios: { name: string; description: string; flow_summary: string; area: string }[];
     try {
       const agent = createExplorationAnalysisAgent(
         (await import("./model")).getWorkspaceModel(aiConfig),
@@ -57,17 +57,18 @@ export const analyzeExploration = internalAction({
       const result = await thread.generateText({
         prompt: `Analyze the following web application pages captured from ${exploration.url}.
 
-Identify the most testable user scenarios. For each scenario provide a name, description, and step-by-step flow summary.
+Identify the most testable user scenarios. For each scenario provide a name, description, step-by-step flow summary, and an area label.
 
 Captured pages:
 ${pagesDescription}
 
-Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
+${exploration.goal ? `User's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
 
 IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
 - "name": string — concise scenario name
 - "description": string — what the scenario tests
-- "flowSummary": string — step-by-step flow summary`,
+- "flowSummary": string — step-by-step flow summary
+- "area": string — app area category (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation")`,
       });
 
       const text = result.text.trim();
@@ -81,6 +82,7 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
         name: s.name,
         description: s.description,
         flow_summary: s.flowSummary,
+        area: s.area,
       }));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -107,6 +109,7 @@ export const generateExplorationTests = action({
         name: v.string(),
         description: v.string(),
         flow_summary: v.string(),
+        area: v.string(),
       }),
     ),
   },
@@ -131,7 +134,7 @@ export const generateExplorationTests = action({
       .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 3000)}`)
       .join("\n\n");
 
-    const allTestBlocks: { name: string; code: string }[] = [];
+    const allTestBlocks: { name: string; code: string; area: string }[] = [];
 
     for (const scenario of args.selected_scenarios) {
       try {
@@ -170,6 +173,7 @@ Generate a single, self-contained Playwright test. Rules:
           allTestBlocks.push({
             name: deriveTestName(blocks[i], i),
             code: blocks[i],
+            area: scenario.area,
           });
         }
       } catch (err: unknown) {
@@ -184,24 +188,36 @@ Generate a single, self-contained Playwright test. Rules:
     const now = new Date();
     const month = now.toLocaleString("en-US", { month: "short" });
     const day = now.getDate();
-    const suiteName = `Exploration — ${month} ${day}`;
 
-    const suiteId: string = await ctx.runMutation(api.suites.mutations.createSuite, {
-      project_id: exploration.project_id,
-      name: suiteName,
-      description: `Generated from URL exploration of ${exploration.url}`,
-      source_type: "url_exploration",
-    });
-
-    const testIds: string[] = [];
+    const areaGroups = new Map<string, { name: string; code: string; area: string }[]>();
     for (const block of allTestBlocks) {
-      const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
-        suite_id: suiteId as Id<"suites">,
-        name: block.name,
-        playwright_code: block.code,
+      const existing = areaGroups.get(block.area) ?? [];
+      existing.push(block);
+      areaGroups.set(block.area, existing);
+    }
+
+    const suiteIds: string[] = [];
+    const testIds: string[] = [];
+
+    for (const [area, blocks] of areaGroups) {
+      const suiteName = `Exploration — ${area} — ${month} ${day}`;
+      const suiteId: string = await ctx.runMutation(api.suites.mutations.createSuite, {
+        project_id: exploration.project_id,
+        name: suiteName,
+        description: `Generated from URL exploration of ${exploration.url} — ${area} flows`,
         source_type: "url_exploration",
       });
-      testIds.push(testId);
+      suiteIds.push(suiteId);
+
+      for (const block of blocks) {
+        const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
+          suite_id: suiteId as Id<"suites">,
+          name: block.name,
+          playwright_code: block.code,
+          source_type: "url_exploration",
+        });
+        testIds.push(testId);
+      }
     }
 
     await ctx.runMutation(internal.explorations.internal.updateExplorationStatus, {
@@ -210,6 +226,6 @@ Generate a single, self-contained Playwright test. Rules:
       progress_message: "Tests generated successfully.",
     });
 
-    return { suiteId, testIds, testNameCount: testIds.length };
+    return { suiteIds, testIds, testNameCount: testIds.length };
   },
 });

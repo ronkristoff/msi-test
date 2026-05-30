@@ -44,9 +44,27 @@ export const getExplorationsByProject = query({
 export const getPendingExplorations = query({
   args: {},
   handler: async (ctx) => {
-    return ctx.db
+    const explorations = await ctx.db
       .query("explorations")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
       .collect();
+
+    const enriched = await Promise.all(
+      explorations.map(async (exploration) => {
+        const project = await ctx.db.get(exploration.project_id);
+        return {
+          _id: exploration._id,
+          url: exploration.url,
+          auth_mode: project?.explore_auth_mode ?? "none",
+          login_url: project?.explore_login_url,
+          username: project?.explore_username,
+          password: project?.explore_password,
+          cookie_name: project?.explore_cookie_name,
+          cookie_value: project?.explore_cookie_value,
+          additional_urls: exploration.additional_urls,
+        };
+      }),
+    );
+    return enriched;
   },
 });

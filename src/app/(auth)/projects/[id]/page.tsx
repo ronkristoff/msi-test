@@ -5,19 +5,29 @@ import { useQuery, useMutation } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, asId } from "@/lib/convex";
+import type { Id } from "@/lib/convex";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
+import { Alert } from "@/components/ui/Alert";
 import { formatDate } from "@/lib/format";
 import { useErrorLogger } from "@/lib/error-logger";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { logError } = useErrorLogger();
   const [creating, setCreating] = useState(false);
+  const [showCreateRegression, setShowCreateRegression] = useState(false);
+  const [regressionName, setRegressionName] = useState("");
+  const [regressionAutoAll, setRegressionAutoAll] = useState(false);
+  const [runAllEnvId, setRunAllEnvId] = useState<string | null>(null);
+  const [triggeringRunAll, setTriggeringRunAll] = useState(false);
+  const [runAllError, setRunAllError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const projectId = asId(params.id, "projects");
   const project = useQuery(api.projects.queries.getProject, {
     project_id: projectId,
@@ -25,8 +35,16 @@ export default function ProjectDetailPage() {
   const suites = useQuery(api.suites.queries.getSuites, {
     project_id: projectId,
   });
+  const environments = useQuery(api.environments.queries.getEnvironments, {
+    project_id: projectId,
+  });
+  const functionalSuites = useQuery(api.suites.queries.getFunctionalSuites, {
+    project_id: projectId,
+  });
 
   const createSuite = useMutation(api.suites.mutations.createSuite);
+  const createRegressionSuite = useMutation(api.suites.mutations.createRegressionSuite);
+  const runAllTests = useMutation(api.runs.mutations.runAllTests);
 
   const handleCreateSuite = async () => {
     try {
@@ -43,8 +61,51 @@ export default function ProjectDetailPage() {
     }
   };
 
-  if (project === undefined || suites === undefined) {
-    return <div className="text-[var(--muted)] text-sm">Loading...</div>;
+  const handleCreateRegression = async () => {
+    if (!regressionName.trim()) return;
+    try {
+      setCreating(true);
+      setCreateError(null);
+      const suiteId = await createRegressionSuite({
+        project_id: projectId,
+        name: regressionName.trim(),
+        auto_include_all: regressionAutoAll,
+        member_suite_ids: regressionAutoAll ? undefined :
+          functionalSuites?.map((s) => s._id as Id<"suites">) ?? undefined,
+      });
+      setShowCreateRegression(false);
+      setRegressionName("");
+      router.push(`/projects/${params.id}/suites/${suiteId}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to create regression suite";
+      setCreateError(msg);
+      logError(msg, { severity: "error", context: { source: "ProjectDetailPage.handleCreateRegression" } });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRunAll = async () => {
+    if (!runAllEnvId) return;
+    try {
+      setTriggeringRunAll(true);
+      setRunAllError(null);
+      const runId = await runAllTests({
+        project_id: projectId,
+        environment_id: asId(runAllEnvId, "environments"),
+      });
+      router.push(`/runs/${runId}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to run all tests";
+      setRunAllError(msg);
+      logError(msg, { severity: "error", context: { source: "ProjectDetailPage.handleRunAll" } });
+    } finally {
+      setTriggeringRunAll(false);
+    }
+  };
+
+  if (project === undefined || suites === undefined || environments === undefined) {
+    return <PageSkeleton />;
   }
 
   return (
@@ -128,6 +189,13 @@ export default function ProjectDetailPage() {
             Suites
           </h3>
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowCreateRegression(true)}
+            >
+              Create Regression
+            </Button>
             <Link href={`/projects/${params.id}/generate-nl`}>
               <Button variant="secondary" size="sm">
                 Generate from NL
@@ -167,42 +235,187 @@ export default function ProjectDetailPage() {
             description="Create a suite to start organizing your tests."
           />
         ) : (
-          <div className="divide-y divide-[var(--border-soft)]">
-            {suites.map((suite) => (
-              <Link
-                key={suite._id}
-                href={`/projects/${params.id}/suites/${suite._id}`}
-                className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
+          <>
+            {(() => {
+              const functionalSuites = suites.filter((s) => s.suite_type !== "regression");
+              const regressionSuites = suites.filter((s) => s.suite_type === "regression");
+              return (
+                <>
+                  {functionalSuites.length > 0 && (
+                    <div className="mb-4">
+                      <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2 px-1">
+                        Functional Suites
+                      </div>
+                      <div className="divide-y divide-[var(--border-soft)]">
+                        {functionalSuites.map((suite) => (
+                          <Link
+                            key={suite._id}
+                            href={`/projects/${params.id}/suites/${suite._id}`}
+                            className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-[var(--fg)] group-hover:text-[var(--accent)] truncate">
+                                  {suite.name}
+                                </div>
+                                <div className="text-xs text-[var(--muted)] mt-0.5">
+                                  {formatDate(suite._creationTime)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-xs text-[var(--muted)]">
+                                {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
+                              </span>
+                              <StatusPill variant="neutral" showDot={false}>
+                                {SOURCE_TYPE_LABELS[suite.source_type] ?? suite.source_type}
+                              </StatusPill>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--muted)] group-hover:text-[var(--fg)]">
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {regressionSuites.length > 0 && (
+                    <div className="mb-4">
+                      <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2 px-1">
+                        Regression Suites
+                      </div>
+                      <div className="divide-y divide-[var(--border-soft)]">
+                        {regressionSuites.map((suite) => (
+                          <Link
+                            key={suite._id}
+                            href={`/projects/${params.id}/suites/${suite._id}`}
+                            className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-medium text-[var(--fg)] group-hover:text-[var(--accent)] truncate">
+                                    {suite.name}
+                                  </div>
+                                  {suite.auto_include_all && (
+                                    <span className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--accent)]">
+                                      Auto
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-[var(--muted)] mt-0.5">
+                                  {formatDate(suite._creationTime)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-xs text-[var(--muted)]">
+                                {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
+                              </span>
+                              <StatusPill variant="neutral" showDot={false}>
+                                Regression
+                              </StatusPill>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--muted)] group-hover:text-[var(--fg)]">
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </>
+        )}
+
+        {environments.length > 0 && (
+          <div className="pt-4 mt-4 border-t border-[var(--border-soft)]">
+            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+              Run All Tests
+            </div>
+            {runAllError && <Alert variant="error" className="mb-3">{runAllError}</Alert>}
+            <div className="flex gap-3 items-center">
+              <select
+                value={runAllEnvId ?? ""}
+                onChange={(e) => setRunAllEnvId(e.target.value || null)}
+                className="font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-[var(--fg)] group-hover:text-[var(--accent)] truncate">
-                      {suite.name}
-                    </div>
-                    <div className="text-xs text-[var(--muted)] mt-0.5">
-                      {formatDate(suite._creationTime)}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-[var(--muted)]">
-                    {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
-                  </span>
-                  <StatusPill variant="neutral" showDot={false}>
-                    {SOURCE_TYPE_LABELS[suite.source_type] ?? suite.source_type}
-                  </StatusPill>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--muted)] group-hover:text-[var(--fg)]">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </Link>
-            ))}
+                <option value="">Select environment...</option>
+                {environments.map((env) => (
+                  <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
+                ))}
+              </select>
+              <Button
+                onClick={handleRunAll}
+                disabled={triggeringRunAll || !runAllEnvId}
+                size="sm"
+              >
+                {triggeringRunAll ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Starting...
+                  </>
+                ) : "Run All"}
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      {showCreateRegression && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCreateRegression(false)}>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 max-w-[440px] w-full shadow-[var(--elev-raised)]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
+              Create Regression Suite
+            </h3>
+            {createError && <Alert variant="error" className="mb-3">{createError}</Alert>}
+            <div className="mb-4">
+              <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
+                Name
+              </label>
+              <input
+                type="text"
+                value={regressionName}
+                onChange={(e) => setRegressionName(e.target.value)}
+                placeholder="e.g., Full Smoke Test"
+                className="w-full font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                autoFocus
+              />
+            </div>
+            <label className="flex items-center gap-2 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={regressionAutoAll}
+                onChange={(e) => setRegressionAutoAll(e.target.checked)}
+                className="accent-[var(--accent)]"
+              />
+              <span className="text-sm text-[var(--fg)]">
+                Auto-include all current and future functional suites
+              </span>
+              <span className="text-xs text-[var(--muted)] block mt-0.5">
+                New functional suites will be automatically added to this regression suite.
+              </span>
+            </label>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" size="sm" onClick={() => { setShowCreateRegression(false); setCreateError(null); }}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreateRegression} disabled={!regressionName.trim() || creating}>
+                {creating ? "Creating..." : "Create"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-        );
-      }}
-    </QueryResult>
-  );
-}
+         );
+       }}
+     </QueryResult>
+   );
+ }

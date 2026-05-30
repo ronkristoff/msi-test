@@ -61,7 +61,7 @@ describe("ExplorePage", () => {
     mockQueryResults.project = undefined;
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
   it("renders project not found when project is null", async () => {
@@ -75,7 +75,7 @@ describe("ExplorePage", () => {
     mockQueryResults.project = projectData;
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
-    expect(screen.getByText("Explore App URL")).toBeInTheDocument();
+    expect(screen.getByText("Explore & Generate Tests")).toBeInTheDocument();
     expect(screen.getByText("https://example.com")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start exploration/i })).toBeInTheDocument();
   });

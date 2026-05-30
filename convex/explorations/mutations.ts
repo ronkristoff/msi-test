@@ -7,6 +7,8 @@ export const createExploration = mutation({
   args: {
     project_id: v.id("projects"),
     url: v.optional(v.string()),
+    goal: v.optional(v.string()),
+    additional_urls: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
@@ -20,6 +22,8 @@ export const createExploration = mutation({
       workspace_id: workspace._id,
       project_id: project._id,
       url,
+      goal: args.goal?.trim() || undefined,
+      additional_urls: args.additional_urls?.filter((u) => u.trim()) || undefined,
       status: "pending",
     });
   },

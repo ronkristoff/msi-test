@@ -42,7 +42,7 @@ describe("explorations queries", () => {
     const pending = await t.query(api.explorations.queries.getPendingExplorations, {});
     expect(pending).toHaveLength(1);
     expect(pending[0].url).toBe("https://example.com");
-    expect(pending[0].status).toBe("pending");
+    expect(pending[0].auth_mode).toBe("none");
   });
 
   it("getPendingExplorations excludes non-pending explorations", async () => {
@@ -172,11 +172,13 @@ describe("explorations internal mutations", () => {
         name: "Login flow",
         description: "Test the login process",
         flow_summary: "Navigate to /login, fill credentials, submit",
+        area: "Authentication",
       },
       {
         name: "Navigation",
         description: "Test main navigation links",
         flow_summary: "Click each nav link, verify page loads",
+        area: "Navigation",
       },
     ];
 

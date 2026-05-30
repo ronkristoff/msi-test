@@ -29,6 +29,14 @@ export default defineSchema({
     app_url: v.string(),
     prd_text: v.optional(v.string()),
     prd_file_id: v.optional(v.id("_storage")),
+    explore_auth_mode: v.optional(
+      v.union(v.literal("none"), v.literal("form"), v.literal("cookie")),
+    ),
+    explore_login_url: v.optional(v.string()),
+    explore_username: v.optional(v.string()),
+    explore_password: v.optional(v.string()),
+    explore_cookie_name: v.optional(v.string()),
+    explore_cookie_value: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_workspace_id_and_name", ["workspace_id", "name"]),
@@ -38,6 +46,10 @@ export default defineSchema({
     project_id: v.id("projects"),
     name: v.string(),
     description: v.optional(v.string()),
+    suite_type: v.optional(
+      v.union(v.literal("functional"), v.literal("regression")),
+    ),
+    auto_include_all: v.optional(v.boolean()),
     source_type: v.union(
       v.literal("url_exploration"),
       v.literal("prd"),
@@ -46,7 +58,8 @@ export default defineSchema({
     ),
   })
     .index("by_workspace_id", ["workspace_id"])
-    .index("by_project_id", ["project_id"]),
+    .index("by_project_id", ["project_id"])
+    .index("by_project_id_and_suite_type", ["project_id", "suite_type"]),
 
   tests: defineTable({
     workspace_id: v.id("workspaces"),
@@ -187,6 +200,8 @@ export default defineSchema({
     workspace_id: v.id("workspaces"),
     project_id: v.id("projects"),
     url: v.string(),
+    goal: v.optional(v.string()),
+    additional_urls: v.optional(v.array(v.string())),
     status: v.union(
       v.literal("pending"),
       v.literal("capturing"),
@@ -215,6 +230,7 @@ export default defineSchema({
           name: v.string(),
           description: v.string(),
           flow_summary: v.string(),
+          area: v.string(),
         }),
       ),
     ),
@@ -223,4 +239,14 @@ export default defineSchema({
     .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"])
     .index("by_status", ["status"]),
+
+  suite_members: defineTable({
+    workspace_id: v.id("workspaces"),
+    regression_suite_id: v.id("suites"),
+    member_suite_id: v.optional(v.id("suites")),
+    member_test_id: v.optional(v.id("tests")),
+  })
+    .index("by_regression_suite_id", ["regression_suite_id"])
+    .index("by_member_suite_id", ["member_suite_id"])
+    .index("by_member_test_id", ["member_test_id"]),
 });

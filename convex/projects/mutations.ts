@@ -4,6 +4,8 @@ import { ConvexError } from "convex/values";
 import { getOwnedWorkspace, getOwnedEntity } from "../lib/requireAuth";
 import { validateProjectName, normalizeAppUrl } from "../lib/validation";
 
+const KEEP_SENTINEL = "___KEEP___";
+
 export const createProject = mutation({
   args: {
     workspace_id: v.id("workspaces"),
@@ -49,6 +51,14 @@ export const updateProject = mutation({
     prd_text: v.optional(v.string()),
     prd_file_id: v.optional(v.id("_storage")),
     clear_prd: v.optional(v.boolean()),
+    explore_auth_mode: v.optional(
+      v.union(v.literal("none"), v.literal("form"), v.literal("cookie")),
+    ),
+    explore_login_url: v.optional(v.string()),
+    explore_username: v.optional(v.string()),
+    explore_password: v.optional(v.string()),
+    explore_cookie_name: v.optional(v.string()),
+    explore_cookie_value: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
@@ -91,6 +101,35 @@ export const updateProject = mutation({
     } else if (args.prd_file_id !== undefined) {
       updates.prd_text = undefined;
       updates.prd_file_id = args.prd_file_id;
+    }
+
+    if (args.explore_auth_mode !== undefined) {
+      if (args.explore_auth_mode === "none") {
+        updates.explore_auth_mode = "none";
+        updates.explore_login_url = undefined;
+        updates.explore_username = undefined;
+        updates.explore_password = undefined;
+        updates.explore_cookie_name = undefined;
+        updates.explore_cookie_value = undefined;
+      } else if (args.explore_auth_mode === "form") {
+        updates.explore_auth_mode = "form";
+        updates.explore_login_url = args.explore_login_url?.trim() || undefined;
+        updates.explore_username = args.explore_username?.trim() || undefined;
+        if (args.explore_password && args.explore_password !== KEEP_SENTINEL) {
+          updates.explore_password = args.explore_password;
+        }
+        updates.explore_cookie_name = undefined;
+        updates.explore_cookie_value = undefined;
+      } else if (args.explore_auth_mode === "cookie") {
+        updates.explore_auth_mode = "cookie";
+        updates.explore_cookie_name = args.explore_cookie_name?.trim() || undefined;
+        if (args.explore_cookie_value && args.explore_cookie_value !== KEEP_SENTINEL) {
+          updates.explore_cookie_value = args.explore_cookie_value;
+        }
+        updates.explore_login_url = undefined;
+        updates.explore_username = undefined;
+        updates.explore_password = undefined;
+      }
     }
 
     await ctx.db.patch(args.project_id, updates);

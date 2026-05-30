@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
+import { maskApiKey } from "../lib/validation";
 
 export const getProjects = query({
   args: { workspace_id: v.id("workspaces") },
@@ -22,6 +23,15 @@ export const getProject = query({
   handler: async (ctx, args) => {
     const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
     if (!result) return null;
-    return result.entity;
+    const project = result.entity;
+    return {
+      ...project,
+      explore_password: project.explore_password
+        ? maskApiKey(project.explore_password)
+        : undefined,
+      explore_cookie_value: project.explore_cookie_value
+        ? maskApiKey(project.explore_cookie_value)
+        : undefined,
+    };
   },
 });

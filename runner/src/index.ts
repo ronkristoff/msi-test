@@ -114,18 +114,38 @@ async function handleRun(work: { run_id: string; tests: unknown[] }) {
   log("Ready for next work");
 }
 
-async function handleExploration(exploration: { _id: string; url: string }) {
+async function handleExploration(exploration: {
+  _id: string;
+  url: string;
+  auth_mode: string;
+  login_url?: string;
+  username?: string;
+  password?: string;
+  cookie_name?: string;
+  cookie_value?: string;
+  additional_urls?: string[];
+}) {
   if (!(await claimWithRetry(
     () => client.claimExploration(exploration._id, RUNNER_ID),
     exploration._id,
   ))) return;
 
   activeWork = { kind: "exploration", id: exploration._id };
-  log(`Claimed exploration ${exploration._id} (${exploration.url})`);
+  log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode})`);
 
   await executeExploration(
     client,
-    { exploration_id: exploration._id, url: exploration.url },
+    {
+      exploration_id: exploration._id,
+      url: exploration.url,
+      auth_mode: (exploration.auth_mode as "none" | "form" | "cookie") ?? "none",
+      login_url: exploration.login_url,
+      username: exploration.username,
+      password: exploration.password,
+      cookie_name: exploration.cookie_name,
+      cookie_value: exploration.cookie_value,
+      additional_urls: exploration.additional_urls,
+    },
     log,
   );
 
