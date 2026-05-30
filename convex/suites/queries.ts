@@ -152,7 +152,7 @@ export const getRegressionMembers = query({
       tests: { _id: string; name: string; status: string }[];
     }[] = [];
 
-    const individualTests: { _id: string; name: string; status: string; source_suite_name: string }[] = [];
+    const individualTests: { _id: string; name: string; status: string; source_suite_name: string; source_suite_id: string }[] = [];
 
     const seenSuiteIds = new Set<string>();
 
@@ -200,6 +200,7 @@ export const getRegressionMembers = query({
           name: t.name,
           status: t.status,
           source_suite_name: parentSuite?.name ?? "Unknown",
+          source_suite_id: t.suite_id,
         });
       }
     }
@@ -220,5 +221,22 @@ export const getFunctionalSuites = query({
         q.eq("project_id", args.project_id).eq("suite_type", "functional"),
       )
       .collect();
+  },
+});
+
+export const getRegressionsForMemberSuite = query({
+  args: { member_suite_id: v.id("suites") },
+  handler: async (ctx, args) => {
+    const result = await getOptionalOwnedEntity(ctx, args.member_suite_id, "suites");
+    if (!result) return [];
+
+    const memberships = await ctx.db
+      .query("suite_members")
+      .withIndex("by_member_suite_id", (q) =>
+        q.eq("member_suite_id", args.member_suite_id),
+      )
+      .collect();
+
+    return memberships.map((m) => m.regression_suite_id);
   },
 });

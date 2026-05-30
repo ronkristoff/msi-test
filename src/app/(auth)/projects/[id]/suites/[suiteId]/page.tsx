@@ -312,6 +312,11 @@ export default function SuiteDetailPage() {
     suite ? { project_id: suite.project_id } : "skip",
   );
 
+  const existingRegressionIds = useQuery(
+    api.suites.queries.getRegressionsForMemberSuite,
+    suite ? { member_suite_id: suiteId as Id<"suites"> } : "skip",
+  );
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -645,7 +650,12 @@ export default function SuiteDetailPage() {
                   <div className="px-4 py-3 bg-[var(--surface)] border-b border-[var(--border-soft)]">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium text-[var(--fg)]">{ref.suite.name}</div>
+                        <Link
+                          href={`/projects/${params.id}/suites/${ref.suite._id}`}
+                          className="text-sm font-medium text-[var(--fg)] hover:text-[var(--accent)] transition-colors"
+                        >
+                          {ref.suite.name}
+                        </Link>
                         {ref.suite.description && (
                           <div className="text-xs text-[var(--muted)] mt-0.5">{ref.suite.description}</div>
                         )}
@@ -658,7 +668,12 @@ export default function SuiteDetailPage() {
                   <div className="divide-y divide-[var(--border-soft)]">
                     {ref.tests.map((test) => (
                       <div key={test._id} className="px-4 py-2 flex items-center justify-between">
-                        <span className="text-sm text-[var(--fg)]">{test.name}</span>
+                        <Link
+                          href={`/projects/${params.id}/suites/${ref.suite._id}`}
+                          className="text-sm text-[var(--fg)] hover:text-[var(--accent)] transition-colors"
+                        >
+                          {test.name}
+                        </Link>
                         <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
                           {test.status}
                         </StatusPill>
@@ -677,7 +692,12 @@ export default function SuiteDetailPage() {
                     {regressionMembers.individualTests.map((test) => (
                       <div key={test._id} className="px-4 py-2 flex items-center justify-between">
                         <div>
-                          <span className="text-sm text-[var(--fg)]">{test.name}</span>
+                          <Link
+                            href={`/projects/${params.id}/suites/${test.source_suite_id}`}
+                            className="text-sm text-[var(--fg)] hover:text-[var(--accent)] transition-colors"
+                          >
+                            {test.name}
+                          </Link>
                           <span className="text-xs text-[var(--muted)] ml-2">from {test.source_suite_name}</span>
                         </div>
                         <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
@@ -712,6 +732,7 @@ export default function SuiteDetailPage() {
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {regressionSuites
                 .filter((s) => s.suite_type === "regression")
+                .filter((s) => !existingRegressionIds?.includes(s._id))
                 .map((regSuite) => (
                   <Button
                     key={regSuite._id}
@@ -736,6 +757,10 @@ export default function SuiteDetailPage() {
                 ))}
               {regressionSuites.filter((s) => s.suite_type === "regression").length === 0 && (
                 <p className="text-sm text-[var(--muted)]">No regression suites yet. Create one from the project page.</p>
+              )}
+              {regressionSuites.filter((s) => s.suite_type === "regression").length > 0 &&
+                regressionSuites.filter((s) => s.suite_type === "regression" && !existingRegressionIds?.includes(s._id)).length === 0 && (
+                <p className="text-sm text-[var(--muted)]">Already added to all regression suites.</p>
               )}
             </div>
             <div className="flex justify-end mt-4">

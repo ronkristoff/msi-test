@@ -89,47 +89,34 @@ export const getPendingWork = query({
 
     return Promise.all(
       pending.map(async (run) => {
-        let tests: Array<{
+        const runResults = await ctx.db
+          .query("run_results")
+          .withIndex("by_run_id", (q) => q.eq("run_id", run._id))
+          .collect();
+
+        const tests: Array<{
           _id: string;
           name: string;
           playwright_code: string;
-        }> = [];
-
-        if (run.suite_id) {
-          const allTests = await ctx.db
-            .query("tests")
-            .withIndex("by_suite_id", (q) => q.eq("suite_id", run.suite_id!))
-            .collect();
-          tests = allTests
-            .filter((t) => t.status === "approved")
-            .map((t) => ({
-              _id: t._id,
-              name: t.name,
-              playwright_code: t.playwright_code,
-            }));
-        } else if (run.test_id) {
-          const test = await ctx.db.get(run.test_id);
-          if (test) {
-            tests = [
-              {
+        }> = (
+          await Promise.all(
+            runResults.map(async (rr) => {
+              const test = await ctx.db.get(rr.test_id);
+              if (!test) return null;
+              return {
                 _id: test._id,
                 name: test.name,
                 playwright_code: test.playwright_code,
-              },
-            ];
-          }
-        }
+              };
+            }),
+          )
+        ).filter((t): t is NonNullable<typeof t> => t !== null);
 
         let base_url: string | null = null;
         if (run.environment_id) {
           const env = await ctx.db.get(run.environment_id);
           if (env) base_url = env.base_url;
         }
-
-        const runResults = await ctx.db
-          .query("run_results")
-          .withIndex("by_run_id", (q) => q.eq("run_id", run._id))
-          .collect();
 
         return {
           run_id: run._id,
