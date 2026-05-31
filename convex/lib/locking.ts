@@ -1,0 +1,1 @@
+export const LOCK_STALE_THRESHOLD_MS = 30 * 60 * 1000;

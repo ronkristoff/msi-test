@@ -2,7 +2,7 @@ import { mutation, type DatabaseReader } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { getOwnedEntity, getOwnedWorkspace } from "../lib/requireAuth";
+import { getOwnedEntity, getOwnedWorkspace, getUserName } from "../lib/requireAuth";
 
 export const triggerRun = mutation({
   args: {
@@ -15,10 +15,17 @@ export const triggerRun = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { workspace } = await getOwnedWorkspace(ctx);
+    const { user, workspace } = await getOwnedWorkspace(ctx);
+    const userId = String(user._id);
     const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
 
-    if (args.suite_id) await getOwnedEntity(ctx, args.suite_id, "suites");
+    if (args.suite_id) {
+      const { entity: suite } = await getOwnedEntity(ctx, args.suite_id, "suites");
+      if (suite.locked_by && suite.locked_by !== userId) {
+        const holderName = await getUserName(ctx, suite.workspace_id, suite.locked_by);
+        throw new ConvexError(`Suite is locked by ${holderName}`);
+      }
+    }
     if (args.test_id) await getOwnedEntity(ctx, args.test_id, "tests");
     if (args.environment_id) await getOwnedEntity(ctx, args.environment_id, "environments");
 
@@ -64,7 +71,16 @@ export const triggerRun = mutation({
       environment_id: args.environment_id,
       trigger_type: args.trigger_type ?? "manual",
       status: "running",
+      triggered_by: userId,
     });
+
+    if (args.suite_id) {
+      await ctx.db.patch(args.suite_id, {
+        locked_by: userId,
+        locked_at: Date.now(),
+        locked_reason: "running",
+      });
+    }
 
     for (const testId of testIds) {
       await ctx.db.insert("run_results", {
@@ -87,7 +103,8 @@ export const rerunTest = mutation({
     environment_id: v.optional(v.id("environments")),
   },
   handler: async (ctx, args) => {
-    const { workspace } = await getOwnedWorkspace(ctx);
+    const { user, workspace } = await getOwnedWorkspace(ctx);
+    const userId = String(user._id);
     const { entity: originalRun } = await getOwnedEntity(ctx, args.run_id, "runs");
 
     const originalResults = await ctx.db
@@ -115,6 +132,7 @@ export const rerunTest = mutation({
       environment_id: args.environment_id ?? originalRun.environment_id,
       trigger_type: "rerun",
       status: "running",
+      triggered_by: userId,
     });
 
     for (const testId of testIds) {
@@ -192,7 +210,8 @@ export const runAllTests = mutation({
     environment_id: v.id("environments"),
   },
   handler: async (ctx, args) => {
-    const { workspace } = await getOwnedWorkspace(ctx);
+    const { user, workspace } = await getOwnedWorkspace(ctx);
+    const userId = String(user._id);
     const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
     await getOwnedEntity(ctx, args.environment_id, "environments");
 
@@ -224,6 +243,7 @@ export const runAllTests = mutation({
       environment_id: args.environment_id,
       trigger_type: "manual",
       status: "running",
+      triggered_by: userId,
     });
 
     for (const testId of testIdSet) {

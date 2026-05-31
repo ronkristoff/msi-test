@@ -28,11 +28,21 @@ export const createWorkspace = mutation({
       .first();
     if (existing) throw new ConvexError("Workspace already exists");
 
-    return ctx.db.insert("workspaces", {
+    const workspaceId = await ctx.db.insert("workspaces", {
       name,
       owner_id: ownerId,
       ai_config: args.ai_config,
     });
+
+    await ctx.db.insert("workspace_members", {
+      workspace_id: workspaceId,
+      user_id: ownerId,
+      role: "owner" as const,
+      invited_at: Date.now(),
+      user_name: ownerId,
+    });
+
+    return workspaceId;
   },
 });
 

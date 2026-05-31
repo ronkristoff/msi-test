@@ -5,11 +5,19 @@ type TestCtx = ReturnType<typeof convexTest>;
 
 export async function seedWorkspace(t: TestCtx, ownerId = "user1") {
   return t.run(async (ctx) => {
-    return ctx.db.insert("workspaces", {
+    const workspaceId = await ctx.db.insert("workspaces", {
       name: "Test WS",
       owner_id: ownerId,
       ai_config: { endpoint_url: "https://api.example.com", api_key: "key123", model_name: "gpt-4" },
     });
+    await ctx.db.insert("workspace_members", {
+      workspace_id: workspaceId,
+      user_id: ownerId,
+      role: "owner",
+      invited_at: Date.now(),
+      user_name: ownerId,
+    });
+    return workspaceId;
   });
 }
 

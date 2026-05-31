@@ -124,6 +124,14 @@ async function aggregateAndFinalize(
     ...(errorMessage !== undefined && { error_message: errorMessage }),
   });
 
+  if (run.suite_id) {
+    await ctx.db.patch(run.suite_id, {
+      locked_by: undefined,
+      locked_at: undefined,
+      locked_reason: undefined,
+    });
+  }
+
   const heartbeat = await ctx.db
     .query("run_heartbeats")
     .withIndex("by_run_id", (q) => q.eq("run_id", run_id))
@@ -203,8 +211,41 @@ export const markStaleRuns = internalMutation({
             finished_at: now,
             duration_ms: run.started_at ? now - run.started_at : 0,
           });
+
+          if (run.suite_id) {
+            await ctx.db.patch(run.suite_id, {
+              locked_by: undefined,
+              locked_at: undefined,
+              locked_reason: undefined,
+            });
+          }
+
           await ctx.db.delete(hb._id);
         }
+      }
+    }
+  },
+});
+
+export const clearStaleTestLocks = internalMutation({
+  args: {
+    stale_threshold_ms: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const cutoff = now - args.stale_threshold_ms;
+
+    const lockedTests = await ctx.db
+      .query("tests")
+      .filter((q) => q.neq(q.field("locked_at"), undefined))
+      .collect();
+
+    for (const test of lockedTests) {
+      if (test.locked_at && test.locked_at < cutoff) {
+        await ctx.db.patch(test._id, {
+          locked_by: undefined,
+          locked_at: undefined,
+        });
       }
     }
   },

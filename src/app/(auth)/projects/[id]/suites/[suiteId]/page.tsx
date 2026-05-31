@@ -74,6 +74,8 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
   const updateTestCode = useMutation(api.tests.mutations.updateTestCode);
   const updateTestStatus = useMutation(api.tests.mutations.updateTestStatus);
   const deleteTest = useMutation(api.tests.mutations.deleteTest);
+  const lockTestMut = useMutation(api.tests.mutations.lockTest);
+  const unlockTestMut = useMutation(api.tests.mutations.unlockTest);
   const regenerateTest = useAction(api.ai.regenerateTest.regenerateTest);
   const healTestAction = useAction(api.ai.healTest.healTest);
   const { logError } = useErrorLogger();
@@ -88,6 +90,23 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
   );
 
   const aiConfigReady = hasAiConfig(workspace);
+
+  const handleExpand = async (opening: boolean) => {
+    setExpanded(opening);
+    if (opening) {
+      try {
+        await lockTestMut({ test_id: test._id });
+      } catch {
+        // Lock may fail if another user has it — still expand for viewing
+      }
+    } else {
+      try {
+        await unlockTestMut({ test_id: test._id });
+      } catch {
+        // Ignore unlock errors
+      }
+    }
+  };
 
   const handleSave = async () => {
     await updateTestCode({ test_id: test._id, playwright_code: localCode! });
@@ -133,7 +152,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
     <>
       <div className="border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => handleExpand(!expanded)}
           className="w-full flex items-center justify-between px-5 py-4 bg-[var(--surface)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] text-left"
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -146,6 +165,11 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
             <span className="text-sm font-medium text-[var(--fg)] truncate">{test.name}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {test.locked_by && (
+              <span className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded">
+                Editing
+              </span>
+            )}
             <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
               {test.status}
             </StatusPill>
@@ -157,6 +181,11 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
 
         {expanded && (
           <div className="border-t border-[var(--border)] p-5 bg-[var(--surface)]">
+            {test.locked_by && (
+              <div className="mb-3 px-3 py-2 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-[var(--radius-sm)] text-xs text-[var(--warning)]">
+                This test is currently being edited by another team member. Changes are read-only.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
@@ -165,7 +194,8 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
                 <textarea
                   value={displayCode}
                   onChange={(e) => setLocalCode(e.target.value)}
-                  className="w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  readOnly={!!test.locked_by}
+                  className={`w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${test.locked_by ? "opacity-60 cursor-not-allowed" : ""}`}
                   spellCheck={false}
                 />
               </div>
@@ -499,6 +529,19 @@ export default function SuiteDetailPage() {
             <Link href={`/runs/${activeRun._id}`} className="text-sm text-[var(--accent)] underline font-medium ml-auto">
               View progress →
             </Link>
+          </div>
+        </div>
+      )}
+
+      {!activeRun && suite.locked_by && (
+        <div className="bg-[var(--surface)] border border-[var(--warning)]/40 rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+          <div className="flex items-center gap-3">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span className="text-sm text-[var(--fg)]">
+              Suite is locked — {suite.locked_reason === "running" ? "a run is in progress" : "tests are being generated"}
+            </span>
           </div>
         </div>
       )}

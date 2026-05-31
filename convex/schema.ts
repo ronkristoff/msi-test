@@ -5,12 +5,24 @@ export default defineSchema({
   workspaces: defineTable({
     name: v.string(),
     owner_id: v.string(),
+    invite_code: v.optional(v.string()),
     ai_config: v.object({
       endpoint_url: v.string(),
       api_key: v.string(),
       model_name: v.string(),
     }),
-  }).index("by_owner_id", ["owner_id"]),
+  }).index("by_owner_id", ["owner_id"]).index("by_invite_code", ["invite_code"]),
+
+  workspace_members: defineTable({
+    workspace_id: v.id("workspaces"),
+    user_id: v.string(),
+    role: v.union(v.literal("owner"), v.literal("member")),
+    invited_at: v.number(),
+    user_name: v.string(),
+  })
+    .index("by_user_id", ["user_id"])
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_workspace_id_and_user_id", ["workspace_id", "user_id"]),
 
   error_logs: defineTable({
     message: v.string(),
@@ -56,6 +68,9 @@ export default defineSchema({
       v.literal("natural_language"),
       v.literal("manual"),
     ),
+    locked_by: v.optional(v.string()),
+    locked_at: v.optional(v.number()),
+    locked_reason: v.optional(v.union(v.literal("running"), v.literal("generating"))),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
@@ -73,6 +88,8 @@ export default defineSchema({
       v.literal("natural_language"),
     ),
     status: v.union(v.literal("draft"), v.literal("approved")),
+    locked_by: v.optional(v.string()),
+    locked_at: v.optional(v.number()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_suite_id", ["suite_id"]),
@@ -90,6 +107,7 @@ export default defineSchema({
       v.literal("ci"),
       v.literal("rerun"),
     ),
+    triggered_by: v.optional(v.string()),
     branch: v.optional(v.string()),
     commit: v.optional(v.string()),
     status: v.union(

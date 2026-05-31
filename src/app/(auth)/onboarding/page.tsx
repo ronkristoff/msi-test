@@ -12,14 +12,20 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { workspaceNameSchema, aiConfigSchema, type WorkspaceNameValues, type AIConfigFormValues } from "@/lib/schemas";
 
+type OnboardingStep = 0 | 1 | 2 | 3;
+const CHOOSE = 0;
+
 export default function OnboardingPage() {
   const router = useRouter();
   const createWorkspace = useMutation(api.workspaces.mutations.createWorkspace);
+  const joinWorkspace = useMutation(api.members.mutations.joinWorkspace);
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<OnboardingStep>(CHOOSE);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedName, setSavedName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [joinName, setJoinName] = useState("");
 
   const nameForm = useForm<WorkspaceNameValues>({
     resolver: zodResolver(workspaceNameSchema),
@@ -78,15 +84,80 @@ export default function OnboardingPage() {
           <div
             key={s}
             className={`w-2 h-2 rounded-full transition-colors duration-[var(--motion-fast)] ${
-              step > s
-                ? "bg-[var(--success)]"
-                : step === s
-                  ? "bg-[var(--accent)]"
-                  : "bg-[var(--border)]"
+              step === CHOOSE
+                ? "bg-[var(--border)]"
+                : step > s
+                  ? "bg-[var(--success)]"
+                  : step === s
+                    ? "bg-[var(--accent)]"
+                    : "bg-[var(--border)]"
             }`}
           />
         ))}
       </div>
+
+      {step === CHOOSE && (
+        <div className={cardClass}>
+          <h1 className="font-[var(--font-display)] text-[32px] font-bold text-[var(--fg)] mb-2 leading-tight">
+            Get started
+          </h1>
+          <p className="text-sm text-[var(--muted)] mb-8 leading-relaxed">
+            Create a new workspace or join an existing team.
+          </p>
+
+          <div className="space-y-3">
+            <Button
+              onClick={() => setStep(1)}
+              icon={chevronRight}
+              className="w-full py-[13px] px-6 text-base font-medium justify-center"
+            >
+              Create new workspace
+            </Button>
+
+            <div className="border-t border-[var(--border-soft)] pt-3">
+              <div className="text-sm font-semibold text-[var(--fg)] mb-3">Join existing workspace</div>
+              <input
+                type="text"
+                placeholder="Your name"
+                value={joinName}
+                onChange={(e) => setJoinName(e.target.value)}
+                className="w-full px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] mb-2"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Invite code"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  className="flex-1 px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm font-mono tracking-wider bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)]"
+                />
+                <Button
+                  onClick={async () => {
+                    if (!inviteCode.trim() || !joinName.trim()) return;
+                    setLoading(true);
+                    setSubmitError(null);
+                    try {
+                      await joinWorkspace({ invite_code: inviteCode.trim(), user_name: joinName.trim() });
+                      router.push("/dashboard");
+                    } catch (err) {
+                      setSubmitError(err instanceof Error ? err.message : "Failed to join workspace");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading || !inviteCode.trim() || !joinName.trim()}
+                >
+                  {loading ? "Joining..." : "Join"}
+                </Button>
+              </div>
+              {submitError && step === CHOOSE && (
+                <p className="text-xs text-[var(--danger)] mt-2">{submitError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {step === 1 && (
         <div className={cardClass}>

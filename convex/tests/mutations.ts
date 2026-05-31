@@ -1,7 +1,7 @@
 import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { getOwnedEntity } from "../lib/requireAuth";
+import { getOwnedEntity, getUserName } from "../lib/requireAuth";
 import { validateRequiredField } from "../lib/validation";
 
 export const updateTestCode = mutation({
@@ -12,7 +12,13 @@ export const updateTestCode = mutation({
     status: v.optional(v.union(v.literal("draft"), v.literal("approved"))),
   },
   handler: async (ctx, args) => {
-    await getOwnedEntity(ctx, args.test_id, "tests");
+    const { user, entity: test } = await getOwnedEntity(ctx, args.test_id, "tests");
+    const userId = String(user._id);
+
+    if (test.locked_by && test.locked_by !== userId) {
+      const holderName = await getUserName(ctx, test.workspace_id, test.locked_by);
+      throw new ConvexError(`Test is locked by ${holderName}`);
+    }
 
     const code = validateRequiredField(args.playwright_code, "Playwright code");
 
@@ -77,6 +83,41 @@ export const createTestFromGeneration = internalMutation({
       playwright_code: args.playwright_code,
       source_type: args.source_type,
       status: "draft",
+    });
+  },
+});
+
+export const lockTest = mutation({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const { user, entity: test } = await getOwnedEntity(ctx, args.test_id, "tests");
+    const userId = String(user._id);
+
+    if (test.locked_by && test.locked_by !== userId) {
+      const holderName = await getUserName(ctx, test.workspace_id, test.locked_by);
+      throw new ConvexError(`Test is locked by ${holderName}`);
+    }
+
+    await ctx.db.patch(args.test_id, {
+      locked_by: userId,
+      locked_at: Date.now(),
+    });
+  },
+});
+
+export const unlockTest = mutation({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const { user, entity: test } = await getOwnedEntity(ctx, args.test_id, "tests");
+    const userId = String(user._id);
+
+    if (test.locked_by && test.locked_by !== userId) {
+      throw new ConvexError("Cannot unlock a test locked by another user");
+    }
+
+    await ctx.db.patch(args.test_id, {
+      locked_by: undefined,
+      locked_at: undefined,
     });
   },
 });

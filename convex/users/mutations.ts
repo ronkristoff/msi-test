@@ -1,7 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth } from "../lib/requireAuth";
+import { requireAuth, getOwnerId } from "../lib/requireAuth";
 import { authComponent, createAuth } from "../auth";
 import { NAME_MAX, PASSWORD_MIN } from "../lib/constraints";
 
@@ -20,6 +20,16 @@ export const updateUserName = mutation({
       body: { name },
       headers,
     });
+
+    const userId = getOwnerId(user);
+    const memberships = await ctx.db
+      .query("workspace_members")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .collect();
+
+    for (const m of memberships) {
+      await ctx.db.patch(m._id, { user_name: name });
+    }
   },
 });
 

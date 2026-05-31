@@ -7,7 +7,18 @@ import { seedFullStack } from "./testHelpers";
 const modules = import.meta.glob("./**/*.ts");
 
 describe("requireAuth helpers", () => {
-  it("getOwnedWorkspace throws without auth (convex-test has no auth provider)", async () => {
+  it("getMemberWorkspace throws without auth (convex-test has no auth provider)", async () => {
+    const t = convexTest(schema, modules);
+
+    await expect(
+      t.run(async (ctx) => {
+        const { getMemberWorkspace } = await import("./lib/requireAuth");
+        await getMemberWorkspace(ctx);
+      }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("getOwnedWorkspace (alias) also throws without auth", async () => {
     const t = convexTest(schema, modules);
 
     await expect(

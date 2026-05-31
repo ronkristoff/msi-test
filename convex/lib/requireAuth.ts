@@ -21,27 +21,51 @@ export function getOwnerId(user: { _id: string }): string {
   return String(user._id);
 }
 
-export async function getOwnedWorkspace(ctx: QueryCtx | MutationCtx) {
+type MemberWorkspaceResult = {
+  user: { _id: string };
+  workspace: Doc<"workspaces"> & { _id: Id<"workspaces"> };
+  membership: Doc<"workspace_members"> & { _id: Id<"workspace_members"> };
+};
+
+export async function getMemberWorkspace(ctx: QueryCtx | MutationCtx): Promise<MemberWorkspaceResult> {
   const user = await requireAuth(ctx);
-  const ownerId = getOwnerId(user);
-  const workspace = await ctx.db
-    .query("workspaces")
-    .withIndex("by_owner_id", (q) => q.eq("owner_id", ownerId))
+  const userId = getOwnerId(user);
+
+  const membership = await ctx.db
+    .query("workspace_members")
+    .withIndex("by_user_id", (q) => q.eq("user_id", userId))
     .first();
+  if (!membership) throw new ConvexError("Workspace not found");
+
+  const workspace = await ctx.db.get(membership.workspace_id);
   if (!workspace) throw new ConvexError("Workspace not found");
-  return { user, workspace, ownerId };
+
+  return { user, workspace, membership };
 }
 
-export async function getOptionalOwnedWorkspace(ctx: QueryCtx | MutationCtx) {
+export async function getOwnerWorkspace(ctx: QueryCtx | MutationCtx): Promise<MemberWorkspaceResult> {
+  const result = await getMemberWorkspace(ctx);
+  if (result.membership.role !== "owner") {
+    throw new ConvexError("Only workspace owners can perform this action");
+  }
+  return result;
+}
+
+export async function getOptionalMemberWorkspace(ctx: QueryCtx | MutationCtx): Promise<MemberWorkspaceResult | null> {
   const user = await getOptionalAuthUser(ctx);
   if (!user) return null;
-  const ownerId = getOwnerId(user);
-  const workspace = await ctx.db
-    .query("workspaces")
-    .withIndex("by_owner_id", (q) => q.eq("owner_id", ownerId))
+  const userId = getOwnerId(user);
+
+  const membership = await ctx.db
+    .query("workspace_members")
+    .withIndex("by_user_id", (q) => q.eq("user_id", userId))
     .first();
+  if (!membership) return null;
+
+  const workspace = await ctx.db.get(membership.workspace_id);
   if (!workspace) return null;
-  return { user, workspace, ownerId };
+
+  return { user, workspace, membership };
 }
 
 export async function getOwnedEntity<T extends TableNames>(
@@ -50,7 +74,7 @@ export async function getOwnedEntity<T extends TableNames>(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _tableName: T,
 ) {
-  const { user, workspace } = await getOwnedWorkspace(ctx);
+  const { user, workspace } = await getMemberWorkspace(ctx);
   const entity = await ctx.db.get(entityId);
   if (!entity) throw new ConvexError("Not found or access denied");
   if (entity.workspace_id !== workspace._id) throw new ConvexError("Not found or access denied");
@@ -63,10 +87,25 @@ export async function getOptionalOwnedEntity<T extends TableNames>(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _tableName: T,
 ) {
-  const result = await getOptionalOwnedWorkspace(ctx);
+  const result = await getOptionalMemberWorkspace(ctx);
   if (!result) return null;
   const entity = await ctx.db.get(entityId);
   if (!entity) return null;
   if (entity.workspace_id !== result.workspace._id) return null;
   return { ...result, entity: entity as Doc<T> & { _id: Id<T> } };
 }
+
+export async function getUserName(ctx: QueryCtx | MutationCtx, workspaceId: Id<"workspaces">, userId: string): Promise<string> {
+  const membership = await ctx.db
+    .query("workspace_members")
+    .withIndex("by_workspace_id_and_user_id", (q) =>
+      q.eq("workspace_id", workspaceId).eq("user_id", userId),
+    )
+    .first();
+  return membership?.user_name ?? "Unknown User";
+}
+
+/** @deprecated Use getMemberWorkspace instead */
+export const getOwnedWorkspace = getMemberWorkspace;
+/** @deprecated Use getOptionalMemberWorkspace instead */
+export const getOptionalOwnedWorkspace = getOptionalMemberWorkspace;

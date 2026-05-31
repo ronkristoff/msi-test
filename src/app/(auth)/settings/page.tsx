@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/lib/convex";
 import { AIConfigForm } from "@/components/AIConfigForm";
+import { MembersTab } from "@/components/MembersTab";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/FormField";
@@ -19,12 +20,13 @@ import {
 } from "@/lib/schemas";
 import type { WorkspaceMasked } from "@/lib/types";
 
-type SettingsTab = "ai" | "profile" | "workspace";
+type SettingsTab = "ai" | "profile" | "workspace" | "members";
 
 const TABS: { value: SettingsTab; label: string }[] = [
   { value: "ai", label: "AI Provider" },
   { value: "profile", label: "Profile" },
   { value: "workspace", label: "Workspace" },
+  { value: "members", label: "Members" },
 ];
 
 function useAutoDismissMessage(ms: number) {
@@ -247,6 +249,10 @@ function SettingsForm({
             </div>
           </div>
         </>
+      )}
+
+      {activeTab === "members" && (
+        <MembersTab />
       )}
     </div>
   );
