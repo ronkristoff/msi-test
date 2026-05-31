@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { api, internal } from "../_generated/api";
@@ -9,6 +10,7 @@ import { createHealAgent, extractPlaywrightCode, deriveTestName } from "./agents
 import { classifyAiError } from "./errors";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
+import { getLiveSnapshot, extractTargetUrl } from "./browserClient";
 
 export const healTest = action({
   args: {
@@ -20,6 +22,22 @@ export const healTest = action({
       test_id: args.test_id,
     });
 
+    try {
+      return await healTestInner(ctx, args);
+    } finally {
+      const current = await ctx.runQuery(internal.tests.queries.getTestInternal, {
+        test_id: args.test_id,
+      });
+      if (current?.status === "healing") {
+        await ctx.runMutation(internal.tests.mutations.setTestDraft, {
+          test_id: args.test_id,
+        });
+      }
+    }
+  },
+});
+
+async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error_message?: string }): Promise<{ testId: string; newName: string }> {
     const test = await ctx.runQuery(internal.tests.queries.getTestInternal, {
       test_id: args.test_id,
     });
@@ -69,6 +87,21 @@ export const healTest = action({
       }
     }
 
+    const targetUrl = extractTargetUrl(test.playwright_code, project.app_url);
+    const liveSnapshot = await getLiveSnapshot({
+      projectId: suite.project_id,
+      url: targetUrl,
+      authConfig: {
+        auth_mode: (project as Record<string, unknown>).explore_auth_mode as string ?? "none",
+        login_url: (project as Record<string, unknown>).explore_login_url as string | undefined,
+        username: (project as Record<string, unknown>).explore_username as string | undefined,
+        password: (project as Record<string, unknown>).explore_password as string | undefined,
+        cookie_name: (project as Record<string, unknown>).explore_cookie_name as string | undefined,
+        cookie_value: (project as Record<string, unknown>).explore_cookie_value as string | undefined,
+        app_url: project.app_url,
+      },
+    });
+
     const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
       workspace_id: project.workspace_id,
     });
@@ -97,7 +130,7 @@ ${test.playwright_code}
 
 Error from test run:
 ${errorMessage}
-${pagesContext ? `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}` : ""}
+${liveSnapshot ? `\nLive DOM Context (current page state — use these real elements and values):\nURL: ${liveSnapshot.url}\nTitle: ${liveSnapshot.title}\n${liveSnapshot.snapshot}` : pagesContext ? `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}` : ""}
 
 Fix the test based on the error. Rules:
 
@@ -160,8 +193,7 @@ For assertion failures (visible/enabled/text mismatch):
     });
 
     return { testId: args.test_id, newName };
-  },
-});
+}
 
 export const healAllFailed = action({
   args: {

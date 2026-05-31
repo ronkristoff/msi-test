@@ -207,7 +207,7 @@ Generate a single, self-contained Playwright test. Rules:
         }
       } catch (err: unknown) {
         failedAreas.add(scenario.area);
-        classifyAiError(err);
+        console.error(`[generateExplorationTests] Failed to generate test for scenario "${scenario.name}":`, err);
       }
     }
 

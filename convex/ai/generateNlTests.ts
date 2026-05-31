@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
@@ -9,6 +10,8 @@ import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext } from "./authContext";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { getLiveSnapshot } from "./browserClient";
+import { internal } from "../_generated/api";
 
 export const generateNlTests = action({
   args: {
@@ -17,6 +20,20 @@ export const generateNlTests = action({
     suite_id: v.id("suites"),
   },
   handler: async (ctx, args) => {
+    try {
+      return await generateNlTestsInner(ctx, args);
+    } finally {
+      const suite = await ctx.runQuery(internal.suites.queries.getSuite, {
+        suite_id: args.suite_id,
+      });
+      if (suite?.status === "generating") {
+        await markSuiteFailed(ctx, args.suite_id, "Generation interrupted unexpectedly");
+      }
+    }
+  },
+});
+
+async function generateNlTestsInner(ctx: ActionCtx, args: { project_id: Id<"projects">; prompt: string; suite_id: Id<"suites"> }) {
     if (!args.prompt.trim()) {
       await markSuiteFailed(ctx, args.suite_id, "Prompt cannot be empty");
       throw new ConvexError("Prompt cannot be empty");
@@ -47,6 +64,20 @@ export const generateNlTests = action({
       }
     }
 
+    const liveSnapshot = await getLiveSnapshot({
+      projectId: args.project_id,
+      url: project.app_url,
+      authConfig: {
+        auth_mode: (project as Record<string, unknown>).explore_auth_mode as string ?? "none",
+        login_url: (project as Record<string, unknown>).explore_login_url as string | undefined,
+        username: (project as Record<string, unknown>).explore_username as string | undefined,
+        password: (project as Record<string, unknown>).explore_password as string | undefined,
+        cookie_name: (project as Record<string, unknown>).explore_cookie_name as string | undefined,
+        cookie_value: (project as Record<string, unknown>).explore_cookie_value as string | undefined,
+        app_url: project.app_url,
+      },
+    });
+
     let responseText: string;
     try {
       const agent = createTestGenerationAgent(
@@ -61,7 +92,7 @@ export const generateNlTests = action({
 Project: ${project.name}
 URL: ${project.app_url}
 ${buildAuthPromptContext(project)}${prdContext}
-
+${liveSnapshot ? `\nCurrent page state (use these real elements and values in your tests):\nURL: ${liveSnapshot.url}\nTitle: ${liveSnapshot.title}\n${liveSnapshot.snapshot}\n` : ""}
 Test Description:
 ${args.prompt}
 
@@ -109,5 +140,4 @@ Only interact with elements and assert on values explicitly described — do NOT
     await markSuiteReady(ctx, args.suite_id);
 
     return { suiteId: args.suite_id, testIds, testNameCount: testIds.length };
-  },
-});
+}

@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
@@ -19,6 +20,22 @@ export const regenerateTest = action({
       test_id: args.test_id,
     });
 
+    try {
+      return await regenerateTestInner(ctx, args);
+    } finally {
+      const current = await ctx.runQuery(internal.tests.queries.getTestInternal, {
+        test_id: args.test_id,
+      });
+      if (current?.status === "healing") {
+        await ctx.runMutation(internal.tests.mutations.setTestDraft, {
+          test_id: args.test_id,
+        });
+      }
+    }
+  },
+});
+
+async function regenerateTestInner(ctx: ActionCtx, args: { test_id: Id<"tests"> }): Promise<{ testId: string; newName: string }> {
     const test: {
       suite_id: Id<"suites">;
       name: string;
@@ -112,5 +129,4 @@ Generate an improved version as a single Playwright test. Rules:
     });
 
     return { testId: args.test_id, newName };
-  },
-});
+}

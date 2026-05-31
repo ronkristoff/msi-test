@@ -10,6 +10,7 @@
 
 import type * as ai_agents from "../ai/agents.js";
 import type * as ai_authContext from "../ai/authContext.js";
+import type * as ai_browserClient from "../ai/browserClient.js";
 import type * as ai_diff from "../ai/diff.js";
 import type * as ai_errors from "../ai/errors.js";
 import type * as ai_exploreApp from "../ai/exploreApp.js";
@@ -69,6 +70,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
   "ai/authContext": typeof ai_authContext;
+  "ai/browserClient": typeof ai_browserClient;
   "ai/diff": typeof ai_diff;
   "ai/errors": typeof ai_errors;
   "ai/exploreApp": typeof ai_exploreApp;

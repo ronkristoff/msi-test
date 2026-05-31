@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
@@ -17,6 +18,20 @@ export const generatePrdTests = action({
     prd_text: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    try {
+      return await generatePrdTestsInner(ctx, args);
+    } finally {
+      const suite = await ctx.runQuery(internal.suites.queries.getSuite, {
+        suite_id: args.suite_id,
+      });
+      if (suite?.status === "generating") {
+        await markSuiteFailed(ctx, args.suite_id, "Generation interrupted unexpectedly");
+      }
+    }
+  },
+});
+
+async function generatePrdTestsInner(ctx: ActionCtx, args: { project_id: Id<"projects">; suite_id: Id<"suites">; prd_text?: string }) {
     const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
       project_id: args.project_id,
     });
@@ -107,5 +122,4 @@ Only interact with elements and assert on values explicitly described in the req
     await markSuiteReady(ctx, args.suite_id);
 
     return { suiteId: args.suite_id, testIds, testNameCount: testIds.length };
-  },
-});
+}

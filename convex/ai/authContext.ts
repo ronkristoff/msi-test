@@ -34,8 +34,8 @@ Password: "${project.explore_password ?? ""}"
 
 You MUST include these login steps at the beginning of EVERY test, right after page.goto():
 
-  await page.getByLabel(/email|username/i).fill("${project.explore_username}");
-  await page.getByLabel(/password/i).fill("${project.explore_password ?? ""}");
+  await page.locator('input[type="email"], input[type="text"][name*="email" i], input[name*="user" i], input[autocomplete="email"]').first().fill("${project.explore_username}");
+  await page.locator('input[type="password"]').first().fill("${project.explore_password ?? ""}");
   await page.getByRole("button", { name: /sign.?in|log.?in|submit/i }).click();
   await page.waitForURL("**/dashboard**", { timeout: 10000 }).catch(() => {});
 

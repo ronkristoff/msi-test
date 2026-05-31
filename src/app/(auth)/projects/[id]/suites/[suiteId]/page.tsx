@@ -73,7 +73,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
   const isDirty = localCode !== null && localCode !== test.playwright_code;
   const displayCode = localCode ?? test.playwright_code;
 
-  const recentlyHealed = !!(test.last_healed_at && test.last_healed_at > 0);
+  const recentlyHealed = test.last_healed_at !== undefined && test.last_healed_at > 0;
 
   const updateTestCode = useMutation(api.tests.mutations.updateTestCode);
   const updateTestStatus = useMutation(api.tests.mutations.updateTestStatus);
@@ -97,6 +97,9 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
 
   const handleExpand = async (opening: boolean) => {
     setExpanded(opening);
+    if (!opening) {
+      setHealSuccess(false);
+    }
     if (opening) {
       try {
         await lockTestMut({ test_id: test._id });
