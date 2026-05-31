@@ -1,6 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getOptionalOwnedEntity } from "../lib/requireAuth";
+import { getOptionalOwnedEntity, getOptionalMemberWorkspace, getUserName } from "../lib/requireAuth";
 
 export const getSuites = query({
   args: { project_id: v.id("projects") },
@@ -238,5 +238,110 @@ export const getRegressionsForMemberSuite = query({
       .collect();
 
     return memberships.map((m) => m.regression_suite_id);
+  },
+});
+
+export const getActiveTasks = query({
+  args: {},
+  handler: async (ctx) => {
+    const result = await getOptionalMemberWorkspace(ctx);
+    if (!result) return [];
+
+    const { workspace } = result;
+
+    const workspaceSuites = await ctx.db
+      .query("suites")
+      .withIndex("by_workspace_id_and_status", (q) =>
+        q.eq("workspace_id", workspace._id).eq("status", "generating"),
+      )
+      .collect();
+
+    const allRuns = await ctx.db
+      .query("runs")
+      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", workspace._id))
+      .collect();
+    const workspaceRuns = allRuns.filter((r) => r.status === "running");
+
+    const EXPLORING_STATUSES = ["pending", "capturing", "analyzing"] as const;
+    const activeExplorations: { _id: string; url: string; project_id: string; status: string }[] = [];
+    for (const status of EXPLORING_STATUSES) {
+      const found = await ctx.db
+        .query("explorations")
+        .withIndex("by_workspace_id_and_status", (q) =>
+          q.eq("workspace_id", workspace._id).eq("status", status),
+        )
+        .collect();
+      activeExplorations.push(...found);
+    }
+
+    const healingTests = await ctx.db
+      .query("tests")
+      .withIndex("by_workspace_id_and_status", (q) =>
+        q.eq("workspace_id", workspace._id).eq("status", "healing"),
+      )
+      .collect();
+
+    const tasks: {
+      type: "generating" | "running" | "exploring" | "healing";
+      id: string;
+      name: string;
+      triggeredByName: string;
+      projectId: string;
+      suiteId?: string;
+    }[] = [];
+
+    for (const suite of workspaceSuites) {
+      const triggeredByName = suite.triggered_by
+        ? await getUserName(ctx, workspace._id, suite.triggered_by)
+        : "Unknown";
+
+      tasks.push({
+        type: "generating",
+        id: suite._id,
+        name: suite.name,
+        triggeredByName,
+        projectId: suite.project_id,
+        suiteId: suite._id,
+      });
+    }
+
+    for (const run of workspaceRuns) {
+      const triggeredByName = run.triggered_by
+        ? await getUserName(ctx, workspace._id, run.triggered_by)
+        : "Unknown";
+
+      tasks.push({
+        type: "running",
+        id: run._id,
+        name: run.suite_id ? `Suite run` : `Test run`,
+        triggeredByName,
+        projectId: run.project_id,
+        suiteId: run.suite_id ?? undefined,
+      });
+    }
+
+    for (const exploration of activeExplorations) {
+      tasks.push({
+        type: "exploring",
+        id: exploration._id,
+        name: `Exploring ${exploration.url}`,
+        triggeredByName: "Unknown",
+        projectId: exploration.project_id,
+      });
+    }
+
+    for (const test of healingTests) {
+      const suite = await ctx.db.get(test.suite_id);
+      tasks.push({
+        type: "healing",
+        id: test._id,
+        name: test.name,
+        triggeredByName: "Unknown",
+        projectId: suite?.project_id ?? "",
+        suiteId: test.suite_id,
+      });
+    }
+
+    return tasks;
   },
 });

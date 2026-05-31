@@ -1,4 +1,4 @@
-import { query } from "../_generated/server";
+import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
 import { maskApiKey } from "../lib/validation";
@@ -33,5 +33,12 @@ export const getProject = query({
         ? maskApiKey(project.explore_cookie_value)
         : undefined,
     };
+  },
+});
+
+export const getProjectForAi = internalQuery({
+  args: { project_id: v.id("projects") },
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.project_id);
   },
 });

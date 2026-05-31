@@ -31,7 +31,7 @@ export async function seedProject(t: TestCtx, workspaceId: string) {
   });
 }
 
-export async function seedSuite(t: TestCtx, workspaceId: string) {
+export async function seedSuite(t: TestCtx, workspaceId: string, overrides?: { name?: string; status?: "generating" | "ready" | "failed"; triggered_by?: string; generation_error?: string; source_type?: "manual" | "prd" | "natural_language" | "url_exploration" }) {
   return t.run(async (ctx) => {
     const projectId = await ctx.db.insert("projects", {
       workspace_id: workspaceId,
@@ -41,8 +41,14 @@ export async function seedSuite(t: TestCtx, workspaceId: string) {
     const suiteId = await ctx.db.insert("suites", {
       workspace_id: workspaceId,
       project_id: projectId,
-      name: "Test Suite",
-      source_type: "manual",
+      name: overrides?.name ?? "Test Suite",
+      source_type: overrides?.source_type ?? "manual",
+      status: overrides?.status,
+      triggered_by: overrides?.triggered_by,
+      generation_error: overrides?.generation_error,
+      ...(overrides?.status === "generating"
+        ? { locked_by: overrides.triggered_by ?? "user1", locked_at: Date.now(), locked_reason: "generating" as const }
+        : {}),
     });
     return { projectId, suiteId };
   });

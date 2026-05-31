@@ -18,6 +18,7 @@ import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { useErrorLogger } from "@/lib/error-logger";
 import { hasAiConfig } from "@/lib/ai-presets";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import { SuiteStatusBanners } from "@/components/SuiteStatusBanners";
 
 hljs.registerLanguage("javascript", javascript);
 
@@ -60,16 +61,19 @@ function CodePreview({ code }: { code: string }) {
   );
 }
 
-function TestAccordionItem({ test, environments, onRunTest, workspace }: {
+function TestAccordionItem({ test, environments, onRunTest, workspace, currentUserId }: {
   test: Doc<"tests">;
   environments: Doc<"environments">[] | undefined;
   onRunTest: (testId: string, envId: string | null) => void;
   workspace: { ai_config?: { endpoint_url: string; api_key: string; model_name: string } } | null | undefined;
+  currentUserId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [localCode, setLocalCode] = useState<string | null>(null);
   const isDirty = localCode !== null && localCode !== test.playwright_code;
   const displayCode = localCode ?? test.playwright_code;
+
+  const recentlyHealed = !!(test.last_healed_at && test.last_healed_at > 0);
 
   const updateTestCode = useMutation(api.tests.mutations.updateTestCode);
   const updateTestStatus = useMutation(api.tests.mutations.updateTestStatus);
@@ -109,7 +113,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
   };
 
   const handleSave = async () => {
-    await updateTestCode({ test_id: test._id, playwright_code: localCode! });
+    await updateTestCode({ test_id: test._id, playwright_code: localCode!, clear_healed_at: true });
     setLocalCode(null);
   };
 
@@ -120,6 +124,9 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
   const toggleStatus = async () => {
     const newStatus = test.status === "draft" ? "approved" : "draft";
     await updateTestStatus({ test_id: test._id, status: newStatus });
+    if (newStatus === "approved" && test.last_healed_at) {
+      await updateTestCode({ test_id: test._id, playwright_code: test.playwright_code, clear_healed_at: true });
+    }
   };
 
   const handleRegenerate = async () => {
@@ -165,9 +172,14 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
             <span className="text-sm font-medium text-[var(--fg)] truncate">{test.name}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {test.locked_by && (
+            {test.locked_by && test.locked_by !== currentUserId && (
               <span className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded">
                 Editing
+              </span>
+            )}
+            {test.last_healed_at && recentlyHealed && (
+              <span className="text-[10px] font-[var(--font-mono)] uppercase tracking-[0.04em] text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded">
+                healed
               </span>
             )}
             <StatusPill variant={test.status === "approved" ? "success" : "neutral"} showDot={test.status === "approved"}>
@@ -181,9 +193,31 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
 
         {expanded && (
           <div className="border-t border-[var(--border)] p-5 bg-[var(--surface)]">
-            {test.locked_by && (
+            {test.locked_by && test.locked_by !== currentUserId && (
               <div className="mb-3 px-3 py-2 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-[var(--radius-sm)] text-xs text-[var(--warning)]">
                 This test is currently being edited by another team member. Changes are read-only.
+              </div>
+            )}
+            {recentlyHealed && (
+              <div className="mb-3">
+                <div className="px-3 py-2 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-t-[var(--radius-sm)] text-xs text-[var(--fg)]">
+                  AI fixed this test from a recent failure. Review changes before approving.
+                </div>
+                {test.last_healed_diff && (
+                  <pre className="px-3 py-2 bg-[#0d1117] border border-t-0 border-[var(--accent)]/20 rounded-b-[var(--radius-sm)] text-[11px] font-[var(--font-mono)] leading-relaxed overflow-x-auto max-h-[200px] overflow-y-auto">
+                    {test.last_healed_diff.split("\n").map((line, i) => (
+                      <span key={i} className={
+                        line.startsWith("+") && !line.startsWith("+ ") || line.startsWith("+ ") ? "text-[#3fb950]" :
+                        line.startsWith("-") ? "text-[#f85149]" :
+                        line.startsWith("...") ? "text-[var(--muted)]" :
+                        "text-[#8b949e]"
+                      }>
+                        {line}
+                        {"\n"}
+                      </span>
+                    ))}
+                  </pre>
+                )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -194,8 +228,8 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
                 <textarea
                   value={displayCode}
                   onChange={(e) => setLocalCode(e.target.value)}
-                  readOnly={!!test.locked_by}
-                  className={`w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${test.locked_by ? "opacity-60 cursor-not-allowed" : ""}`}
+                  readOnly={!!(test.locked_by && test.locked_by !== currentUserId)}
+                  className={`w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${test.locked_by && test.locked_by !== currentUserId ? "opacity-60 cursor-not-allowed" : ""}`}
                   spellCheck={false}
                 />
               </div>
@@ -243,7 +277,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace }: {
                 </Button>
               )}
               {healSuccess && (
-                <span className="text-xs text-[var(--success-text)]">Saved as draft</span>
+                <span className="text-xs text-[var(--success-text)]">Healed and saved as draft. Review before approving.</span>
               )}
               <Button
                 variant="primary"
@@ -359,10 +393,12 @@ export default function SuiteDetailPage() {
   const [triggeringRun, setTriggeringRun] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
 
+  const aiConfigReady = hasAiConfig(workspace);
+  const currentUser = useQuery(api.workspaces.queries.getCurrentUser);
+  const currentUserId = currentUser?._id;
+
   const [showAddToRegression, setShowAddToRegression] = useState(false);
   const [addToRegError, setAddToRegError] = useState<string | null>(null);
-
-  const aiConfigReady = hasAiConfig(workspace);
 
   const approvedCount = tests?.filter((t) => t.status === "approved").length ?? 0;
 
@@ -533,18 +569,7 @@ export default function SuiteDetailPage() {
         </div>
       )}
 
-      {!activeRun && suite.locked_by && (
-        <div className="bg-[var(--surface)] border border-[var(--warning)]/40 rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
-          <div className="flex items-center gap-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span className="text-sm text-[var(--fg)]">
-              Suite is locked — {suite.locked_reason === "running" ? "a run is in progress" : "tests are being generated"}
-            </span>
-          </div>
-        </div>
-      )}
+      <SuiteStatusBanners suite={suite} activeRun={activeRun} />
 
       {!activeRun && effectiveApprovedCount > 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
@@ -649,6 +674,7 @@ export default function SuiteDetailPage() {
                 test={test}
                 environments={environments}
                 workspace={workspace}
+                currentUserId={currentUserId}
                 onRunTest={(testId, envId) => {
                       if (!envId) return;
                       setTriggeringRun(true);

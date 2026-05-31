@@ -79,6 +79,14 @@ export function createTestGenerationAgent(model: AgentModel) {
   });
 }
 
+export function createHealAgent(model: AgentModel) {
+  return new Agent(components.agent, {
+    name: "Test Heal",
+    languageModel: model,
+    instructions: TEST_GENERATION_PROMPT,
+  });
+}
+
 export function createExplorationAnalysisAgent(model: AgentModel) {
   return new Agent(components.agent, {
     name: "Exploration Analysis",

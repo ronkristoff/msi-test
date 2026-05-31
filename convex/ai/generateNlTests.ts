@@ -2,9 +2,11 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { internal, api } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
+import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
+import { buildAuthPromptContext } from "./authContext";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
@@ -12,20 +14,24 @@ export const generateNlTests = action({
   args: {
     project_id: v.id("projects"),
     prompt: v.string(),
-    suite_id: v.optional(v.id("suites")),
+    suite_id: v.id("suites"),
   },
   handler: async (ctx, args) => {
     if (!args.prompt.trim()) {
+      await markSuiteFailed(ctx, args.suite_id, "Prompt cannot be empty");
       throw new ConvexError("Prompt cannot be empty");
     }
 
-    const project = await ctx.runQuery(api.projects.queries.getProject, {
+    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
       project_id: args.project_id,
     });
 
     if (!project) {
+      await markSuiteFailed(ctx, args.suite_id, "Project not found");
       throw new ConvexError("Project not found");
     }
+
+    console.log(`[generateNlTests] project auth: mode=${(project as Record<string, unknown>).explore_auth_mode}, username=${(project as Record<string, unknown>).explore_username ?? "(none)"}`);
 
     const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
       workspace_id: project.workspace_id,
@@ -53,7 +59,8 @@ export const generateNlTests = action({
         prompt: `Generate Playwright tests from the following test description.
 
 Project: ${project.name}
-URL: ${project.app_url}${prdContext}
+URL: ${project.app_url}
+${buildAuthPromptContext(project)}${prdContext}
 
 Test Description:
 ${args.prompt}
@@ -73,36 +80,24 @@ Only interact with elements and assert on values explicitly described — do NOT
       });
       responseText = result.text;
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "AI generation failed";
+      await markSuiteFailed(ctx, args.suite_id, msg);
       classifyAiError(err);
+      return;
     }
 
     const testBlocks = extractMultipleTests(responseText);
 
     if (testBlocks.length === 0) {
+      await markSuiteFailed(ctx, args.suite_id, "AI did not generate any valid Playwright tests.");
       throw createAiError("malformed_response", "AI did not generate any valid Playwright tests.");
-    }
-
-    let suiteId: string;
-
-    if (args.suite_id) {
-      suiteId = args.suite_id;
-    } else {
-      const now = new Date();
-      const month = now.toLocaleString("en-US", { month: "short" });
-      const day = now.getDate();
-      suiteId = await ctx.runMutation(api.suites.mutations.createSuite, {
-        project_id: args.project_id,
-        name: `NL Tests — ${month} ${day}`,
-        description: `Generated from natural language prompt`,
-        source_type: "natural_language",
-      });
     }
 
     const testIds: string[] = [];
     for (let i = 0; i < testBlocks.length; i++) {
       const testName = deriveTestName(testBlocks[i], i);
       const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
-        suite_id: suiteId as Id<"suites">,
+        suite_id: args.suite_id as Id<"suites">,
         name: testName,
         playwright_code: testBlocks[i],
         source_type: "natural_language",
@@ -111,6 +106,8 @@ Only interact with elements and assert on values explicitly described — do NOT
       testIds.push(testId);
     }
 
-    return { suiteId, testIds, testNameCount: testIds.length };
+    await markSuiteReady(ctx, args.suite_id);
+
+    return { suiteId: args.suite_id, testIds, testNameCount: testIds.length };
   },
 });

@@ -71,7 +71,7 @@ export default function RunDetailPage() {
       const results = await healAllFailedAction({ run_id: runId as Id<"runs"> });
       const succeeded = results.filter((r: { success: boolean }) => r.success).length;
       const failed = results.filter((r: { success: boolean }) => !r.success).length;
-      setHealAllResults(`${succeeded} of ${results.length} test${results.length > 1 ? "s" : ""} healed and saved as draft.${failed > 0 ? ` ${failed} failed.` : ""} Review changes in the suite.`);
+      setHealAllResults(`${succeeded} of ${results.length} test${results.length > 1 ? "s" : ""} healed. Each is saved as draft for review before re-running.${failed > 0 ? ` ${failed} failed to heal.` : ""}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Heal all failed";
       setHealAllError(msg);
@@ -347,13 +347,13 @@ export default function RunDetailPage() {
                           </Button>
                           {healSuccessId === selectedResult.test_id && (
                             <span className="text-xs text-[var(--success-text)]">
-                              Saved as draft.
+                              Healed and saved as draft.
                               {selectedResult.suite_id && (
                                 <Link
                                   href={`/projects/${runDetail.project_id}/suites/${selectedResult.suite_id}`}
                                   className="text-[var(--link)] hover:underline ml-1"
                                 >
-                                  View in Suite
+                                  Review in suite
                                 </Link>
                               )}
                             </span>

@@ -17,6 +17,10 @@ interface PendingWorkItem {
     playwright_code: string;
   }>;
   run_result_ids: Array<{ _id: string; test_id: string }>;
+  auth_mode?: string;
+  login_url?: string;
+  test_username?: string;
+  test_password?: string;
 }
 
 export async function executeRun(
@@ -48,7 +52,7 @@ export async function executeRun(
 
     fsSync.mkdirSync(reporterDir, { recursive: true });
 
-    const { exitCode, output: pwOutput } = await runPlaywright(runDir, log);
+    const { exitCode, output: pwOutput } = await runPlaywright(runDir, work, log);
 
     log(`Run ${work.run_id}: Playwright exited with code ${exitCode}`);
 
@@ -336,8 +340,14 @@ async function uploadConsoleLogs(
   return result;
 }
 
-function runPlaywright(cwd: string, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
+function runPlaywright(cwd: string, work: PendingWorkItem, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
   const projectRoot = path.resolve(__dirname, "../..");
+
+  const authEnv: Record<string, string> = {};
+  if (work.test_username) authEnv.TEST_USERNAME = work.test_username;
+  if (work.test_password) authEnv.TEST_PASSWORD = work.test_password;
+  if (work.login_url) authEnv.TEST_LOGIN_URL = work.login_url;
+  if (work.auth_mode) authEnv.TEST_AUTH_MODE = work.auth_mode;
 
   return new Promise((resolve) => {
     const proc = spawn(
@@ -348,6 +358,7 @@ function runPlaywright(cwd: string, log: (msg: string) => void): Promise<{ exitC
         stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
+          ...authEnv,
           NODE_PATH: path.join(projectRoot, "node_modules"),
           MSITEST_REPORTER_DIR: path.join(cwd, "reporter"),
         },

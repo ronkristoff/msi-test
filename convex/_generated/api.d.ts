@@ -9,6 +9,8 @@
  */
 
 import type * as ai_agents from "../ai/agents.js";
+import type * as ai_authContext from "../ai/authContext.js";
+import type * as ai_diff from "../ai/diff.js";
 import type * as ai_errors from "../ai/errors.js";
 import type * as ai_exploreApp from "../ai/exploreApp.js";
 import type * as ai_generateNlTests from "../ai/generateNlTests.js";
@@ -17,6 +19,7 @@ import type * as ai_healTest from "../ai/healTest.js";
 import type * as ai_model from "../ai/model.js";
 import type * as ai_parse from "../ai/parse.js";
 import type * as ai_regenerateTest from "../ai/regenerateTest.js";
+import type * as ai_suiteStatus from "../ai/suiteStatus.js";
 import type * as ai_tools_definitions from "../ai/tools/definitions.js";
 import type * as ai_tools_logic from "../ai/tools/logic.js";
 import type * as ai_tools_queries from "../ai/tools/queries.js";
@@ -35,10 +38,13 @@ import type * as flakiness_queries from "../flakiness/queries.js";
 import type * as http from "../http.js";
 import type * as insights_queries from "../insights/queries.js";
 import type * as lib_constraints from "../lib/constraints.js";
+import type * as lib_locking from "../lib/locking.js";
 import type * as lib_requireAuth from "../lib/requireAuth.js";
 import type * as lib_runner from "../lib/runner.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as logs_mutations from "../logs/mutations.js";
+import type * as members_mutations from "../members/mutations.js";
+import type * as members_queries from "../members/queries.js";
 import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
 import type * as runs_actions from "../runs/actions.js";
@@ -62,6 +68,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
+  "ai/authContext": typeof ai_authContext;
+  "ai/diff": typeof ai_diff;
   "ai/errors": typeof ai_errors;
   "ai/exploreApp": typeof ai_exploreApp;
   "ai/generateNlTests": typeof ai_generateNlTests;
@@ -70,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   "ai/model": typeof ai_model;
   "ai/parse": typeof ai_parse;
   "ai/regenerateTest": typeof ai_regenerateTest;
+  "ai/suiteStatus": typeof ai_suiteStatus;
   "ai/tools/definitions": typeof ai_tools_definitions;
   "ai/tools/logic": typeof ai_tools_logic;
   "ai/tools/queries": typeof ai_tools_queries;
@@ -88,10 +97,13 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "insights/queries": typeof insights_queries;
   "lib/constraints": typeof lib_constraints;
+  "lib/locking": typeof lib_locking;
   "lib/requireAuth": typeof lib_requireAuth;
   "lib/runner": typeof lib_runner;
   "lib/validation": typeof lib_validation;
   "logs/mutations": typeof logs_mutations;
+  "members/mutations": typeof members_mutations;
+  "members/queries": typeof members_queries;
   "projects/mutations": typeof projects_mutations;
   "projects/queries": typeof projects_queries;
   "runs/actions": typeof runs_actions;

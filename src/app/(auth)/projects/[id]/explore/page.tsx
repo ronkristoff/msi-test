@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api, asId } from "@/lib/convex";
@@ -39,6 +39,7 @@ export default function ExplorePage() {
   const [explorationId, setExplorationId] = useState<string | null>(null);
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [userDismissed, setUserDismissed] = useState(false);
 
   const [goal, setGoal] = useState("");
   const [additionalUrlInput, setAdditionalUrlInput] = useState("");
@@ -46,17 +47,30 @@ export default function ExplorePage() {
   const url = project?.app_url ?? "";
 
   const createExploration = useMutation(api.explorations.mutations.createExploration);
+  const createSuitesForExploration = useMutation(api.suites.mutations.createSuitesForExploration);
   const generateTests = useAction(api.ai.exploreApp.generateExplorationTests);
+  const user = useQuery(api.workspaces.queries.getCurrentUser);
+
+  const latestActive = useQuery(
+    api.explorations.queries.getLatestActiveExploration,
+    !explorationId ? { project_id: projectId } : "skip",
+  );
+
+  const effectiveExplorationId = useMemo(
+    () => explorationId ?? ((latestActive && !userDismissed) ? latestActive._id : null),
+    [explorationId, latestActive, userDismissed],
+  );
 
   const exploration = useQuery(
     api.explorations.queries.getExploration,
-    explorationId ? { exploration_id: asId(explorationId, "explorations") } : "skip",
+    effectiveExplorationId ? { exploration_id: asId(effectiveExplorationId, "explorations") } : "skip",
   );
 
   const handleStartExploration = useCallback(async () => {
     setError(null);
     setSelectedScenarios(new Set());
     setExplorationId(null);
+    setUserDismissed(false);
     try {
       const additionalUrls = additionalUrlInput
         .split("\n")
@@ -85,7 +99,7 @@ export default function ExplorePage() {
   }, []);
 
   const handleGenerateTests = useCallback(async () => {
-    if (!exploration?.proposed_scenarios) return;
+    if (!exploration?.proposed_scenarios || !user) return;
     const selected = exploration.proposed_scenarios.filter((_: Scenario, i: number) =>
       selectedScenarios.has(i),
     );
@@ -94,19 +108,34 @@ export default function ExplorePage() {
     setGenerating(true);
     setError(null);
     try {
-      await generateTests({
-        exploration_id: asId(explorationId!, "explorations"),
-        selected_scenarios: selected,
+      const areas = [...new Set(selected.map((s: Scenario) => s.area))];
+      const suiteResults = await createSuitesForExploration({
+        project_id: projectId,
+        areas,
+        source_type: "url_exploration",
+        triggered_by: user._id,
       });
-      router.push(`/projects/${params.id}`);
+
+      router.push(`/projects/${params.id}/suites/${suiteResults[0].suite_id}`);
+
+      generateTests({
+        exploration_id: asId(effectiveExplorationId!, "explorations"),
+        selected_scenarios: selected,
+        suite_ids: suiteResults,
+      }).catch((err) => {
+        logError(err instanceof Error ? err.message : "Test generation failed", {
+          severity: "error",
+          context: { source: "ExplorePage.handleGenerateTests" },
+        });
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Test generation failed";
+      const msg = err instanceof Error ? err.message : "Failed to create suites";
       setError(msg);
       logError(msg, { severity: "error", context: { source: "ExplorePage.handleGenerateTests" } });
     } finally {
       setGenerating(false);
     }
-  }, [exploration, selectedScenarios, generateTests, explorationId, router, params.id, logError]);
+  }, [exploration, selectedScenarios, createSuitesForExploration, generateTests, effectiveExplorationId, router, params.id, logError, user, projectId]);
 
   if (project === undefined) {
     return <PageSkeleton />;
@@ -160,7 +189,7 @@ export default function ExplorePage() {
           <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
         </div>
 
-        {!explorationId && (
+        {!effectiveExplorationId && (
           <div className="mb-5">
             <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
               URL to Explore
@@ -228,7 +257,7 @@ export default function ExplorePage() {
                 Exploration failed: {exploration.error_message || "Unknown error. Try again or check your AI configuration."}
               </Alert>
             <div className="flex gap-3 mt-4">
-              <Button onClick={() => { setExplorationId(null); setError(null); }}>
+              <Button onClick={() => { setExplorationId(null); setError(null); setUserDismissed(true); }}>
                 Try Again
               </Button>
               <Link href={`/projects/${params.id}`}>
@@ -325,6 +354,7 @@ export default function ExplorePage() {
                   setSelectedScenarios(new Set());
                   setGoal("");
                   setAdditionalUrlInput("");
+                  setUserDismissed(true);
                 }}
               >
                 New Exploration

@@ -234,7 +234,7 @@ export const runAllTests = mutation({
     }
 
     if (testIdSet.size === 0) {
-      throw new ConvexError("No approved tests in this project");
+      throw new ConvexError("No approved tests found. Approve tests before running them.");
     }
 
     const runId = await ctx.db.insert("runs", {

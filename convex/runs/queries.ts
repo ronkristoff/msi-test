@@ -118,6 +118,8 @@ export const getPendingWork = query({
           if (env) base_url = env.base_url;
         }
 
+        const project = await ctx.db.get(run.project_id);
+
         return {
           run_id: run._id,
           workspace_id: run.workspace_id,
@@ -127,6 +129,10 @@ export const getPendingWork = query({
           trigger_type: run.trigger_type,
           tests,
           run_result_ids: runResults.map((rr) => ({ _id: rr._id, test_id: rr.test_id })),
+          auth_mode: project?.explore_auth_mode ?? "none",
+          login_url: project?.explore_login_url ?? undefined,
+          test_username: project?.explore_username ?? undefined,
+          test_password: project?.explore_password ?? undefined,
         };
       }),
     );

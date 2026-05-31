@@ -6,7 +6,20 @@ import { ConvexError } from "convex/values";
 import { internal, api } from "../_generated/api";
 import { createExplorationAnalysisAgent, createTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema } from "./agents";
 import { classifyAiError } from "./errors";
+import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
+import { buildAuthPromptContext } from "./authContext";
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
+
+async function markAllSuitesFailed(
+  ctx: ActionCtx,
+  suiteIds: { area: string; suite_id: Id<"suites"> }[],
+  error: string,
+) {
+  for (const s of suiteIds) {
+    await markSuiteFailed(ctx, s.suite_id, error);
+  }
+}
 
 export const analyzeExploration = internalAction({
   args: { exploration_id: v.id("explorations") },
@@ -112,6 +125,12 @@ export const generateExplorationTests = action({
         area: v.string(),
       }),
     ),
+    suite_ids: v.array(
+      v.object({
+        area: v.string(),
+        suite_id: v.id("suites"),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
@@ -119,10 +138,12 @@ export const generateExplorationTests = action({
     });
 
     if (!exploration) {
+      await markAllSuitesFailed(ctx, args.suite_ids, "Exploration not found");
       throw new ConvexError("Exploration not found");
     }
 
     if (args.selected_scenarios.length === 0) {
+      await markAllSuitesFailed(ctx, args.suite_ids, "No scenarios selected");
       throw new ConvexError("No scenarios selected");
     }
 
@@ -130,10 +151,18 @@ export const generateExplorationTests = action({
       workspace_id: exploration.workspace_id,
     });
 
+    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
+      project_id: exploration.project_id,
+    });
+    const authContext = buildAuthPromptContext(project);
+    console.log(`[generateExplorationTests] project auth: mode=${(project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(project as Record<string, unknown> | null)?.explore_username ?? "(none)"}, authContext length=${authContext.length}`);
+
     const pagesContext = (exploration.captured_pages ?? [])
       .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 3000)}`)
       .join("\n\n");
 
+    const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
+    const failedAreas = new Set<string>();
     const allTestBlocks: { name: string; code: string; area: string }[] = [];
 
     for (const scenario of args.selected_scenarios) {
@@ -149,7 +178,7 @@ export const generateExplorationTests = action({
           prompt: `Generate a single Playwright test for the following scenario.
 
 Application URL: ${exploration.url}
-
+${authContext}
 Scenario: ${scenario.name}
 Description: ${scenario.description}
 Flow: ${scenario.flow_summary}
@@ -177,17 +206,10 @@ Generate a single, self-contained Playwright test. Rules:
           });
         }
       } catch (err: unknown) {
+        failedAreas.add(scenario.area);
         classifyAiError(err);
       }
     }
-
-    if (allTestBlocks.length === 0) {
-      throw new ConvexError("AI did not generate any valid Playwright tests for the selected scenarios.");
-    }
-
-    const now = new Date();
-    const month = now.toLocaleString("en-US", { month: "short" });
-    const day = now.getDate();
 
     const areaGroups = new Map<string, { name: string; code: string; area: string }[]>();
     for (const block of allTestBlocks) {
@@ -200,13 +222,9 @@ Generate a single, self-contained Playwright test. Rules:
     const testIds: string[] = [];
 
     for (const [area, blocks] of areaGroups) {
-      const suiteName = `Exploration — ${area} — ${month} ${day}`;
-      const suiteId: string = await ctx.runMutation(api.suites.mutations.createSuite, {
-        project_id: exploration.project_id,
-        name: suiteName,
-        description: `Generated from URL exploration of ${exploration.url} — ${area} flows`,
-        source_type: "url_exploration",
-      });
+      const suiteId = areaSuiteMap.get(area);
+      if (!suiteId) continue;
+
       suiteIds.push(suiteId);
 
       for (const block of blocks) {
@@ -217,6 +235,20 @@ Generate a single, self-contained Playwright test. Rules:
           source_type: "url_exploration",
         });
         testIds.push(testId);
+      }
+
+      await markSuiteReady(ctx, suiteId);
+    }
+
+    for (const [area, suiteId] of areaSuiteMap) {
+      if (!areaGroups.has(area)) {
+        await markSuiteFailed(
+          ctx,
+          suiteId,
+          failedAreas.has(area)
+            ? "AI failed to generate tests for this area"
+            : "No test blocks generated for this area",
+        );
       }
     }
 

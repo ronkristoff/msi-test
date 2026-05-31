@@ -10,6 +10,9 @@ export const updateTestCode = mutation({
     playwright_code: v.string(),
     name: v.optional(v.string()),
     status: v.optional(v.union(v.literal("draft"), v.literal("approved"))),
+    last_healed_at: v.optional(v.number()),
+    last_healed_diff: v.optional(v.string()),
+    clear_healed_at: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { user, entity: test } = await getOwnedEntity(ctx, args.test_id, "tests");
@@ -29,6 +32,16 @@ export const updateTestCode = mutation({
     if (args.status !== undefined) {
       updates.status = args.status;
     }
+    if (args.last_healed_at !== undefined) {
+      updates.last_healed_at = args.last_healed_at;
+    }
+    if (args.last_healed_diff !== undefined) {
+      updates.last_healed_diff = args.last_healed_diff;
+    }
+    if (args.clear_healed_at) {
+      updates.last_healed_at = undefined;
+      updates.last_healed_diff = undefined;
+    }
 
     await ctx.db.patch(args.test_id, updates);
   },
@@ -37,12 +50,30 @@ export const updateTestCode = mutation({
 export const updateTestStatus = mutation({
   args: {
     test_id: v.id("tests"),
-    status: v.union(v.literal("draft"), v.literal("approved")),
+    status: v.union(v.literal("draft"), v.literal("approved"), v.literal("healing")),
   },
   handler: async (ctx, args) => {
     await getOwnedEntity(ctx, args.test_id, "tests");
 
     await ctx.db.patch(args.test_id, { status: args.status });
+  },
+});
+
+export const setTestHealing = internalMutation({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const test = await ctx.db.get(args.test_id);
+    if (!test) throw new ConvexError("Test not found");
+    await ctx.db.patch(args.test_id, { status: "healing" });
+  },
+});
+
+export const setTestDraft = internalMutation({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const test = await ctx.db.get(args.test_id);
+    if (!test) throw new ConvexError("Test not found");
+    await ctx.db.patch(args.test_id, { status: "draft" });
   },
 });
 

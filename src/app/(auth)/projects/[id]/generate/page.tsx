@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api, asId } from "@/lib/convex";
 import { Button } from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useErrorLogger } from "@/lib/error-logger";
 import Link from "next/link";
@@ -18,29 +16,38 @@ export default function GeneratePrdTestsPage() {
   const project = useQuery(api.projects.queries.getProject, {
     project_id: projectId,
   });
+  const user = useQuery(api.workspaces.queries.getCurrentUser);
+  const createSuite = useMutation(api.suites.mutations.createSuite);
   const generatePrdTests = useAction(api.ai.generatePrdTests.generatePrdTests);
-
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const hasPrd = !!(project?.prd_text || project?.prd_file_id);
 
   const handleGenerate = async () => {
-    setError(null);
-    setGenerating(true);
+    if (!user) return;
     try {
-      const result = await generatePrdTests({ project_id: projectId });
-      router.push(`/projects/${params.id}/suites/${result.suiteId}`);
+      const suiteId = await createSuite({
+        project_id: projectId,
+        name: undefined,
+        source_type: "prd",
+        status: "generating",
+        triggered_by: user._id,
+      });
+      router.push(`/projects/${params.id}/suites/${suiteId}`);
+      generatePrdTests({ project_id: projectId, suite_id: asId(suiteId, "suites") }).catch((err) => {
+        logError(err instanceof Error ? err.message : "PRD generation failed", {
+          severity: "error",
+          context: { source: "GeneratePrdTestsPage" },
+        });
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Generation failed";
-      setError(msg);
-      logError(msg, { severity: "error", context: { source: "GeneratePrdTestsPage" } });
-    } finally {
-      setGenerating(false);
+      logError(err instanceof Error ? err.message : "Failed to create suite", {
+        severity: "error",
+        context: { source: "GeneratePrdTestsPage" },
+      });
     }
   };
 
-  if (project === undefined) {
+  if (project === undefined || user === undefined) {
     return <div className="text-[var(--muted)] text-sm">Loading...</div>;
   }
 
@@ -74,8 +81,6 @@ export default function GeneratePrdTestsPage() {
             AI will generate Playwright tests from your product requirements document.
           </p>
         </div>
-
-        {error && <Alert variant="error" className="mb-5">{error}</Alert>}
 
         <div className="mb-5">
           <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
@@ -125,23 +130,13 @@ export default function GeneratePrdTestsPage() {
         </div>
 
         <div className="flex gap-3">
-          <Button onClick={handleGenerate} disabled={generating || !hasPrd}>
-            {generating ? "Generating..." : "Generate Tests"}
+          <Button onClick={handleGenerate} disabled={!hasPrd}>
+            Generate Tests
           </Button>
           <Link href={`/projects/${params.id}`}>
             <Button variant="secondary">Cancel</Button>
           </Link>
         </div>
-
-        {generating && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            AI is analyzing your PRD and generating Playwright tests...
-          </div>
-        )}
       </div>
     </div>
   );

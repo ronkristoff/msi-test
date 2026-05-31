@@ -2,25 +2,31 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { internal, api } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
+import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
+import { buildAuthPromptContext } from "./authContext";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 
 export const generatePrdTests = action({
   args: {
     project_id: v.id("projects"),
+    suite_id: v.id("suites"),
     prd_text: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const project = await ctx.runQuery(api.projects.queries.getProject, {
+    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
       project_id: args.project_id,
     });
 
     if (!project) {
+      await markSuiteFailed(ctx, args.suite_id, "Project not found");
       throw new ConvexError("Project not found");
     }
+
+    console.log(`[generatePrdTests] project auth: mode=${(project as Record<string, unknown>).explore_auth_mode}, username=${(project as Record<string, unknown>).explore_username ?? "(none)"}`);
 
     let prdContent = args.prd_text ?? project.prd_text ?? "";
 
@@ -32,6 +38,7 @@ export const generatePrdTests = action({
     }
 
     if (!prdContent.trim()) {
+      await markSuiteFailed(ctx, args.suite_id, "No PRD content found. Add PRD text or upload a file to the project.");
       throw new ConvexError("No PRD content found. Add PRD text or upload a file to the project.");
     }
 
@@ -52,6 +59,7 @@ export const generatePrdTests = action({
 
 Project: ${project.name}
 URL: ${project.app_url}
+${buildAuthPromptContext(project)}
 
 Product Requirements:
 ${prdContent}
@@ -71,32 +79,24 @@ Only interact with elements and assert on values explicitly described in the req
       });
       responseText = result.text;
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "AI generation failed";
+      await markSuiteFailed(ctx, args.suite_id, msg);
       classifyAiError(err);
+      return;
     }
 
     const testBlocks = extractMultipleTests(responseText);
 
     if (testBlocks.length === 0) {
+      await markSuiteFailed(ctx, args.suite_id, "AI did not generate any valid Playwright tests.");
       throw createAiError("malformed_response", "AI did not generate any valid Playwright tests.");
     }
-
-    const now = new Date();
-    const month = now.toLocaleString("en-US", { month: "short" });
-    const day = now.getDate();
-    const suiteName = `PRD Tests — ${month} ${day}`;
-
-    const suiteId: string = await ctx.runMutation(api.suites.mutations.createSuite, {
-      project_id: args.project_id,
-      name: suiteName,
-      description: `Auto-generated from PRD for ${project.name}`,
-      source_type: "prd",
-    });
 
     const testIds: string[] = [];
     for (let i = 0; i < testBlocks.length; i++) {
       const testName = deriveTestName(testBlocks[i], i);
       const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
-        suite_id: suiteId as Id<"suites">,
+        suite_id: args.suite_id as Id<"suites">,
         name: testName,
         playwright_code: testBlocks[i],
         source_type: "prd",
@@ -104,6 +104,8 @@ Only interact with elements and assert on values explicitly described in the req
       testIds.push(testId);
     }
 
-    return { suiteId, testIds, testNameCount: testIds.length };
+    await markSuiteReady(ctx, args.suite_id);
+
+    return { suiteId: args.suite_id, testIds, testNameCount: testIds.length };
   },
 });

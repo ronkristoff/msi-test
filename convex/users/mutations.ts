@@ -8,7 +8,7 @@ import { NAME_MAX, PASSWORD_MIN } from "../lib/constraints";
 export const updateUserName = mutation({
   args: { name: v.string() },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    const user = await requireAuth(ctx);
 
     const name = args.name.trim();
     if (name.length === 0 || name.length > NAME_MAX) {

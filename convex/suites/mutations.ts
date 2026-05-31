@@ -1,8 +1,9 @@
-import { mutation } from "../_generated/server";
+import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { getOwnedWorkspace, getOwnedEntity } from "../lib/requireAuth";
+import { getOwnedWorkspace, getOwnedEntity, getMemberWorkspace } from "../lib/requireAuth";
 import { validateRequiredField } from "../lib/validation";
+import type { Id } from "../_generated/dataModel";
 
 function generateDefaultName(): string {
   const now = new Date();
@@ -24,12 +25,18 @@ export const createSuite = mutation({
         v.literal("manual"),
       ),
     ),
+    status: v.optional(
+      v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
+    ),
+    triggered_by: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { workspace } = await getOwnedWorkspace(ctx);
+    const { user, workspace } = await getMemberWorkspace(ctx);
     const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
 
     const name = args.name?.trim() ? validateRequiredField(args.name, "Suite name") : generateDefaultName();
+    const userId = String(user._id);
+    const status = args.status ?? "ready";
 
     return ctx.db.insert("suites", {
       workspace_id: workspace._id,
@@ -38,6 +45,11 @@ export const createSuite = mutation({
       description: args.description?.trim() || undefined,
       suite_type: "functional",
       source_type: args.source_type ?? "manual",
+      status,
+      triggered_by: args.triggered_by ?? (status === "generating" ? userId : undefined),
+      ...(status === "generating"
+        ? { locked_by: userId, locked_at: Date.now(), locked_reason: "generating" as const }
+        : {}),
     });
   },
 });
@@ -242,5 +254,113 @@ export const removeSuiteMember = mutation({
     }
 
     await ctx.db.delete(match._id);
+  },
+});
+
+export const updateSuiteStatus = internalMutation({
+  args: {
+    suite_id: v.id("suites"),
+    status: v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
+    generation_error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const suite = await ctx.db.get(args.suite_id);
+    if (!suite) {
+      throw new ConvexError(`Suite not found: ${args.suite_id}`);
+    }
+
+    const updates: Record<string, unknown> = {
+      status: args.status,
+    };
+
+    if (args.status === "ready" || args.status === "failed") {
+      updates.locked_by = undefined;
+      updates.locked_at = undefined;
+      updates.locked_reason = undefined;
+    }
+
+    if (args.status === "failed" && args.generation_error) {
+      updates.generation_error = args.generation_error;
+    }
+
+    if (args.status === "ready") {
+      updates.generation_error = undefined;
+    }
+
+    await ctx.db.patch(args.suite_id, updates);
+  },
+});
+
+export const retrySuiteGeneration = mutation({
+  args: {
+    suite_id: v.id("suites"),
+  },
+  handler: async (ctx, args) => {
+    const { entity: suite } = await getOwnedEntity(ctx, args.suite_id, "suites");
+
+    if (suite.source_type !== "prd" && suite.source_type !== "natural_language") {
+      throw new ConvexError("Can only retry PRD or NL generation");
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
+    const userId = identity?.subject ?? "unknown";
+
+    await ctx.db.patch(args.suite_id, {
+      status: "generating",
+      generation_error: undefined,
+      locked_by: userId,
+      locked_at: Date.now(),
+      locked_reason: "generating",
+      triggered_by: userId,
+    });
+
+    return { project_id: suite.project_id, source_type: suite.source_type };
+  },
+});
+
+export const createSuitesForExploration = mutation({
+  args: {
+    project_id: v.id("projects"),
+    areas: v.array(v.string()),
+    source_type: v.optional(
+      v.union(
+        v.literal("url_exploration"),
+        v.literal("prd"),
+        v.literal("natural_language"),
+        v.literal("manual"),
+      ),
+    ),
+    triggered_by: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user, workspace } = await getMemberWorkspace(ctx);
+    const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
+    const userId = String(user._id);
+
+    const now = new Date();
+    const month = now.toLocaleString("en-US", { month: "short" });
+    const day = now.getDate();
+
+    const results: { area: string; suite_id: Id<"suites"> }[] = [];
+
+    for (const area of args.areas) {
+      const suiteName = `Exploration — ${area} — ${month} ${day}`;
+      const suiteId = await ctx.db.insert("suites", {
+        workspace_id: workspace._id,
+        project_id: project._id,
+        name: suiteName,
+        description: `Generated from URL exploration — ${area} flows`,
+        suite_type: "functional",
+        source_type: args.source_type ?? "url_exploration",
+        status: "generating",
+        triggered_by: args.triggered_by ?? userId,
+        locked_by: userId,
+        locked_at: Date.now(),
+        locked_reason: "generating",
+      });
+      results.push({ area, suite_id: suiteId });
+    }
+
+    return results;
   },
 });

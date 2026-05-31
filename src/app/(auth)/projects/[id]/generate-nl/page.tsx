@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api, asId } from "@/lib/convex";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
@@ -20,34 +20,43 @@ export default function GenerateNlTestsPage() {
     project_id: projectId,
   });
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
+  const user = useQuery(api.workspaces.queries.getCurrentUser);
+  const createSuite = useMutation(api.suites.mutations.createSuite);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
 
   const [prompt, setPrompt] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const aiConfigReady = hasAiConfig(workspace);
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    setError(null);
-    setGenerating(true);
+    if (!prompt.trim() || !user) return;
     try {
-      const result = await generateNlTests({
+      const suiteId = await createSuite({
+        project_id: projectId,
+        source_type: "natural_language",
+        status: "generating",
+        triggered_by: user._id,
+      });
+      router.push(`/projects/${params.id}/suites/${suiteId}`);
+      generateNlTests({
         project_id: projectId,
         prompt: prompt.trim(),
+        suite_id: asId(suiteId, "suites"),
+      }).catch((err) => {
+        logError(err instanceof Error ? err.message : "NL generation failed", {
+          severity: "error",
+          context: { source: "GenerateNlTestsPage" },
+        });
       });
-      router.push(`/projects/${params.id}/suites/${result.suiteId}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Generation failed";
-      setError(msg);
-      logError(msg, { severity: "error", context: { source: "GenerateNlTestsPage" } });
-    } finally {
-      setGenerating(false);
+      logError(err instanceof Error ? err.message : "Failed to create suite", {
+        severity: "error",
+        context: { source: "GenerateNlTestsPage" },
+      });
     }
   };
 
-  if (project === undefined || workspace === undefined) {
+  if (project === undefined || workspace === undefined || user === undefined) {
     return <div className="text-[var(--muted)] text-sm">Loading...</div>;
   }
 
@@ -81,8 +90,6 @@ export default function GenerateNlTestsPage() {
             Describe test scenarios in plain English and AI will generate Playwright tests.
           </p>
         </div>
-
-        {error && <Alert variant="error" className="mb-5">{error}</Alert>}
 
         <div className="mb-5">
           <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
@@ -120,29 +127,18 @@ export default function GenerateNlTestsPage() {
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={"e.g., Test that login works with valid credentials\nTest that the shopping cart updates when adding items"}
                 className="w-full min-h-[160px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                disabled={generating}
               />
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleGenerate} disabled={generating || !prompt.trim()}>
-                {generating ? "Generating..." : "Generate Tests"}
+              <Button onClick={handleGenerate} disabled={!prompt.trim()}>
+                Generate Tests
               </Button>
               <Link href={`/projects/${params.id}`}>
                 <Button variant="secondary">Cancel</Button>
               </Link>
             </div>
           </>
-        )}
-
-        {generating && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            AI is generating Playwright tests from your description...
-          </div>
         )}
       </div>
     </div>

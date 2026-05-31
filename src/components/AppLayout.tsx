@@ -8,6 +8,7 @@ import { api } from "@/lib/convex";
 import { authClient } from "@/lib/auth-client";
 import { Topbar } from "@/components/ui/Topbar";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { TaskTray } from "@/components/TaskTray";
 import { useBreadcrumbs } from "@/lib/use-breadcrumbs";
 import type { ReactNode } from "react";
 
@@ -183,7 +184,12 @@ export function AppLayout({ children, pageTitle, pageSubtitle, pageActions }: Ap
         <Topbar
           title={pageTitle ?? workspace?.name ?? "MSITest"}
           subtitle={pageSubtitle}
-          actions={pageActions}
+          actions={
+            <>
+              <TaskTray />
+              {pageActions}
+            </>
+          }
         />
         {breadcrumbs.length > 0 && (
           <div className="px-6 py-2">

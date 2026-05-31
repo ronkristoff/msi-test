@@ -68,13 +68,19 @@ export default defineSchema({
       v.literal("natural_language"),
       v.literal("manual"),
     ),
+    status: v.optional(
+      v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
+    ),
+    generation_error: v.optional(v.string()),
+    triggered_by: v.optional(v.string()),
     locked_by: v.optional(v.string()),
     locked_at: v.optional(v.number()),
     locked_reason: v.optional(v.union(v.literal("running"), v.literal("generating"))),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
-    .index("by_project_id_and_suite_type", ["project_id", "suite_type"]),
+    .index("by_project_id_and_suite_type", ["project_id", "suite_type"])
+    .index("by_workspace_id_and_status", ["workspace_id", "status"]),
 
   tests: defineTable({
     workspace_id: v.id("workspaces"),
@@ -87,11 +93,14 @@ export default defineSchema({
       v.literal("prd"),
       v.literal("natural_language"),
     ),
-    status: v.union(v.literal("draft"), v.literal("approved")),
+    status: v.union(v.literal("draft"), v.literal("approved"), v.literal("healing")),
+    last_healed_at: v.optional(v.number()),
+    last_healed_diff: v.optional(v.string()),
     locked_by: v.optional(v.string()),
     locked_at: v.optional(v.number()),
   })
     .index("by_workspace_id", ["workspace_id"])
+    .index("by_workspace_id_and_status", ["workspace_id", "status"])
     .index("by_suite_id", ["suite_id"]),
 
   runs: defineTable({
@@ -256,6 +265,7 @@ export default defineSchema({
   })
     .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"])
+    .index("by_workspace_id_and_status", ["workspace_id", "status"])
     .index("by_status", ["status"]),
 
   suite_members: defineTable({

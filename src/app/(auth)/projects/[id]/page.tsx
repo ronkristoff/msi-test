@@ -96,8 +96,10 @@ export default function ProjectDetailPage() {
       });
       router.push(`/runs/${runId}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to run all tests";
-      setRunAllError(msg);
+      const msg = err instanceof Error
+        ? err.message.replace(/^Uncaught ConvexError:\s*/, "")
+        : "Failed to run all tests";
+      setRunAllError(msg || "Failed to run all tests");
       logError(msg, { severity: "error", context: { source: "ProjectDetailPage.handleRunAll" } });
     } finally {
       setTriggeringRunAll(false);

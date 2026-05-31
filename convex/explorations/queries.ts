@@ -41,6 +41,29 @@ export const getExplorationsByProject = query({
   },
 });
 
+const ACTIVE_STATUSES = ["pending", "capturing", "captured", "analyzing", "analyzed"] as const;
+
+export const getLatestActiveExploration = query({
+  args: { project_id: v.id("projects") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return null;
+
+    const project = await ctx.db.get(args.project_id);
+    if (!project || project.workspace_id !== ws.workspace._id) return null;
+
+    const explorations = await ctx.db
+      .query("explorations")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .order("desc")
+      .collect();
+
+    return explorations.find((e) =>
+      (ACTIVE_STATUSES as readonly string[]).includes(e.status),
+    ) ?? null;
+  },
+});
+
 export const getPendingExplorations = query({
   args: {},
   handler: async (ctx) => {

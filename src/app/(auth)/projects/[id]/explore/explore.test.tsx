@@ -13,9 +13,15 @@ vi.mock("convex/react", () => ({
     if (key.includes("getExploration") && args && typeof args === "object" && "exploration_id" in (args as Record<string, unknown>)) {
       return mockQueryResults.exploration;
     }
+    if (key.includes("getCurrentUser")) return mockQueryResults.user;
     return undefined;
   }),
-  useMutation: vi.fn(() => mockCreateExploration),
+  useMutation: vi.fn((_ref: unknown) => {
+    const key = String(_ref);
+    if (key.includes("createExploration")) return mockCreateExploration;
+    if (key.includes("createSuitesForExploration")) return vi.fn().mockResolvedValue([{ area: "Auth", suiteId: "s1" }]);
+    return vi.fn();
+  }),
   useAction: vi.fn(() => mockGenerateTests),
 }));
 
@@ -33,8 +39,16 @@ vi.mock("@/lib/convex", () => ({
       },
       mutations: { createExploration: "explorations.mutations.createExploration" },
     },
+    suites: {
+      mutations: {
+        createSuitesForExploration: "suites.mutations.createSuitesForExploration",
+      },
+    },
     ai: {
       exploreApp: { generateExplorationTests: "ai.exploreApp.generateExplorationTests" },
+    },
+    workspaces: {
+      queries: { getCurrentUser: "workspaces.queries.getCurrentUser" },
     },
   },
   asId: (v: string) => v,
@@ -54,7 +68,7 @@ const projectData = {
 describe("ExplorePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockQueryResults = { project: undefined, exploration: undefined };
+    mockQueryResults = { project: undefined, exploration: undefined, user: { _id: "user1", name: "Test" } };
   });
 
   it("renders loading state while project loads", async () => {

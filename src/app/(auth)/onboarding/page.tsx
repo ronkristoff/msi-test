@@ -60,7 +60,10 @@ export default function OnboardingPage() {
       });
       setStep(3);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to create workspace");
+      const msg = err instanceof Error
+        ? err.message.replace(/^Uncaught (ConvexError:\s*)?/, "")
+        : "Failed to create workspace";
+      setSubmitError(msg || "Failed to create workspace");
     } finally {
       setLoading(false);
     }
