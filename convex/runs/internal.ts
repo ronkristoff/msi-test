@@ -32,10 +32,14 @@ export const writeStepResult = internalMutation({
       v.literal("passed"),
       v.literal("failed"),
       v.literal("skipped"),
+      v.literal("healed"),
     ),
     error_message: v.optional(v.string()),
     screenshot_file_id: v.optional(v.id("_storage")),
     duration_ms: v.number(),
+    heal_reason: v.optional(v.string()),
+    heal_confidence: v.optional(v.number()),
+    before_screenshot_file_id: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("steps", {
@@ -48,6 +52,9 @@ export const writeStepResult = internalMutation({
       error_message: args.error_message,
       screenshot_file_id: args.screenshot_file_id,
       duration_ms: args.duration_ms,
+      heal_reason: args.heal_reason,
+      heal_confidence: args.heal_confidence,
+      before_screenshot_file_id: args.before_screenshot_file_id,
     });
   },
 });
@@ -98,6 +105,7 @@ async function aggregateAndFinalize(
   let pass_count = 0;
   let fail_count = 0;
   let skip_count = 0;
+  let healed_count = 0;
   let total_duration_ms = 0;
 
   for (const r of results) {
@@ -108,6 +116,7 @@ async function aggregateAndFinalize(
       total_duration_ms += r.duration_ms;
       if (r.status === "passed") pass_count++;
       else if (r.status === "failed") fail_count++;
+      else if (r.status === "healed") healed_count++;
       else skip_count++;
     }
   }
@@ -121,6 +130,7 @@ async function aggregateAndFinalize(
     pass_count,
     fail_count,
     skip_count,
+    healed_count,
     ...(errorMessage !== undefined && { error_message: errorMessage }),
   });
 

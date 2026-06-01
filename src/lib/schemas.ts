@@ -36,6 +36,7 @@ export type AIConfigFormValues = z.infer<typeof aiConfigSchema>;
 
 export const workspaceSettingsSchema = z.object({
   name: z.string().trim().min(1, "Workspace name is required").max(NAME_MAX, `Workspace name must be under ${NAME_MAX} characters`),
+  heal_confidence_threshold: z.number().min(0, "Threshold must be at least 0").max(1, "Threshold must be at most 1"),
 });
 
 export type WorkspaceSettingsValues = z.infer<typeof workspaceSettingsSchema>;

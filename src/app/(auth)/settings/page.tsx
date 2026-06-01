@@ -75,7 +75,10 @@ function SettingsForm({
 
   const wsForm = useForm<WorkspaceSettingsValues>({
     resolver: zodResolver(workspaceSettingsSchema),
-    defaultValues: { name: workspace.name },
+    defaultValues: {
+      name: workspace.name,
+      heal_confidence_threshold: workspace.heal_confidence_threshold ?? 0.8,
+    },
   });
 
   const accountForm = useForm<AccountValues>({
@@ -112,7 +115,10 @@ function SettingsForm({
   const handleSaveWorkspace = wsForm.handleSubmit(async (data) => {
     setSaving("ws");
     try {
-      await updateWorkspace({ name: data.name });
+      await updateWorkspace({
+        name: data.name,
+        heal_confidence_threshold: data.heal_confidence_threshold,
+      });
       showMsg("success", "Workspace updated");
     } catch (err) {
       showMsg("error", err instanceof Error ? err.message : "Failed to save");
@@ -230,6 +236,33 @@ function SettingsForm({
               className="max-w-[480px]"
               {...wsForm.register("name")}
             />
+            <div className="mt-4 pt-4 border-t border-[var(--border-soft)]">
+              <label className="block text-sm font-medium text-[var(--fg)] mb-1">
+                Auto-Heal Confidence Threshold
+              </label>
+              <p className="text-xs text-[var(--muted)] mb-2">
+                When a test step fails due to element not found, the Runner attempts to auto-heal by finding candidate elements. If confidence exceeds this threshold, the step is auto-healed. Default: 80%.
+              </p>
+              <div className="flex items-center gap-3 max-w-[240px]">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round((wsForm.watch("heal_confidence_threshold") ?? 0.8) * 100)}
+                  onChange={(e) => wsForm.setValue("heal_confidence_threshold", Number(e.target.value) / 100, { shouldValidate: true })}
+                  className="flex-1 accent-[var(--accent)]"
+                />
+                <span className="text-sm font-mono text-[var(--fg)] w-12 text-right">
+                  {Math.round((wsForm.watch("heal_confidence_threshold") ?? 0.8) * 100)}%
+                </span>
+              </div>
+              {wsForm.formState.errors.heal_confidence_threshold && (
+                <p className="text-xs text-[var(--danger)] mt-1">
+                  {wsForm.formState.errors.heal_confidence_threshold.message}
+                </p>
+              )}
+            </div>
             <div className="mt-5 pt-4 border-t border-[var(--border-soft)]">
               <Button variant="secondary" onClick={handleSaveWorkspace} disabled={saving === "ws"}>
                 Update Workspace

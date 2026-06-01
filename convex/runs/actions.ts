@@ -37,10 +37,13 @@ export const runnerWriteStepResult = action({
     step_number: v.number(),
     command: v.string(),
     locator: v.optional(v.string()),
-    status: v.union(v.literal("passed"), v.literal("failed"), v.literal("skipped")),
+    status: v.union(v.literal("passed"), v.literal("failed"), v.literal("skipped"), v.literal("healed")),
     error_message: v.optional(v.string()),
     screenshot_file_id: v.optional(v.id("_storage")),
     duration_ms: v.number(),
+    heal_reason: v.optional(v.string()),
+    heal_confidence: v.optional(v.number()),
+    before_screenshot_file_id: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);

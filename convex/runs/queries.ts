@@ -12,6 +12,9 @@ type StepRow = {
   duration_ms: number;
   error_message: string | null;
   screenshot_file_id?: string | null;
+  heal_reason?: string | null;
+  heal_confidence?: number | null;
+  before_screenshot_file_id?: string | null;
 };
 
 type ResultWithSteps = {
@@ -71,6 +74,9 @@ async function fetchResultsWithSteps(
           duration_ms: s.duration_ms,
           error_message: s.error_message ?? null,
           screenshot_file_id: s.screenshot_file_id ?? null,
+          heal_reason: s.heal_reason ?? null,
+          heal_confidence: s.heal_confidence ?? null,
+          before_screenshot_file_id: s.before_screenshot_file_id ?? null,
         })),
       };
     }),
@@ -123,6 +129,7 @@ export const getPendingWork = query({
         }
 
         const project = await ctx.db.get(run.project_id);
+        const workspace = await ctx.db.get(run.workspace_id);
 
         return {
           run_id: run._id,
@@ -138,6 +145,7 @@ export const getPendingWork = query({
           test_username: project?.explore_username ?? undefined,
           test_password: project?.explore_password ?? undefined,
           test_data: project?.test_data ?? undefined,
+          heal_confidence_threshold: workspace?.heal_confidence_threshold ?? undefined,
         };
       }),
     );

@@ -13,6 +13,7 @@ export default defineSchema({
       model_name: v.string(),
       stagehand_model_name: v.optional(v.string()),
     }),
+    heal_confidence_threshold: v.optional(v.number()),
   }).index("by_owner_id", ["owner_id"]).index("by_invite_code", ["invite_code"]),
 
   workspace_members: defineTable({
@@ -140,6 +141,7 @@ export default defineSchema({
     pass_count: v.optional(v.number()),
     fail_count: v.optional(v.number()),
     skip_count: v.optional(v.number()),
+    healed_count: v.optional(v.number()),
     error_message: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
@@ -179,10 +181,14 @@ export default defineSchema({
       v.literal("passed"),
       v.literal("failed"),
       v.literal("skipped"),
+      v.literal("healed"),
     ),
     error_message: v.optional(v.string()),
     screenshot_file_id: v.optional(v.id("_storage")),
     duration_ms: v.number(),
+    heal_reason: v.optional(v.string()),
+    heal_confidence: v.optional(v.number()),
+    before_screenshot_file_id: v.optional(v.id("_storage")),
   }).index("by_run_result_id", ["run_result_id"]),
 
   ai_insights: defineTable({

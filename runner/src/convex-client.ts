@@ -37,10 +37,13 @@ export class RunnerConvexClient {
     step_number: number;
     command: string;
     locator?: string;
-    status: "passed" | "failed" | "skipped";
+    status: "passed" | "failed" | "skipped" | "healed";
     error_message?: string;
     screenshot_file_id?: string;
     duration_ms: number;
+    heal_reason?: string;
+    heal_confidence?: number;
+    before_screenshot_file_id?: string;
   }): Promise<void> {
     await this.client.action(api.runs.actions.runnerWriteStepResult, {
       runner_secret: this.secret,
@@ -53,6 +56,9 @@ export class RunnerConvexClient {
       error_message: args.error_message,
       screenshot_file_id: args.screenshot_file_id as Id<"_storage"> | undefined,
       duration_ms: args.duration_ms,
+      heal_reason: args.heal_reason,
+      heal_confidence: args.heal_confidence,
+      before_screenshot_file_id: args.before_screenshot_file_id as Id<"_storage"> | undefined,
     });
   }
 

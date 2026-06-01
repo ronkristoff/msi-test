@@ -58,6 +58,7 @@ export const updateWorkspace = mutation({
         stagehand_model_name: v.optional(v.string()),
       }),
     ),
+    heal_confidence_threshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
@@ -78,6 +79,12 @@ export const updateWorkspace = mutation({
         model_name: args.ai_config.model_name,
         stagehand_model_name: args.ai_config.stagehand_model_name ?? workspace.ai_config.stagehand_model_name,
       };
+    }
+    if (args.heal_confidence_threshold !== undefined) {
+      if (args.heal_confidence_threshold < 0 || args.heal_confidence_threshold > 1) {
+        throw new ConvexError("Confidence threshold must be between 0 and 1");
+      }
+      updates.heal_confidence_threshold = args.heal_confidence_threshold;
     }
 
     await ctx.db.patch(workspace._id, updates);

@@ -163,7 +163,7 @@ describe("SettingsPage", () => {
 
     await user.click(within(getTabList()).getByText("Workspace"));
     await user.click(screen.getByRole("button", { name: /update workspace/i }));
-    expect(mockUpdateWorkspace).toHaveBeenCalledWith({ name: "My Workspace" });
+    expect(mockUpdateWorkspace).toHaveBeenCalledWith({ name: "My Workspace", heal_confidence_threshold: 0.8 });
   });
 
   it("shows success message after saving", async () => {

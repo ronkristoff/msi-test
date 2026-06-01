@@ -63,4 +63,5 @@ export interface RunWorkItem {
   test_username?: string;
   test_password?: string;
   test_data?: Record<string, string>;
+  heal_confidence_threshold?: number;
 }
