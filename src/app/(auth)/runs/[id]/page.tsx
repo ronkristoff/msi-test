@@ -37,6 +37,7 @@ export default function RunDetailPage() {
   const [healAllRunning, setHealAllRunning] = useState(false);
   const [healAllError, setHealAllError] = useState<string | null>(null);
   const [healAllResults, setHealAllResults] = useState<string | null>(null);
+  const [healHint, setHealHint] = useState("");
 
   const healTestAction = useAction(api.ai.healTest.healTest);
   const healAllFailedAction = useAction(api.ai.healTest.healAllFailed);
@@ -53,8 +54,13 @@ export default function RunDetailPage() {
     setHealingTestId(testId);
     setHealSuccessId(null);
     try {
-      await healTestAction({ test_id: testId as Id<"tests">, error_message: errorMessage });
+      await healTestAction({
+        test_id: testId as Id<"tests">,
+        error_message: errorMessage,
+        user_hint: healHint.trim() || undefined,
+      });
       setHealSuccessId(testId);
+      setHealHint("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Healing failed";
       logError(msg, { severity: "error", context: { source: "RunDetailPage.handleHealTest" } });
@@ -328,23 +334,32 @@ export default function RunDetailPage() {
                         </span>
                       </div>
                       {aiConfigReady && selectedResult.status === "failed" && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleHealTest(selectedResult.test_id, selectedResult.error_message ?? "")}
+                        <div className="mt-2 space-y-2">
+                          <input
+                            type="text"
+                            value={healHint}
+                            onChange={(e) => setHealHint(e.target.value)}
+                            placeholder="Describe what's wrong..."
                             disabled={healingTestId === selectedResult.test_id}
-                          >
-                            {healingTestId === selectedResult.test_id ? (
-                              <>
-                                <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Healing...
-                              </>
-                            ) : "AI Heal"}
-                          </Button>
+                            className="w-full max-w-[400px] text-sm bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-2.5 py-1.5 placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleHealTest(selectedResult.test_id, selectedResult.error_message ?? "")}
+                              disabled={healingTestId === selectedResult.test_id}
+                            >
+                              {healingTestId === selectedResult.test_id ? (
+                                <>
+                                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                  Healing...
+                                </>
+                              ) : "AI Heal"}
+                            </Button>
                           {healSuccessId === selectedResult.test_id && (
                             <span className="text-xs text-[var(--success-text)]">
                               Healed and saved as draft.
@@ -358,6 +373,7 @@ export default function RunDetailPage() {
                               )}
                             </span>
                           )}
+                          </div>
                         </div>
                       )}
                     </div>

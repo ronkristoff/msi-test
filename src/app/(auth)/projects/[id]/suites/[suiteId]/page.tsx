@@ -87,6 +87,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
   const [regenerating, setRegenerating] = useState(false);
   const [healing, setHealing] = useState(false);
   const [healSuccess, setHealSuccess] = useState(false);
+  const [healHint, setHealHint] = useState("");
 
   const latestFailure = useQuery(
     api.runs.queries.getLatestFailureForTest,
@@ -148,8 +149,12 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
     setHealing(true);
     setHealSuccess(false);
     try {
-      await healTestAction({ test_id: test._id as Id<"tests"> });
+      await healTestAction({
+        test_id: test._id as Id<"tests">,
+        user_hint: healHint.trim() || undefined,
+      });
       setHealSuccess(true);
+      setHealHint("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Healing failed";
       logError(msg, { severity: "error", context: { source: "TestAccordionItem.handleHeal" } });
@@ -262,22 +267,32 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
                 ) : "Regenerate"}
               </Button>
               {aiConfigReady && latestFailure && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleHeal}
-                  disabled={healing}
-                >
-                  {healing ? (
-                    <>
-                      <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Healing...
-                    </>
-                  ) : "AI Heal"}
-                </Button>
+                <div className="flex items-start gap-2">
+                  <input
+                    type="text"
+                    value={healHint}
+                    onChange={(e) => setHealHint(e.target.value)}
+                    placeholder="Describe what's wrong..."
+                    disabled={healing}
+                    className="flex-1 min-w-[180px] max-w-[320px] text-sm bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-2.5 py-1.5 placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleHeal}
+                    disabled={healing}
+                  >
+                    {healing ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Healing...
+                      </>
+                    ) : "AI Heal"}
+                  </Button>
+                </div>
               )}
               {healSuccess && (
                 <span className="text-xs text-[var(--success-text)]">Healed and saved as draft. Review before approving.</span>

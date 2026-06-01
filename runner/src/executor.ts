@@ -52,9 +52,31 @@ export async function executeRun(
 
     fsSync.mkdirSync(reporterDir, { recursive: true });
 
-    const { exitCode, output: pwOutput } = await runPlaywright(runDir, work, log);
+    const MAX_ATTEMPTS = 3;
+    let pwOutput = "";
+    let exitCode = 1;
+    let summary: TestSummary[] = [];
 
-    log(`Run ${work.run_id}: Playwright exited with code ${exitCode}`);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const stepsFile = path.join(reporterDir, "steps.jsonl");
+      if (fsSync.existsSync(stepsFile)) fsSync.writeFileSync(stepsFile, "", "utf-8");
+      const consoleFile = path.join(reporterDir, "console.jsonl");
+      if (fsSync.existsSync(consoleFile)) fsSync.writeFileSync(consoleFile, "", "utf-8");
+      const summaryFile = path.join(reporterDir, "summary.json");
+      if (fsSync.existsSync(summaryFile)) fsSync.writeFileSync(summaryFile, "[]", "utf-8");
+
+      ({ exitCode, output: pwOutput } = await runPlaywright(runDir, work, log));
+
+      log(`Run ${work.run_id}: Playwright exited with code ${exitCode} (attempt ${attempt}/${MAX_ATTEMPTS})`);
+
+      summary = readSummary(reporterDir);
+
+      const hasConvexTimeout = detectConvexTimeout(summary, reporterDir);
+
+      if (!hasConvexTimeout || attempt >= MAX_ATTEMPTS) break;
+
+      log(`Run ${work.run_id}: Convex function timeout detected, retrying (attempt ${attempt + 1}/${MAX_ATTEMPTS})...`);
+    }
 
     const indexToResultId = buildIndexMapping(work);
 
@@ -64,8 +86,6 @@ export async function executeRun(
     }
 
     await processStepResults(client, work, reporterDir, indexToResultId, log);
-
-    const summary = readSummary(reporterDir);
 
     log(`Run ${work.run_id}: summary has ${summary.length} entries:`);
     for (const entry of summary) {
@@ -389,4 +409,32 @@ function runPlaywright(cwd: string, work: PendingWorkItem, log: (msg: string) =>
       resolve({ exitCode: 1, output: chunks.join("") + `\nProcess error: ${err.message}` });
     });
   });
+}
+
+function detectConvexTimeout(summary: TestSummary[], reporterDir: string): boolean {
+  for (const entry of summary) {
+    if (entry.status === "failed" && entry.error_message?.includes("Function execution timed out")) {
+      return true;
+    }
+  }
+
+  const consoleFile = path.join(reporterDir, "console.jsonl");
+  if (fsSync.existsSync(consoleFile)) {
+    const lines = fsSync.readFileSync(consoleFile, "utf-8").trim().split("\n").filter(Boolean);
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        const logs: Array<{ text: string }> = entry.logs ?? [];
+        for (const log of logs) {
+          if (log.text?.includes("Function execution timed out")) {
+            return true;
+          }
+        }
+      } catch {
+        // skip malformed lines
+      }
+    }
+  }
+
+  return false;
 }

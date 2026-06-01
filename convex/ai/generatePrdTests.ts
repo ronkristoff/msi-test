@@ -3,7 +3,7 @@
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
@@ -21,7 +21,7 @@ export const generatePrdTests = action({
     try {
       return await generatePrdTestsInner(ctx, args);
     } finally {
-      const suite = await ctx.runQuery(internal.suites.queries.getSuite, {
+      const suite = await ctx.runQuery(api.suites.queries.getSuite, {
         suite_id: args.suite_id,
       });
       if (suite?.status === "generating") {
@@ -90,7 +90,18 @@ Assertion rules:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
 
-Only interact with elements and assert on values explicitly described in the requirements — do NOT invent or guess selectors.`,
+Only interact with elements and assert on values explicitly described in the requirements — do NOT invent or guess selectors.
+
+Form submission resilience:
+- When a test submits a form (clicks Create/Save/Submit), wrap the submission in a retry loop to handle intermittent backend timeouts.
+- Pattern: click submit, check if dialog closes (success) or stays open (failure). If still open, retry up to 3 times.
+- Example:
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await submitBtn.click();
+    const closed = await expect(dialog).toBeHidden({ timeout: 10000 }).then(() => true).catch(() => false);
+    if (closed) break;
+  }
+  await expect(dialog).toBeHidden({ timeout: 5000 });`,
       });
       responseText = result.text;
     } catch (err: unknown) {

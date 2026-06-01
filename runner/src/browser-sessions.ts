@@ -199,6 +199,74 @@ export class BrowserSessionManager {
     }
   }
 
+  async interactAndCapture(
+    projectId: string,
+    url: string,
+    authConfig: AuthConfig,
+    actions: Array<{ action: string; role?: string; name?: string; value?: string }>,
+  ): Promise<SnapshotResult[]> {
+    return this.enqueue(projectId, async () => {
+      const session = await this.getOrCreateSession(projectId, authConfig);
+
+      await session.page.goto(url, { waitUntil: "networkidle", timeout: NAVIGATION_TIMEOUT_MS })
+        .catch(async () => {
+          await session.page.goto(url, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
+        });
+
+      await session.page.waitForTimeout(HYDRATION_WAIT_MS);
+
+      const results: SnapshotResult[] = [];
+
+      const initialSnapshot = await (session.page as Page & { ariaSnapshot(opts?: { mode?: string; timeout?: number }): Promise<string> }).ariaSnapshot({ mode: "ai", timeout: 5_000 });
+      results.push({
+        snapshot: initialSnapshot,
+        url: session.page.url(),
+        title: await session.page.title(),
+      });
+
+      for (const step of actions) {
+        try {
+          if (step.role && step.name) {
+            const locator = session.page.getByRole(step.role as "button" | "link" | "textbox" | "combobox" | "spinbutton" | "checkbox" | "radio" | "switch" | "tab" | "menuitem" | "option" | "heading" | "dialog" | "alert" | "article" | "banner" | "cell" | "columnheader" | "row" | "rowheader" | "table" | "grid" | "listbox" | "menu" | "navigation" | "search", { exact: false, name: step.name }).first();
+
+            if (step.action === "click") {
+              if (await locator.count() > 0) {
+                await locator.click({ timeout: 5_000 });
+                await session.page.waitForTimeout(1_000);
+              }
+            } else if (step.action === "fill" && step.value !== undefined) {
+              if (await locator.count() > 0) {
+                await locator.fill(step.value, { timeout: 5_000 });
+              }
+            }
+          }
+
+          const stepSnapshot = await (session.page as Page & { ariaSnapshot(opts?: { mode?: string; timeout?: number }): Promise<string> }).ariaSnapshot({ mode: "ai", timeout: 5_000 });
+          results.push({
+            snapshot: stepSnapshot,
+            url: session.page.url(),
+            title: await session.page.title(),
+          });
+        } catch (err) {
+          this.log(`  interactAndCapture step error: ${err}`);
+          try {
+            const errorSnapshot = await (session.page as Page & { ariaSnapshot(opts?: { mode?: string; timeout?: number }): Promise<string> }).ariaSnapshot({ mode: "ai", timeout: 5_000 });
+            results.push({
+              snapshot: errorSnapshot,
+              url: session.page.url(),
+              title: await session.page.title(),
+            });
+          } catch {
+            // skip this step
+          }
+        }
+      }
+
+      session.lastActivity = Date.now();
+      return results;
+    });
+  }
+
   startIdleSweep(intervalMs: number = 60_000): void {
     this.idleSweepTimer = setInterval(() => {
       const now = Date.now();

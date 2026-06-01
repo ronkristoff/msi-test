@@ -3,15 +3,14 @@
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext } from "./authContext";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { getLiveSnapshot } from "./browserClient";
-import { internal } from "../_generated/api";
+import { getLiveSnapshot, interactAndCapture, extractClickableRefs } from "./browserClient";
 
 export const generateNlTests = action({
   args: {
@@ -23,7 +22,7 @@ export const generateNlTests = action({
     try {
       return await generateNlTestsInner(ctx, args);
     } finally {
-      const suite = await ctx.runQuery(internal.suites.queries.getSuite, {
+      const suite = await ctx.runQuery(api.suites.queries.getSuite, {
         suite_id: args.suite_id,
       });
       if (suite?.status === "generating") {
@@ -78,6 +77,33 @@ async function generateNlTestsInner(ctx: ActionCtx, args: { project_id: Id<"proj
       },
     });
 
+    let discoveredSnapshots: string[] = [];
+    if (liveSnapshot) {
+      const clickTargets = extractClickableRefs(liveSnapshot.snapshot);
+      if (clickTargets.length > 0) {
+        const topTargets = clickTargets.slice(0, 5);
+        const stepResults = await interactAndCapture({
+          projectId: args.project_id,
+          url: project.app_url,
+          authConfig: {
+            auth_mode: (project as Record<string, unknown>).explore_auth_mode as string ?? "none",
+            login_url: (project as Record<string, unknown>).explore_login_url as string | undefined,
+            username: (project as Record<string, unknown>).explore_username as string | undefined,
+            password: (project as Record<string, unknown>).explore_password as string | undefined,
+            cookie_name: (project as Record<string, unknown>).explore_cookie_name as string | undefined,
+            cookie_value: (project as Record<string, unknown>).explore_cookie_value as string | undefined,
+            app_url: project.app_url,
+          },
+          actions: topTargets.map((step) => ({ action: "click", role: step.role, name: step.name })),
+        });
+        if (stepResults && stepResults.length > 1) {
+          discoveredSnapshots = stepResults
+            .slice(1)
+            .map((s, i) => `--- After clicking "${topTargets[i]?.name ?? ""}" ---\nURL: ${s.url}\nTitle: ${s.title}\n${s.snapshot}`);
+        }
+      }
+    }
+
     let responseText: string;
     try {
       const agent = createTestGenerationAgent(
@@ -93,6 +119,7 @@ Project: ${project.name}
 URL: ${project.app_url}
 ${buildAuthPromptContext(project)}${prdContext}
 ${liveSnapshot ? `\nCurrent page state (use these real elements and values in your tests):\nURL: ${liveSnapshot.url}\nTitle: ${liveSnapshot.title}\n${liveSnapshot.snapshot}\n` : ""}
+${discoveredSnapshots.length > 0 ? `\nDiscovered page states (elements found after clicking buttons/links):\n${discoveredSnapshots.join("\n\n")}\n` : ""}
 Test Description:
 ${args.prompt}
 
@@ -107,7 +134,18 @@ Assertion rules:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
 
-Only interact with elements and assert on values explicitly described — do NOT invent or guess selectors.`,
+CRITICAL — Only use locators for elements that appear in the snapshots above. Do NOT invent or guess selectors for elements not shown in any snapshot.
+
+Form submission resilience:
+- When a test submits a form (clicks Create/Save/Submit), wrap the submission in a retry loop to handle intermittent backend timeouts.
+- Pattern: click submit, check if dialog closes (success) or stays open (failure). If still open, retry up to 3 times.
+- Example:
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await submitBtn.click();
+    const closed = await expect(dialog).toBeHidden({ timeout: 10000 }).then(() => true).catch(() => false);
+    if (closed) break;
+  }
+  await expect(dialog).toBeHidden({ timeout: 5000 });`,
       });
       responseText = result.text;
     } catch (err: unknown) {

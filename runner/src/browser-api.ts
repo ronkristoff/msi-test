@@ -73,6 +73,38 @@ export function createBrowserApiServer(
     },
     {
       method: "POST",
+      path: "/browser/interact",
+      handler: async ({ body, sendJson }) => {
+        const { project_id, url, actions, ...authFields } = body;
+
+        if (!project_id || typeof project_id !== "string") {
+          return sendJson(400, { error: "project_id is required" });
+        }
+        if (!url || typeof url !== "string") {
+          return sendJson(400, { error: "url is required" });
+        }
+
+        const rawActions = Array.isArray(actions) ? actions : [];
+        const authConfig = buildAuthConfig(authFields, url);
+
+        try {
+          const results = await sessionManager.interactAndCapture(
+            project_id,
+            url,
+            authConfig,
+            rawActions as Array<{ action: string; role?: string; name?: string; value?: string }>,
+          );
+          log(`Browser API: interact ${project_id} → ${url} (${results.length} snapshots)`);
+          sendJson(200, { steps: results });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          log(`Browser API: interact error for ${project_id}: ${message}`);
+          sendJson(500, { error: `Interaction failed: ${message}` });
+        }
+      },
+    },
+    {
+      method: "POST",
       path: "/browser/login",
       handler: async ({ body, sendJson }) => {
         const { project_id, ...authFields } = body;
