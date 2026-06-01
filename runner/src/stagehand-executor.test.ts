@@ -1,33 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import fs from "fs/promises";
+import path from "path";
 import { executeStagehandTests } from "../src/stagehand-executor";
-import type { RunnerConvexClient } from "../src/convex-client";
 import type { RunWorkItem } from "../src/types";
+import {
+  createMockClient,
+  createHealMockStagehand,
+  createLearnedMockStagehand,
+  createMockPage,
+  createMockStagehandContext,
+} from "../src/test-utils/stagehand-mocks";
 
 vi.mock("../src/stagehand", () => {
   return {
     initStagehand: vi.fn().mockImplementation(() => {
       const mockAct = vi.fn().mockResolvedValue({ success: true });
       const mockClose = vi.fn().mockResolvedValue(undefined);
-      const mockScreenshot = vi.fn().mockResolvedValue(Buffer.from("png-data"));
-      const mockGoto = vi.fn().mockResolvedValue(undefined);
-      const mockTitle = vi.fn().mockResolvedValue("Test Page");
-      const mockUrl = vi.fn().mockReturnValue("https://example.com");
-      const mockEvaluate = vi.fn().mockResolvedValue(undefined);
-      const mockPage = {
-        goto: mockGoto,
-        title: mockTitle,
-        url: mockUrl,
-        screenshot: mockScreenshot,
-        evaluate: mockEvaluate,
-      };
-      const mockActivePage = vi.fn().mockReturnValue(mockPage);
-      const mockNewPage = vi.fn().mockResolvedValue(mockPage);
-      const mockAddCookies = vi.fn().mockResolvedValue(undefined);
-      const mockContext = {
-        activePage: mockActivePage,
-        newPage: mockNewPage,
-        addCookies: mockAddCookies,
-      };
+      const mockPage = createMockPage();
+      const mockContext = createMockStagehandContext(mockPage);
 
       return Promise.resolve({
         init: vi.fn().mockResolvedValue(undefined),
@@ -38,24 +28,6 @@ vi.mock("../src/stagehand", () => {
     }),
   };
 });
-
-function createMockClient(overrides: Partial<RunnerConvexClient> = {}): RunnerConvexClient {
-  return {
-    getWorkspaceAiConfig: vi.fn().mockResolvedValue({
-      endpoint_url: "https://api.openai.com/v1",
-      api_key: "sk-test",
-      model_name: "gpt-4o",
-    }),
-    writeStepResult: vi.fn().mockResolvedValue(undefined),
-    writeRunResult: vi.fn().mockResolvedValue(undefined),
-    completeRun: vi.fn().mockResolvedValue(undefined),
-    forceCompleteRun: vi.fn().mockResolvedValue(undefined),
-    uploadBuffer: vi.fn().mockResolvedValue("storage-id-123"),
-    uploadFile: vi.fn().mockResolvedValue("storage-id-123"),
-    generateUploadUrl: vi.fn().mockResolvedValue("https://upload.example.com"),
-    ...overrides,
-  } as RunnerConvexClient;
-}
 
 const BASE_WORK: RunWorkItem = {
   run_id: "run-1",
@@ -167,32 +139,17 @@ describe("executeStagehandTests", () => {
   });
 
   it("stops on first failed step and marks test as failed", async () => {
-    const { initStagehand } = await import("../src/stagehand");
-
     const mockAct = vi.fn()
       .mockResolvedValueOnce({ success: true })
       .mockRejectedValueOnce(new Error("Element not found"));
-    const mockClose = vi.fn().mockResolvedValue(undefined);
-    const mockScreenshot = vi.fn().mockResolvedValue(Buffer.from("png-data"));
-    const mockEvaluate = vi.fn().mockResolvedValue(undefined);
-    const mockGoto = vi.fn().mockResolvedValue(undefined);
-    const mockPage = {
-      goto: mockGoto,
-      title: vi.fn().mockResolvedValue("Test Page"),
-      url: vi.fn().mockReturnValue("https://example.com"),
-      screenshot: mockScreenshot,
-      evaluate: mockEvaluate,
-    };
+    const mockPage = createMockPage();
 
+    const { initStagehand } = await import("../src/stagehand");
     vi.mocked(initStagehand).mockResolvedValueOnce({
       init: vi.fn().mockResolvedValue(undefined),
-      close: mockClose,
+      close: vi.fn().mockResolvedValue(undefined),
       act: mockAct,
-      context: {
-        activePage: vi.fn().mockReturnValue(mockPage),
-        newPage: vi.fn().mockResolvedValue(mockPage),
-        addCookies: vi.fn().mockResolvedValue(undefined),
-      },
+      context: createMockStagehandContext(mockPage),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
@@ -254,25 +211,14 @@ describe("executeStagehandTests", () => {
   it("closes Stagehand instance in finally block", async () => {
     const mockClose = vi.fn().mockResolvedValue(undefined);
     const mockAct = vi.fn().mockRejectedValue(new Error("step failed"));
-    const mockScreenshot = vi.fn().mockResolvedValue(Buffer.from("png-data"));
-    const mockPage = {
-      goto: vi.fn().mockResolvedValue(undefined),
-      title: vi.fn().mockResolvedValue("Test Page"),
-      url: vi.fn().mockReturnValue("https://example.com"),
-      screenshot: mockScreenshot,
-      evaluate: vi.fn().mockResolvedValue(undefined),
-    };
+    const mockPage = createMockPage();
 
     const { initStagehand } = await import("../src/stagehand");
     vi.mocked(initStagehand).mockResolvedValueOnce({
       init: vi.fn().mockResolvedValue(undefined),
       close: mockClose,
       act: mockAct,
-      context: {
-        activePage: vi.fn().mockReturnValue(mockPage),
-        newPage: vi.fn().mockResolvedValue(mockPage),
-        addCookies: vi.fn().mockResolvedValue(undefined),
-      },
+      context: createMockStagehandContext(mockPage),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
@@ -309,64 +255,6 @@ describe("executeStagehandTests", () => {
 
 describe("auto-heal logic", () => {
   const HEAL_THRESHOLD = 0.8;
-
-  function createHealMockStagehand(config: {
-    failOnStep?: number;
-    observeResults?: Array<{ selector: string; description: string }>;
-    extractResult?: { confidence: number; reasoning: string };
-    healActSucceeds?: boolean;
-  }) {
-    const mockAct = vi.fn();
-    const mockObserve = vi.fn();
-    const mockExtract = vi.fn();
-    const mockClose = vi.fn().mockResolvedValue(undefined);
-    const mockScreenshot = vi.fn().mockResolvedValue(Buffer.from("png-data"));
-    const mockGoto = vi.fn().mockResolvedValue(undefined);
-    const mockEvaluate = vi.fn().mockResolvedValue(undefined);
-    const mockPage = {
-      goto: mockGoto,
-      title: vi.fn().mockResolvedValue("Test Page"),
-      url: vi.fn().mockReturnValue("https://example.com"),
-      screenshot: mockScreenshot,
-      evaluate: mockEvaluate,
-    };
-
-    let callCount = 0;
-    mockAct.mockImplementation(async () => {
-      callCount++;
-      if (config.failOnStep && callCount === config.failOnStep) {
-        throw new Error("Element not found: could not locate button");
-      }
-      return { success: true };
-    });
-
-    if (config.observeResults) {
-      mockObserve.mockResolvedValue(config.observeResults);
-    } else {
-      mockObserve.mockResolvedValue([]);
-    }
-
-    if (config.extractResult) {
-      mockExtract.mockResolvedValue(config.extractResult);
-    } else {
-      mockExtract.mockResolvedValue({ confidence: 0, reasoning: "" });
-    }
-
-    const stagehand = {
-      init: vi.fn().mockResolvedValue(undefined),
-      close: mockClose,
-      act: mockAct,
-      observe: mockObserve,
-      extract: mockExtract,
-      context: {
-        activePage: vi.fn().mockReturnValue(mockPage),
-        newPage: vi.fn().mockResolvedValue(mockPage),
-        addCookies: vi.fn().mockResolvedValue(undefined),
-      },
-    };
-
-    return { stagehand, mockAct, mockObserve, mockExtract, mockClose };
-  }
 
   const HEAL_WORK: RunWorkItem = {
     ...BASE_WORK,
@@ -618,5 +506,320 @@ describe("auto-heal logic", () => {
     const stepCall = client.writeStepResult.mock.calls[0][0];
     expect(stepCall.status).toBe("failed");
     expect(stepCall.error_message).toContain("Navigation timeout");
+  });
+});
+
+describe("learned selector persistence", () => {
+  it("uses learned selector as first attempt before normal execution", async () => {
+    const { stagehand, mockAct } = createLearnedMockStagehand({
+      observeResults: [],
+    });
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const LEARNED_WORK: RunWorkItem = {
+      ...BASE_WORK,
+      tests: [
+        {
+          _id: "test-learned",
+          name: "Learned test",
+          execution_type: "stagehand" as const,
+          steps: [
+            {
+              instruction: "Click the approve button",
+              learned_selector: "button.approve-v2",
+              learned_description: "Approve button",
+            },
+          ],
+          playwright_code: "",
+        },
+      ],
+      run_result_ids: [{ _id: "result-learned", test_id: "test-learned" }],
+    };
+
+    const client = createMockClient();
+    await executeStagehandTests(client, LEARNED_WORK, log);
+
+    expect(mockAct).toHaveBeenCalledWith(
+      expect.objectContaining({ selector: "button.approve-v2" }),
+      expect.any(Object),
+    );
+
+    const stepCall = client.writeStepResult.mock.calls[0][0];
+    expect(stepCall.status).toBe("passed");
+  });
+
+  it("falls back to normal act() when learned selector fails", async () => {
+    const { stagehand, mockAct, mockObserve } = createLearnedMockStagehand({
+      observeResults: [
+        { selector: "button.approve-v2", description: "Approve button" },
+      ],
+      actFailsOnInstruction: true,
+    });
+
+    let observeCount = 0;
+    mockObserve.mockImplementation(async () => {
+      observeCount++;
+      if (observeCount === 1) {
+        return [{ selector: "button.approve-v2", description: "Approve button" }];
+      }
+      return [{ selector: "button.approve-v3", description: "New approve" }];
+    });
+
+    let actCount = 0;
+    mockAct.mockImplementation(async (target: unknown) => {
+      actCount++;
+      if (actCount === 1 && typeof target === "object" && target !== null && "selector" in target) {
+        throw new Error("Element not found: button.approve-v2");
+      }
+      if (actCount === 2) {
+        throw new Error("Element not found: button");
+      }
+      return { success: true };
+    });
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const LEARNED_WORK: RunWorkItem = {
+      ...BASE_WORK,
+      heal_confidence_threshold: 0.8,
+      tests: [
+        {
+          _id: "test-learned-fail",
+          name: "Learned fail test",
+          execution_type: "stagehand" as const,
+          steps: [
+            {
+              instruction: "Click the approve button",
+              learned_selector: "button.approve-v2",
+              learned_description: "Approve button",
+            },
+          ],
+          playwright_code: "",
+        },
+      ],
+      run_result_ids: [{ _id: "result-learned-fail", test_id: "test-learned-fail" }],
+    };
+
+    const client = createMockClient();
+    await executeStagehandTests(client, LEARNED_WORK, log);
+
+    const stepCall = client.writeStepResult.mock.calls[0][0];
+    expect(stepCall.status).toBe("healed");
+    expect(stepCall.heal_confidence).toBe(0.9);
+  });
+
+  it("records healing history after successful heal", async () => {
+    const { stagehand } = createLearnedMockStagehand({
+      observeResults: [],
+    });
+
+    let actCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).act = vi.fn().mockImplementation(async () => {
+      actCount++;
+      if (actCount === 1) throw new Error("Element not found: button");
+      return { success: true };
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).observe = vi.fn().mockResolvedValue([
+      { selector: "button.new-submit", description: "New submit" },
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).extract = vi.fn().mockResolvedValue({
+      confidence: 0.95,
+      reasoning: "Button renamed",
+    });
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const client = createMockClient();
+    await executeStagehandTests(client, {
+      ...BASE_WORK,
+      heal_confidence_threshold: 0.8,
+      tests: [
+        {
+          _id: "test-record",
+          name: "Record test",
+          execution_type: "stagehand" as const,
+          steps: [{ instruction: "Click submit" }],
+          playwright_code: "",
+        },
+      ],
+      run_result_ids: [{ _id: "result-record", test_id: "test-record" }],
+    }, log);
+
+    expect(client.recordHealingHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        test_id: "test-record",
+        step_index: 0,
+        original_instruction: "Click submit",
+        healed_selector: "button.new-submit",
+        confidence: 0.95,
+        reason: "Button renamed",
+      }),
+    );
+  });
+
+  it("does not call recordHealingHistory for passed steps", async () => {
+    const { stagehand } = createLearnedMockStagehand({
+      observeResults: [],
+    });
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const client = createMockClient();
+    await executeStagehandTests(client, BASE_WORK, log);
+
+    expect(client.recordHealingHistory).not.toHaveBeenCalled();
+  });
+
+  it("does not call recordHealingHistory for failed steps without heal", async () => {
+    const { stagehand } = createLearnedMockStagehand({
+      observeResults: [],
+    });
+
+    let actCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).act = vi.fn().mockImplementation(async () => {
+      actCount++;
+      if (actCount === 1) throw new Error("Element not found: button");
+      return { success: true };
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).observe = vi.fn().mockResolvedValue([]);
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const client = createMockClient();
+    await executeStagehandTests(client, {
+      ...BASE_WORK,
+      heal_confidence_threshold: 0.8,
+      tests: [
+        {
+          _id: "test-fail-noheal",
+          name: "Fail no heal",
+          execution_type: "stagehand" as const,
+          steps: [{ instruction: "Click submit" }],
+          playwright_code: "",
+        },
+      ],
+      run_result_ids: [{ _id: "result-fail", test_id: "test-fail-noheal" }],
+    }, log);
+
+    expect(client.recordHealingHistory).not.toHaveBeenCalled();
+  });
+
+  it("healing history recording failure does not break test execution", async () => {
+    const { stagehand } = createLearnedMockStagehand({
+      observeResults: [],
+    });
+
+    let actCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).act = vi.fn().mockImplementation(async () => {
+      actCount++;
+      if (actCount === 1) throw new Error("Element not found: button");
+      return { success: true };
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).observe = vi.fn().mockResolvedValue([
+      { selector: "button.fix", description: "Fixed" },
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stagehand as any).extract = vi.fn().mockResolvedValue({
+      confidence: 0.9,
+      reasoning: "Fixed",
+    });
+
+    const { initStagehand } = await import("../src/stagehand");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(initStagehand).mockResolvedValueOnce(stagehand as any);
+
+    const client = createMockClient({
+      recordHealingHistory: vi.fn().mockRejectedValue(new Error("Network error")),
+    });
+
+    await executeStagehandTests(client, {
+      ...BASE_WORK,
+      heal_confidence_threshold: 0.8,
+      tests: [
+        {
+          _id: "test-recfail",
+          name: "Record fail test",
+          execution_type: "stagehand" as const,
+          steps: [
+            { instruction: "Click submit" },
+            { instruction: "Verify result" },
+          ],
+          playwright_code: "",
+        },
+      ],
+      run_result_ids: [{ _id: "result-recfail", test_id: "test-recfail" }],
+    }, log);
+
+    expect(client.writeRunResult).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "passed" }),
+    );
+  });
+});
+
+describe("cached login flows", () => {
+  it("creates per-project cache directory and passes it to initStagehand", async () => {
+    const mkdirSpy = vi.spyOn(fs, "mkdir").mockResolvedValue(undefined);
+    const client = createMockClient();
+
+    await executeStagehandTests(client, BASE_WORK, log);
+
+    expect(mkdirSpy).toHaveBeenCalledWith(
+      path.join(".stagehand-cache", "proj-1"),
+      { recursive: true },
+    );
+
+    mkdirSpy.mockRestore();
+  });
+
+  it("uses different cache dirs for different projects", async () => {
+    const mkdirSpy = vi.spyOn(fs, "mkdir").mockResolvedValue(undefined);
+    const client = createMockClient();
+
+    const work2 = { ...BASE_WORK, project_id: "proj-different" };
+    await executeStagehandTests(client, work2, log);
+
+    expect(mkdirSpy).toHaveBeenCalledWith(
+      path.join(".stagehand-cache", "proj-different"),
+      { recursive: true },
+    );
+
+    mkdirSpy.mockRestore();
+  });
+
+  it("logs cache dir creation", async () => {
+    vi.spyOn(fs, "mkdir").mockResolvedValue(undefined);
+    const client = createMockClient();
+
+    await executeStagehandTests(client, BASE_WORK, log);
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("cache dir ready at"),
+    );
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(path.join(".stagehand-cache", "proj-1")),
+    );
   });
 });

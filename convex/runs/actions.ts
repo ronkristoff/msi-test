@@ -180,3 +180,22 @@ Error: ${result.error_message ?? "See step errors above"}`;
   },
 });
 
+export const runnerRecordHealingHistory = action({
+  args: {
+    runner_secret: v.string(),
+    workspace_id: v.id("workspaces"),
+    test_id: v.id("tests"),
+    step_index: v.number(),
+    original_instruction: v.string(),
+    healed_selector: v.string(),
+    healed_description: v.optional(v.string()),
+    confidence: v.number(),
+    reason: v.optional(v.string()),
+    run_id: v.optional(v.id("runs")),
+  },
+  handler: async (ctx, args) => {
+    validateRunnerSecret(args.runner_secret);
+    await ctx.runMutation(internal.runs.internal.recordHealingHistory, stripSecret(args));
+  },
+});
+

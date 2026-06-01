@@ -39,6 +39,8 @@ export interface TestStep {
   instruction: string;
   assertion_code?: string;
   expected_outcome?: string;
+  learned_selector?: string;
+  learned_description?: string;
 }
 
 export interface RunTestItem {

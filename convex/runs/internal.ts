@@ -286,3 +286,44 @@ export const storeAiInsight = internalMutation({
     });
   },
 });
+
+export const recordHealingHistory = internalMutation({
+  args: {
+    workspace_id: v.id("workspaces"),
+    test_id: v.id("tests"),
+    step_index: v.number(),
+    original_instruction: v.string(),
+    healed_selector: v.string(),
+    healed_description: v.optional(v.string()),
+    confidence: v.number(),
+    reason: v.optional(v.string()),
+    run_id: v.optional(v.id("runs")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("healing_history", {
+      workspace_id: args.workspace_id,
+      test_id: args.test_id,
+      step_index: args.step_index,
+      original_instruction: args.original_instruction,
+      healed_selector: args.healed_selector,
+      healed_description: args.healed_description,
+      confidence: args.confidence,
+      reason: args.reason,
+      run_id: args.run_id,
+    });
+
+    const test = await ctx.db.get(args.test_id);
+    if (!test || !test.steps || args.step_index >= test.steps.length) return;
+
+    const steps = test.steps.map((step, i) =>
+      i === args.step_index
+        ? { ...step, learned_selector: args.healed_selector, learned_description: args.healed_description }
+        : step,
+    );
+
+    await ctx.db.patch(args.test_id, {
+      steps,
+      last_healed_at: Date.now(),
+    });
+  },
+});

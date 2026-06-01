@@ -63,6 +63,8 @@ export const testStepValidator = v.object({
   instruction: v.string(),
   assertion_code: v.optional(v.string()),
   expected_outcome: v.optional(v.string()),
+  learned_selector: v.optional(v.string()),
+  learned_description: v.optional(v.string()),
 });
 
 export const discoveredFlowValidator = v.object({

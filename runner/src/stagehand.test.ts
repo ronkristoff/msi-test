@@ -94,4 +94,30 @@ describe("initStagehand", () => {
       expect.stringContaining("model=gpt-4o-mini"),
     );
   });
+
+  it("passes cacheDir to Stagehand config", async () => {
+    await initStagehand(BASE_CONFIG, log, "/tmp/test-cache/proj-1");
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("cacheDir=/tmp/test-cache/proj-1"),
+    );
+  });
+
+  it("omits cacheDir log when not provided", async () => {
+    await initStagehand(BASE_CONFIG, log);
+    expect(log).not.toHaveBeenCalledWith(
+      expect.stringContaining("cacheDir="),
+    );
+  });
+});
+
+describe("createStagehandConfig with cacheDir", () => {
+  it("includes cacheDir when provided", () => {
+    const config = createStagehandConfig(BASE_CONFIG, "/tmp/cache/proj-1");
+    expect(config.cacheDir).toBe("/tmp/cache/proj-1");
+  });
+
+  it("sets cacheDir to undefined when not provided", () => {
+    const config = createStagehandConfig(BASE_CONFIG);
+    expect(config.cacheDir).toBeUndefined();
+  });
 });

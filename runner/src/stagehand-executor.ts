@@ -1,10 +1,13 @@
 import { z } from "zod";
+import fs from "fs/promises";
+import path from "path";
 import { RunnerConvexClient } from "./convex-client";
 import { initStagehand, type StagehandInstance } from "./stagehand";
 import type { AiConfig } from "../../convex/ai/model";
 import type { RunWorkItem, RunTestItem, TestStep } from "./types";
 
 const DEFAULT_HEAL_CONFIDENCE_THRESHOLD = 0.8;
+const DEFAULT_CACHE_BASE_PATH = ".stagehand-cache";
 
 interface StepResult {
   status: "passed" | "failed" | "healed";
@@ -13,6 +16,8 @@ interface StepResult {
   heal_reason?: string;
   heal_confidence?: number;
   before_screenshot_storage_id?: string;
+  learned_selector?: string;
+  learned_description?: string;
 }
 
 interface TestResult {
@@ -23,9 +28,22 @@ interface TestResult {
 }
 
 type HealResult =
-  | { outcome: "healed"; reason: string; confidence: number; afterScreenshotId: string | undefined }
+  | { outcome: "healed"; reason: string; confidence: number; afterScreenshotId: string | undefined; selector: string; description?: string }
   | { outcome: "no_candidates" }
   | { outcome: "below_threshold"; candidateCount: number; bestConfidence: number };
+
+interface StepContext {
+  stagehand: StagehandInstance;
+  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>;
+  client: RunnerConvexClient;
+  workspaceId: string;
+  testId: string;
+  runResultId: string;
+  runId: string;
+  testData: Record<string, string> | undefined;
+  threshold: number;
+  log: (msg: string) => void;
+}
 
 const NAVIGATION_TIMEOUT_MS = 30_000;
 const STEP_TIMEOUT_MS = 60_000;
@@ -75,8 +93,12 @@ export async function executeStagehandTests(
     log(`Run ${work.run_id}: fetching AI config for workspace ${work.workspace_id}`);
     const aiConfig: AiConfig = await client.getWorkspaceAiConfig(work.workspace_id);
 
+    const cacheDir = path.join(DEFAULT_CACHE_BASE_PATH, work.project_id);
+    await fs.mkdir(cacheDir, { recursive: true });
+    log(`Run ${work.run_id}: cache dir ready at ${cacheDir}`);
+
     log(`Run ${work.run_id}: initializing Stagehand`);
-    stagehand = await initStagehand(aiConfig, log);
+    stagehand = await initStagehand(aiConfig, log, cacheDir);
 
     const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
 
@@ -91,8 +113,21 @@ export async function executeStagehandTests(
         continue;
       }
 
+      const ctx: StepContext = {
+        stagehand,
+        page,
+        client,
+        workspaceId: work.workspace_id,
+        testId: test._id,
+        runResultId: resultEntry._id,
+        runId: work.run_id,
+        testData: work.test_data,
+        threshold: work.heal_confidence_threshold ?? DEFAULT_HEAL_CONFIDENCE_THRESHOLD,
+        log,
+      };
+
       log(`Run ${work.run_id}: executing Stagehand test "${test.name}" (${test.steps!.length} steps)`);
-      const result = await executeTest(stagehand, page, test, client, work.workspace_id, resultEntry._id, work.test_data, work.heal_confidence_threshold, log);
+      const result = await executeTest(ctx, test);
 
       await client.writeRunResult({
         run_result_id: resultEntry._id,
@@ -151,40 +186,52 @@ async function performLogin(
   }
 }
 
-async function executeTest(
-  stagehand: StagehandInstance,
-  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>,
-  test: RunTestItem,
-  client: RunnerConvexClient,
-  workspaceId: string,
-  runResultId: string,
-  testData: Record<string, string> | undefined,
-  healConfidenceThreshold: number | undefined,
-  log: (msg: string) => void,
-): Promise<TestResult> {
+async function recordHeal(
+  ctx: StepContext,
+  stepIndex: number,
+  step: TestStep,
+  stepResult: StepResult,
+): Promise<void> {
+  try {
+    await ctx.client.recordHealingHistory({
+      workspace_id: ctx.workspaceId,
+      test_id: ctx.testId,
+      step_index: stepIndex,
+      original_instruction: step.instruction,
+      healed_selector: stepResult.learned_selector ?? "",
+      healed_description: stepResult.learned_description,
+      confidence: stepResult.heal_confidence!,
+      reason: stepResult.heal_reason,
+      run_id: ctx.runId,
+    });
+  } catch (err) {
+    ctx.log(`  Failed to record healing history: ${err}`);
+  }
+}
+
+async function executeTest(ctx: StepContext, test: RunTestItem): Promise<TestResult> {
   const startTime = Date.now();
   const steps = test.steps!;
   const screenshotIds: string[] = [];
   let testStatus: "passed" | "failed" = "passed";
   let errorMessage: string | undefined;
-  const threshold = healConfidenceThreshold ?? DEFAULT_HEAL_CONFIDENCE_THRESHOLD;
 
   for (let i = 0; i < steps.length; i++) {
     const stepStart = Date.now();
     const step = steps[i];
 
-    log(`  Step ${i + 1}/${steps.length}: ${step.instruction}`);
+    ctx.log(`  Step ${i + 1}/${steps.length}: ${step.instruction}`);
 
-    const stepResult = await executeStep(stagehand, page, step, testData, client, threshold, log);
+    const stepResult = await executeStep(ctx, step);
     const durationMs = Date.now() - stepStart;
 
     if (stepResult.screenshot_storage_id) {
       screenshotIds.push(stepResult.screenshot_storage_id);
     }
 
-    await client.writeStepResult({
-      workspace_id: workspaceId,
-      run_result_id: runResultId,
+    await ctx.client.writeStepResult({
+      workspace_id: ctx.workspaceId,
+      run_result_id: ctx.runResultId,
       step_number: i + 1,
       command: step.instruction,
       status: stepResult.status,
@@ -199,14 +246,15 @@ async function executeTest(
     if (stepResult.status === "failed") {
       testStatus = "failed";
       errorMessage = stepResult.error_message;
-      log(`  Step ${i + 1} FAILED: ${stepResult.error_message}`);
+      ctx.log(`  Step ${i + 1} FAILED: ${stepResult.error_message}`);
       break;
     }
 
     if (stepResult.status === "healed") {
-      log(`  Step ${i + 1} HEALED (${(stepResult.heal_confidence ?? 0) * 100}% confidence): ${stepResult.heal_reason}`);
+      await recordHeal(ctx, i, step, stepResult);
+      ctx.log(`  Step ${i + 1} HEALED (${(stepResult.heal_confidence ?? 0) * 100}% confidence): ${stepResult.heal_reason}`);
     } else {
-      log(`  Step ${i + 1} passed (${durationMs}ms)`);
+      ctx.log(`  Step ${i + 1} passed (${durationMs}ms)`);
     }
   }
 
@@ -218,61 +266,57 @@ async function executeTest(
   };
 }
 
-async function executeStep(
-  stagehand: StagehandInstance,
-  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>,
-  step: TestStep,
-  testData: Record<string, string> | undefined,
-  client: RunnerConvexClient,
-  healConfidenceThreshold: number,
-  log: (msg: string) => void,
-): Promise<StepResult> {
+async function executeStep(ctx: StepContext, step: TestStep): Promise<StepResult> {
+  if (step.learned_selector) {
+    ctx.log(`  Trying learned selector: "${step.learned_selector}"`);
+    try {
+      const variables = ctx.testData ? { ...ctx.testData } : undefined;
+      await ctx.stagehand.act(
+        { selector: step.learned_selector, description: step.learned_description ?? step.instruction },
+        { variables, timeout: STEP_TIMEOUT_MS },
+      );
+      if (step.assertion_code) await executeAssertion(ctx.page, step.assertion_code);
+      ctx.log(`  Learned selector succeeded`);
+      return { status: "passed", screenshot_storage_id: await captureScreenshot(ctx.page, ctx.client, ctx.log) };
+    } catch (err) {
+      ctx.log(`  Learned selector failed: ${err instanceof Error ? err.message : String(err)}, falling back`);
+    }
+  }
+
   try {
-    return await runStep(stagehand, page, step, testData, client, log);
+    return await runStep(ctx, step);
   } catch (err) {
-    return await handleStepFailure(err, stagehand, page, step, testData, client, healConfidenceThreshold, log);
+    return await handleStepFailure(err, ctx, step);
   }
 }
 
-async function runStep(
-  stagehand: StagehandInstance,
-  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>,
-  step: TestStep,
-  testData: Record<string, string> | undefined,
-  client: RunnerConvexClient,
-  log: (msg: string) => void,
-): Promise<StepResult> {
-  const variables = testData ? { ...testData } : undefined;
+async function runStep(ctx: StepContext, step: TestStep): Promise<StepResult> {
+  const variables = ctx.testData ? { ...ctx.testData } : undefined;
 
-  await stagehand.act(step.instruction, {
+  await ctx.stagehand.act(step.instruction, {
     variables,
     timeout: STEP_TIMEOUT_MS,
   });
 
   if (step.assertion_code) {
-    await executeAssertion(page, step.assertion_code);
+    await executeAssertion(ctx.page, step.assertion_code);
   }
 
   return {
     status: "passed",
-    screenshot_storage_id: await captureScreenshot(page, client, log),
+    screenshot_storage_id: await captureScreenshot(ctx.page, ctx.client, ctx.log),
   };
 }
 
 async function handleStepFailure(
   err: unknown,
-  stagehand: StagehandInstance,
-  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>,
+  ctx: StepContext,
   step: TestStep,
-  testData: Record<string, string> | undefined,
-  client: RunnerConvexClient,
-  threshold: number,
-  log: (msg: string) => void,
 ): Promise<StepResult> {
   const errMsg = err instanceof Error ? err.message : String(err);
 
-  const beforeScreenshotId = await captureScreenshot(page, client, log).catch((e) => {
-    log(`  Failed to capture before-screenshot on error: ${e}`);
+  const beforeScreenshotId = await captureScreenshot(ctx.page, ctx.client, ctx.log).catch((e) => {
+    ctx.log(`  Failed to capture before-screenshot on error: ${e}`);
     return undefined;
   });
 
@@ -280,7 +324,7 @@ async function handleStepFailure(
     return { status: "failed", error_message: errMsg, screenshot_storage_id: beforeScreenshotId };
   }
 
-  const healResult = await attemptHeal(stagehand, page, step, testData, threshold, client, log);
+  const healResult = await attemptHeal(ctx, step);
 
   switch (healResult.outcome) {
     case "healed":
@@ -290,11 +334,13 @@ async function handleStepFailure(
         before_screenshot_storage_id: beforeScreenshotId,
         heal_reason: healResult.reason,
         heal_confidence: healResult.confidence,
+        learned_selector: healResult.selector,
+        learned_description: healResult.description,
       };
     case "below_threshold":
       return {
         status: "failed",
-        error_message: `${errMsg}\n\nHeal candidates found but confidence too low (${healResult.candidateCount} candidates, best: ${healResult.bestConfidence * 100}%, threshold: ${threshold * 100}%)`,
+        error_message: `${errMsg}\n\nHeal candidates found but confidence too low (${healResult.candidateCount} candidates, best: ${healResult.bestConfidence * 100}%, threshold: ${ctx.threshold * 100}%)`,
         screenshot_storage_id: beforeScreenshotId,
       };
     case "no_candidates":
@@ -302,57 +348,49 @@ async function handleStepFailure(
   }
 }
 
-async function attemptHeal(
-  stagehand: StagehandInstance,
-  page: NonNullable<ReturnType<StagehandInstance["context"]["activePage"]>>,
-  step: TestStep,
-  testData: Record<string, string> | undefined,
-  threshold: number,
-  client: RunnerConvexClient,
-  log: (msg: string) => void,
-): Promise<HealResult> {
+async function attemptHeal(ctx: StepContext, step: TestStep): Promise<HealResult> {
   try {
-    log(`  Attempting heal: observing page for "${step.instruction}"`);
-    const candidates = await stagehand.observe(step.instruction, {
+    ctx.log(`  Attempting heal: observing page for "${step.instruction}"`);
+    const candidates = await ctx.stagehand.observe(step.instruction, {
       timeout: STEP_TIMEOUT_MS,
     });
 
     if (!candidates || candidates.length === 0) {
-      log(`  Heal: no candidates found`);
+      ctx.log(`  Heal: no candidates found`);
       return { outcome: "no_candidates" };
     }
 
-    log(`  Heal: ${candidates.length} candidate(s) found, evaluating confidence`);
+    ctx.log(`  Heal: ${candidates.length} candidate(s) found, evaluating confidence`);
 
     const topCandidate = candidates[0];
     const { confidence, reasoning } = await evaluateHealConfidence(
-      stagehand,
+      ctx.stagehand,
       step.instruction,
       topCandidate.selector,
       topCandidate.description,
     );
 
-    log(`  Heal: confidence=${confidence}, threshold=${threshold}`);
+    ctx.log(`  Heal: confidence=${confidence}, threshold=${ctx.threshold}`);
 
-    if (confidence < threshold) {
+    if (confidence < ctx.threshold) {
       return { outcome: "below_threshold", candidateCount: candidates.length, bestConfidence: confidence };
     }
 
-    log(`  Heal: confidence above threshold, executing with candidate selector "${topCandidate.selector}"`);
-    await stagehand.act(topCandidate, {
-      variables: testData ? { ...testData } : undefined,
+    ctx.log(`  Heal: confidence above threshold, executing with candidate selector "${topCandidate.selector}"`);
+    await ctx.stagehand.act(topCandidate, {
+      variables: ctx.testData ? { ...ctx.testData } : undefined,
       timeout: STEP_TIMEOUT_MS,
     });
 
     if (step.assertion_code) {
-      await executeAssertion(page, step.assertion_code);
+      await executeAssertion(ctx.page, step.assertion_code);
     }
 
-    const afterScreenshotId = await captureScreenshot(page, client, log);
+    const afterScreenshotId = await captureScreenshot(ctx.page, ctx.client, ctx.log);
 
-    return { outcome: "healed", reason: reasoning, confidence, afterScreenshotId };
+    return { outcome: "healed", reason: reasoning, confidence, afterScreenshotId, selector: topCandidate.selector, description: topCandidate.description };
   } catch (healErr) {
-    log(`  Heal attempt failed: ${healErr}`);
+    ctx.log(`  Heal attempt failed: ${healErr}`);
     return { outcome: "no_candidates" };
   }
 }

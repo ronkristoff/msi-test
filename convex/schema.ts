@@ -284,4 +284,18 @@ export default defineSchema({
     .index("by_regression_suite_id", ["regression_suite_id"])
     .index("by_member_suite_id", ["member_suite_id"])
     .index("by_member_test_id", ["member_test_id"]),
+
+  healing_history: defineTable({
+    workspace_id: v.id("workspaces"),
+    test_id: v.id("tests"),
+    step_index: v.number(),
+    original_instruction: v.string(),
+    healed_selector: v.string(),
+    healed_description: v.optional(v.string()),
+    confidence: v.number(),
+    reason: v.optional(v.string()),
+    run_id: v.optional(v.id("runs")),
+  })
+    .index("by_test_id", ["test_id"])
+    .index("by_workspace_id", ["workspace_id"]),
 });

@@ -18,6 +18,7 @@ import { ScreenshotViewer } from "@/components/RunDetail/ScreenshotViewer";
 import { ArtifactViewer } from "@/components/RunDetail/ArtifactViewer";
 import { ConsoleOutput } from "@/components/RunDetail/ConsoleOutput";
 import { SameFailureHistory } from "@/components/RunDetail/SameFailureHistory";
+import { HealingHistoryTimeline } from "@/components/RunDetail/HealingHistoryTimeline";
 import { TestMetadata } from "@/components/RunDetail/TestMetadata";
 import { hasAiConfig } from "@/lib/ai-presets";
 import { useErrorLogger } from "@/lib/error-logger";
@@ -433,6 +434,10 @@ export default function RunDetailPage() {
                     />
                   </Card>
                 </div>
+
+                <Card>
+                  <HealingHistoryTimeline testId={selectedResult.test_id} />
+                </Card>
               </div>
             )}
           </div>

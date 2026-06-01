@@ -105,7 +105,7 @@ export const getPendingWork = query({
           name: string;
           playwright_code: string;
           execution_type: string | null;
-          steps: Array<{ instruction: string; assertion_code?: string; expected_outcome?: string }> | null;
+          steps: Array<{ instruction: string; assertion_code?: string; expected_outcome?: string; learned_selector?: string; learned_description?: string }> | null;
         }> = (
           await Promise.all(
             runResults.map(async (rr) => {
@@ -486,5 +486,31 @@ export const getRunForAnalysis = internalQuery({
         steps: r.steps,
       })),
     };
+  },
+});
+
+export const getHealingHistory = query({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const result = await getOptionalOwnedEntity(ctx, args.test_id, "tests");
+    if (!result) return [];
+
+    const history = await ctx.db
+      .query("healing_history")
+      .withIndex("by_test_id", (q) => q.eq("test_id", args.test_id))
+      .order("desc")
+      .collect();
+
+    return history.map((h) => ({
+      _id: h._id,
+      _creationTime: h._creationTime,
+      step_index: h.step_index,
+      original_instruction: h.original_instruction,
+      healed_selector: h.healed_selector,
+      healed_description: h.healed_description ?? null,
+      confidence: h.confidence,
+      reason: h.reason ?? null,
+      run_id: h.run_id ?? null,
+    }));
   },
 });

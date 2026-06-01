@@ -199,4 +199,29 @@ export class RunnerConvexClient {
       workspace_id: workspaceId as Id<"workspaces">,
     });
   }
+
+  async recordHealingHistory(args: {
+    workspace_id: string;
+    test_id: string;
+    step_index: number;
+    original_instruction: string;
+    healed_selector: string;
+    healed_description?: string;
+    confidence: number;
+    reason?: string;
+    run_id?: string;
+  }): Promise<void> {
+    await this.client.action(api.runs.actions.runnerRecordHealingHistory, {
+      runner_secret: this.secret,
+      workspace_id: args.workspace_id as Id<"workspaces">,
+      test_id: args.test_id as Id<"tests">,
+      step_index: args.step_index,
+      original_instruction: args.original_instruction,
+      healed_selector: args.healed_selector,
+      healed_description: args.healed_description,
+      confidence: args.confidence,
+      reason: args.reason,
+      run_id: args.run_id as Id<"runs"> | undefined,
+    });
+  }
 }

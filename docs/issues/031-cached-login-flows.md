@@ -1,7 +1,7 @@
 # 031 — Cached login flows
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 **Blocked by**: 028
 
 ## What to build
@@ -10,13 +10,13 @@ Enable Stagehand's `cacheDir` for the Runner. The first time Stagehand logs into
 
 ## Acceptance criteria
 
-- [ ] Stagehand initialized with `cacheDir` pointing to a per-project cache directory
-- [ ] First login for a project: LLM-powered, cached to disk
-- [ ] Second+ login for same project: replayed from cache, no LLM tokens consumed
-- [ ] Login page change: cache miss → fresh LLM call → re-cached
-- [ ] Cache directory created under a configurable path (default: `.stagehand-cache/`)
-- [ ] Cache keyed by project ID so different apps don't share login caches
-- [ ] Runner tests: verify cache is created on first run, used on second run
+- [x] Stagehand initialized with `cacheDir` pointing to a per-project cache directory
+- [x] First login for a project: LLM-powered, cached to disk
+- [x] Second+ login for same project: replayed from cache, no LLM tokens consumed
+- [x] Login page change: cache miss → fresh LLM call → re-cached
+- [x] Cache directory created under a configurable path (default: `.stagehand-cache/`)
+- [x] Cache keyed by project ID so different apps don't share login caches
+- [x] Runner tests: verify cache is created on first run, used on second run
 
 ## Blocked by
 
