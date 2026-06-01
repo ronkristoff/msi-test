@@ -100,7 +100,7 @@ function SettingsForm({
           endpoint_url: data.endpoint_url,
           api_key: resolvedKey,
           model_name: data.model_name,
-          stagehand_model_name: data.stagehand_model_name || undefined,
+          stagehand_model_name: data.stagehand_model_name,
         },
       });
       aiForm.reset({ ...data, api_key: "" });

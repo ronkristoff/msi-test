@@ -77,7 +77,7 @@ export const updateWorkspace = mutation({
         endpoint_url: args.ai_config.endpoint_url,
         api_key: resolvedKey,
         model_name: args.ai_config.model_name,
-        stagehand_model_name: args.ai_config.stagehand_model_name ?? workspace.ai_config.stagehand_model_name,
+        stagehand_model_name: args.ai_config.stagehand_model_name,
       };
     }
     if (args.heal_confidence_threshold !== undefined) {

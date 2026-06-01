@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { PRESETS, findPresetByUrl } from "@/lib/ai-presets";
 import type { AIConfigFormValues } from "@/lib/schemas";
@@ -18,6 +19,8 @@ export function AIConfigForm({
   const { register, setValue, watch, formState: { errors } } = useFormContext<AIConfigFormValues>();
   const endpoint = watch("endpoint_url");
   const modelName = watch("model_name");
+  const stagehandModelName = watch("stagehand_model_name");
+  const [browserAiOpen, setBrowserAiOpen] = useState(!!stagehandModelName);
 
   const activePreset = findPresetByUrl(endpoint);
 
@@ -26,6 +29,7 @@ export function AIConfigForm({
     if (p) {
       setValue("endpoint_url", p.url, { shouldValidate: true });
       setValue("model_name", p.model, { shouldValidate: true });
+      setValue("stagehand_model_name", p.fastModel);
     }
   };
 
@@ -35,6 +39,7 @@ export function AIConfigForm({
     }`;
 
   const presetModels = activePreset ? PRESETS[activePreset].models : [];
+  const fastModel = activePreset ? PRESETS[activePreset].fastModel : null;
 
   return (
     <>
@@ -138,20 +143,73 @@ export function AIConfigForm({
         )}
       </div>
 
-      <div className="mb-5">
-        <label className="block font-mono text-[11px] uppercase tracking-wider text-[var(--muted)] mb-2">
-          Stagehand Model{" "}
-          <span className="text-[var(--fg-2)] normal-case tracking-normal">optional</span>
-        </label>
-        <input
-          type="text"
-          placeholder="Defaults to primary model"
-          className={`w-full max-w-[480px] ${inputClass(false)}`}
-          {...register("stagehand_model_name")}
-        />
-        <p className="font-mono text-xs text-[var(--muted)] mt-1">
-          Separate model for browser reasoning. Uses a faster/cheaper model by default.
-        </p>
+      <div className="border-t border-[var(--border-soft)] pt-4 mt-4">
+        <button
+          type="button"
+          onClick={() => setBrowserAiOpen((v) => !v)}
+          className="flex items-center gap-2 w-full text-left cursor-pointer group"
+        >
+          <svg
+            className={`w-4 h-4 text-[var(--muted)] transition-transform duration-150 ${browserAiOpen ? "rotate-90" : ""}`}
+            viewBox="0 0 16 16"
+            fill="currentColor"
+          >
+            <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-sm font-semibold text-[var(--fg)] group-hover:text-[var(--accent)] transition-colors">
+            Browser AI
+          </span>
+          <span className="text-[11px] text-[var(--muted)] ml-1">optional</span>
+        </button>
+
+        {browserAiOpen && (
+          <div className="mt-3 ml-6">
+            <p className="text-xs text-[var(--muted)] mb-3">
+              Separate model for browser reasoning (Stagehand). Defaults to your primary model if not set.
+            </p>
+
+            {showModelDropdown && activePreset ? (
+              <div className="flex items-center gap-3 p-3 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg)] mb-3">
+                <label className="font-mono text-xs text-[var(--muted)] uppercase tracking-wider whitespace-nowrap" htmlFor="stagehand-model">
+                  Model
+                </label>
+                <select
+                  id="stagehand-model"
+                  value={stagehandModelName || ""}
+                  className="flex-1 border-none bg-transparent font-inherit text-[var(--fg)] outline-none cursor-pointer"
+                  {...register("stagehand_model_name")}
+                >
+                  <option value="">Use primary model</option>
+                  {presetModels.map((m) => (
+                    <option key={m} value={m}>{m}{m === fastModel ? " (recommended)" : ""}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <label className="block font-mono text-[11px] uppercase tracking-wider text-[var(--muted)] mb-2">
+                  Stagehand Model
+                </label>
+                <input
+                  type="text"
+                  placeholder={fastModel ? `e.g. ${fastModel}` : "Defaults to primary model"}
+                  className={`w-full max-w-[480px] ${inputClass(false)}`}
+                  {...register("stagehand_model_name")}
+                />
+              </div>
+            )}
+
+            {fastModel && (
+              <button
+                type="button"
+                onClick={() => setValue("stagehand_model_name", fastModel)}
+                className="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+              >
+                Use {fastModel} (fast default for {PRESETS[activePreset]?.label})
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

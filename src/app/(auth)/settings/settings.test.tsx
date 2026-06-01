@@ -149,7 +149,7 @@ describe("SettingsPage", () => {
         endpoint_url: "https://api.openai.com/v1",
         api_key: "test-key-123",
         model_name: "gpt-4o",
-        stagehand_model_name: undefined,
+        stagehand_model_name: "",
       },
     });
   });
