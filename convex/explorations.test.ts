@@ -244,4 +244,121 @@ describe("explorations internal mutations", () => {
     expect(result!.captured_pages).toHaveLength(1);
     expect(result!.captured_pages[0].title).toBe("Home");
   });
+
+  it("completeExplorationCapture stores pages with structured data", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId);
+
+    const capturedPages = [
+      {
+        url: "https://example.com",
+        title: "Home",
+        structure_text: "Headings:\n  h1: Welcome",
+        semantic_description: "Home page: Welcome to our application",
+        interactive_elements: [
+          { selector: "button.submit", description: "Submit button", element_type: "button" },
+          { selector: "input.email", description: "Email input", element_type: "input" },
+        ],
+      },
+    ];
+
+    await t.mutation(internal.explorations.internal.completeExplorationCapture, {
+      exploration_id: explorationId,
+      captured_pages: capturedPages,
+    });
+
+    const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
+    expect(exploration!.captured_pages).toHaveLength(1);
+    expect(exploration!.captured_pages![0].semantic_description).toBe("Home page: Welcome to our application");
+    expect(exploration!.captured_pages![0].interactive_elements).toHaveLength(2);
+    expect(exploration!.captured_pages![0].interactive_elements![0].element_type).toBe("button");
+  });
+
+  it("completeExplorationCapture stores discovered_flows", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId);
+
+    const capturedPages = [
+      { url: "https://example.com", title: "Home", structure_text: "Home" },
+      { url: "https://example.com/about", title: "About", structure_text: "About" },
+    ];
+
+    const discoveredFlows = [
+      {
+        name: "Home → About",
+        steps: ["Home", "About"],
+        pages_involved: [0, 1],
+        complexity: "low" as const,
+      },
+    ];
+
+    await t.mutation(internal.explorations.internal.completeExplorationCapture, {
+      exploration_id: explorationId,
+      captured_pages: capturedPages,
+      discovered_flows: discoveredFlows,
+    });
+
+    const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
+    expect(exploration!.discovered_flows).toHaveLength(1);
+    expect(exploration!.discovered_flows![0].name).toBe("Home → About");
+    expect(exploration!.discovered_flows![0].complexity).toBe("low");
+  });
+
+  it("completeExplorationCapture works without discovered_flows (backward compat)", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId);
+
+    const capturedPages = [
+      { url: "https://example.com", title: "Home", structure_text: "Home" },
+    ];
+
+    await t.mutation(internal.explorations.internal.completeExplorationCapture, {
+      exploration_id: explorationId,
+      captured_pages: capturedPages,
+    });
+
+    const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
+    expect(exploration!.discovered_flows).toBeUndefined();
+    expect(exploration!.captured_pages![0].semantic_description).toBeUndefined();
+  });
+
+  it("getExplorationForAnalysis returns discovered_flows", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    const explorationId = await t.run(async (ctx) => {
+      return ctx.db.insert("explorations", {
+        workspace_id: workspaceId,
+        project_id: projectId,
+        url: "https://example.com",
+        status: "captured",
+        captured_pages: [
+          { url: "https://example.com", title: "Home", structure_text: "Home" },
+        ],
+        discovered_flows: [
+          {
+            name: "Home Flow",
+            steps: ["Home"],
+            pages_involved: [0],
+            complexity: "low",
+          },
+        ],
+      });
+    });
+
+    const result = await t.query(internal.explorations.internal.getExplorationForAnalysis, {
+      exploration_id: explorationId,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.discovered_flows).toHaveLength(1);
+    expect(result!.discovered_flows![0].name).toBe("Home Flow");
+  });
 });

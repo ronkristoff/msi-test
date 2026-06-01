@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { v } from "convex/values";
 import { NAME_MIN, NAME_MAX, prependScheme, parseUrlOrNull } from "./constraints";
 
 function validateName(name: string, label: string) {
@@ -42,3 +43,29 @@ export function maskApiKey(apiKey: string): string {
   if (apiKey.length < 7) return "••••••••";
   return apiKey.slice(0, 3) + "••••••••" + apiKey.slice(-4);
 }
+
+export const interactiveElementValidator = v.object({
+  selector: v.string(),
+  description: v.string(),
+  element_type: v.string(),
+});
+
+export const capturedPageValidator = v.object({
+  url: v.string(),
+  title: v.string(),
+  screenshot_storage_id: v.optional(v.id("_storage")),
+  structure_text: v.string(),
+  semantic_description: v.optional(v.string()),
+  interactive_elements: v.optional(v.array(interactiveElementValidator)),
+});
+
+export const discoveredFlowValidator = v.object({
+  name: v.string(),
+  steps: v.array(v.string()),
+  pages_involved: v.array(v.number()),
+  complexity: v.union(
+    v.literal("low"),
+    v.literal("medium"),
+    v.literal("high"),
+  ),
+});

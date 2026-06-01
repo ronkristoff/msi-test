@@ -8,6 +8,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createHealAgent, extractPlaywrightCode, deriveTestName } from "./agents";
 import { classifyAiError } from "./errors";
+import { formatCapturedPagesForPrompt } from "./formatPages";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
 import { getLiveSnapshot, extractTargetUrl, interactAndCapture, extractInteractionsFromTestCode } from "./browserClient";
@@ -81,10 +82,7 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
     if (explorations.length > 0) {
       const latest = explorations[0];
       if (latest.captured_pages && latest.captured_pages.length > 0) {
-        pagesContext = latest.captured_pages
-          .slice(0, 5)
-          .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 2000)}`)
-          .join("\n\n");
+        pagesContext = formatCapturedPagesForPrompt(latest.captured_pages.slice(0, 5), 2000);
       }
     }
 

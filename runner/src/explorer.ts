@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { RunnerConvexClient } from "./convex-client";
 import { initStagehand } from "./stagehand";
-import type { CapturedPage, ExplorationWorkItem } from "./types";
+import { discoverFlows } from "./flowDiscovery";
+import type { CapturedPage, ExplorationWorkItem, InteractiveElement } from "./types";
 
 const MAX_PAGES = 15;
 const HYDRATION_WAIT_MS = 2_000;
@@ -48,6 +49,7 @@ export async function executeExploration(
 
     const capturedPages: CapturedPage[] = [];
     const visited = new Set<string>();
+    const linkGraph = new Map<string, string[]>();
 
     if (work.auth_mode === "form" && work.username && work.password) {
       const loginPage = await handleFormLogin(stagehand, work, client, log);
@@ -94,8 +96,18 @@ export async function executeExploration(
         const result = await visitPage(stagehand, normalized, work.interactive, log);
         if (!result) continue;
 
-        const captured = await capturePage(stagehand, normalized, result.title, result.structureText, client, log);
+        const captured = await capturePage({
+          stagehand,
+          url: normalized,
+          title: result.title,
+          pageText: result.pageText,
+          interactiveElements: result.interactiveElements,
+          client,
+          log,
+        });
         capturedPages.push(captured);
+
+        linkGraph.set(normalized, result.links.map((l) => l.href));
 
         await client.updateExplorationProgress(
           work.exploration_id,
@@ -123,7 +135,12 @@ export async function executeExploration(
 
     log(`Exploration ${work.exploration_id}: captured ${capturedPages.length} pages`);
 
-    await client.completeExploration(work.exploration_id, capturedPages);
+    const discoveredFlows = discoverFlows(
+      capturedPages.map((p) => ({ url: p.url, title: p.title })),
+      linkGraph,
+    );
+
+    await client.completeExploration(work.exploration_id, capturedPages, discoveredFlows);
     log(`Exploration ${work.exploration_id}: completed`);
   } catch (err) {
     log(`Exploration ${work.exploration_id}: error: ${err}`);
@@ -151,7 +168,6 @@ async function handleFormLogin(
 
   const title = await page.title();
   const extraction = await stagehand.extract();
-  const structureText = buildStructureText(loginUrl, title, extraction.pageText);
 
   log(`Exploration ${work.exploration_id}: performing Stagehand act() login at ${loginUrl}`);
   await stagehand.act(
@@ -167,17 +183,36 @@ async function handleFormLogin(
   await sleep(page);
   log(`Exploration ${work.exploration_id}: login act() completed, current URL: ${page.url()}`);
 
-  return capturePage(stagehand, loginUrl, title, structureText, client, log);
+  return capturePage({
+    stagehand,
+    url: loginUrl,
+    title,
+    pageText: extraction.pageText,
+    interactiveElements: [],
+    client,
+    log,
+  });
 }
 
-async function capturePage(
-  stagehand: Stagehand,
-  url: string,
-  title: string,
-  structureText: string,
-  client: RunnerConvexClient,
-  log: (msg: string) => void,
-): Promise<CapturedPage> {
+interface CapturePageArgs {
+  stagehand: Stagehand;
+  url: string;
+  title: string;
+  pageText: string;
+  interactiveElements: InteractiveElement[];
+  client: RunnerConvexClient;
+  log: (msg: string) => void;
+}
+
+async function capturePage({
+  stagehand,
+  url,
+  title,
+  pageText,
+  interactiveElements,
+  client,
+  log,
+}: CapturePageArgs): Promise<CapturedPage> {
   let screenshotStorageId: string | undefined;
   try {
     const page = stagehand.context.activePage();
@@ -189,12 +224,20 @@ async function capturePage(
     log(`  Screenshot failed for ${url}: ${err}`);
   }
 
-  return { url, title, structure_text: structureText, screenshot_storage_id: screenshotStorageId };
+  return {
+    url,
+    title,
+    structure_text: "",
+    screenshot_storage_id: screenshotStorageId,
+    semantic_description: buildSemanticDescription(title, pageText),
+    interactive_elements: interactiveElements.length > 0 ? interactiveElements : undefined,
+  };
 }
 
 interface VisitResult {
   title: string;
-  structureText: string;
+  pageText: string;
+  interactiveElements: InteractiveElement[];
   links: Array<{ text: string; href: string }>;
   interactiveCount: number;
 }
@@ -234,16 +277,10 @@ async function visitPage(
     interactiveCount = await exploreInteractiveElements(stagehand, actions, log);
   }
 
-  const structureText = buildStructureText(
-    url,
-    title,
-    pageTextResult.pageText,
-    actions.map((a) => ({ selector: a.selector, description: a.description })),
-  );
-
   return {
     title,
-    structureText,
+    pageText: pageTextResult.pageText,
+    interactiveElements: buildInteractiveElements(actions),
     links: linksResult.links,
     interactiveCount,
   };
@@ -302,28 +339,37 @@ async function exploreInteractiveElements(
   return explored;
 }
 
-function buildStructureText(
-  url: string,
-  title: string,
-  pageText: string,
-  interactiveElements?: Array<{ selector: string; description: string }>,
-): string {
-  const parts: string[] = [];
-  parts.push(`URL: ${url}`);
-  parts.push(`Title: ${title}`);
-
-  if (pageText) {
-    parts.push(`\nPage Content:\n${pageText}`);
+function buildSemanticDescription(title: string, pageText: string): string {
+  const textSnippet = pageText.slice(0, 300).trim();
+  if (textSnippet) {
+    return `${title}: ${textSnippet}`;
   }
+  return title;
+}
 
-  if (interactiveElements && interactiveElements.length > 0) {
-    parts.push("\nInteractive Elements:");
-    for (const el of interactiveElements) {
-      parts.push(`  [${el.selector}] — ${el.description}`);
-    }
-  }
+function buildInteractiveElements(
+  actions: Array<{ selector: string; description: string }>,
+): InteractiveElement[] {
+  return actions.map((a) => ({
+    selector: a.selector,
+    description: a.description,
+    element_type: inferElementType(a.description),
+  }));
+}
 
-  return parts.join("\n");
+function inferElementType(description: string): string {
+  const lower = description.toLowerCase();
+  if (/\b(button|submit|click|btn)\b/.test(lower)) return "button";
+  if (/\b(input|field|email|password|text)\b/.test(lower)) return "input";
+  if (/\b(link|anchor|navigate)\b/.test(lower)) return "link";
+  if (/\b(dropdown|select|combo)\b/.test(lower)) return "dropdown";
+  if (/\b(checkbox|check)\b/.test(lower)) return "checkbox";
+  if (/\b(radio)\b/.test(lower)) return "radio";
+  if (/\b(toggle|switch)\b/.test(lower)) return "toggle";
+  if (/\b(menu|nav)\b/.test(lower)) return "navigation";
+  if (/\b(tab)\b/.test(lower)) return "tab";
+  if (/\b(search)\b/.test(lower)) return "search";
+  return "interactive";
 }
 
 async function sleep(page: { waitForTimeout?: (ms: number) => Promise<void> }): Promise<void> {

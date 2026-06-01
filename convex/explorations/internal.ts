@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
+import { capturedPageValidator, discoveredFlowValidator } from "../lib/validation";
 
 export const claimExploration = internalMutation({
   args: {
@@ -38,14 +39,8 @@ export const updateExplorationProgress = internalMutation({
 export const completeExplorationCapture = internalMutation({
   args: {
     exploration_id: v.id("explorations"),
-    captured_pages: v.array(
-      v.object({
-        url: v.string(),
-        title: v.string(),
-        screenshot_storage_id: v.optional(v.id("_storage")),
-        structure_text: v.string(),
-      }),
-    ),
+    captured_pages: v.array(capturedPageValidator),
+    discovered_flows: v.optional(v.array(discoveredFlowValidator)),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.exploration_id, {
@@ -53,6 +48,7 @@ export const completeExplorationCapture = internalMutation({
       captured_pages: args.captured_pages,
       pages_captured: args.captured_pages.length,
       progress_message: "Capture complete, starting analysis...",
+      ...(args.discovered_flows !== undefined ? { discovered_flows: args.discovered_flows } : {}),
     });
   },
 });
@@ -125,6 +121,7 @@ export const getExplorationForAnalysis = internalQuery({
       url: exploration.url,
       goal: exploration.goal,
       captured_pages: exploration.captured_pages ?? [],
+      discovered_flows: exploration.discovered_flows,
     };
   },
 });

@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { capturedPageValidator, discoveredFlowValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -244,16 +245,8 @@ export default defineSchema({
     pages_captured: v.optional(v.number()),
     runner_id: v.optional(v.string()),
     interactive: v.optional(v.boolean()),
-    captured_pages: v.optional(
-      v.array(
-        v.object({
-          url: v.string(),
-          title: v.string(),
-          screenshot_storage_id: v.optional(v.id("_storage")),
-          structure_text: v.string(),
-        }),
-      ),
-    ),
+    captured_pages: v.optional(v.array(capturedPageValidator)),
+    discovered_flows: v.optional(v.array(discoveredFlowValidator)),
     proposed_scenarios: v.optional(
       v.array(
         v.object({

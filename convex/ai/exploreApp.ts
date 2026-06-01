@@ -8,6 +8,7 @@ import { createExplorationAnalysisAgent, createTestGenerationAgent, extractMulti
 import { classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext } from "./authContext";
+import { formatCapturedPagesForPrompt } from "./formatPages";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 
@@ -60,12 +61,11 @@ export const analyzeExploration = internalAction({
         title: `Exploration Analysis — ${exploration.url}`,
       });
 
-      const pagesDescription = exploration.captured_pages
-        .map((page, i) => {
-          const linksSummary = page.structure_text.slice(0, 2000);
-          return `--- Page ${i + 1}: ${page.title} (${page.url}) ---\n${linksSummary}`;
-        })
-        .join("\n\n");
+      const pagesDescription = formatCapturedPagesForPrompt(exploration.captured_pages, 2000);
+
+      const flowsDescription = exploration.discovered_flows
+        ?.map((f) => `Flow: ${f.name} (${f.complexity})\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.join(", ")}`)
+        .join("\n\n") ?? "";
 
       const result = await thread.generateText({
         prompt: `Analyze the following web application pages captured from ${exploration.url}.
@@ -74,7 +74,7 @@ Identify the most testable user scenarios. For each scenario provide a name, des
 
 Captured pages:
 ${pagesDescription}
-
+${flowsDescription ? `\nDiscovered navigation flows:\n${flowsDescription}\n` : ""}
 ${exploration.goal ? `User's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
 
 IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
@@ -157,9 +157,7 @@ export const generateExplorationTests = action({
     const authContext = buildAuthPromptContext(project);
     console.log(`[generateExplorationTests] project auth: mode=${(project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(project as Record<string, unknown> | null)?.explore_username ?? "(none)"}, authContext length=${authContext.length}`);
 
-    const pagesContext = (exploration.captured_pages ?? [])
-      .map((page, i) => `Page ${i + 1}: ${page.title} (${page.url})\n${page.structure_text.slice(0, 3000)}`)
-      .join("\n\n");
+    const pagesContext = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 3000);
 
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();

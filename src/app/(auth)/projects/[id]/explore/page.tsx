@@ -24,6 +24,23 @@ interface CapturedPageWithUrl {
   structure_text: string;
   screenshot_storage_id?: string;
   screenshot_url: string | null;
+  semantic_description?: string;
+  interactive_elements?: Array<{
+    selector: string;
+    description: string;
+    element_type: string;
+  }>;
+}
+
+interface DiscoveredFlow {
+  name: string;
+  steps: string[];
+  pages_involved: number[];
+  complexity: "low" | "medium" | "high";
+}
+
+interface ExplorationWithFlows {
+  discovered_flows?: DiscoveredFlow[];
 }
 
 export default function ExplorePage() {
@@ -290,7 +307,14 @@ export default function ExplorePage() {
                           className="w-full h-auto"
                           loading="lazy"
                         />
-                        <div className="px-2 py-1 text-[10px] text-[var(--muted)] truncate">{page.title}</div>
+                        <div className="px-2 py-1 text-[10px] text-[var(--muted)] truncate">
+                          {page.title}
+                          {page.interactive_elements && page.interactive_elements.length > 0 && (
+                            <span className="ml-1 text-[var(--accent)]">
+                              ({page.interactive_elements.length} elements)
+                            </span>
+                          )}
+                        </div>
                       </a>
                     ) : (
                       <div
@@ -304,6 +328,44 @@ export default function ExplorePage() {
                 </div>
               </div>
             )}
+
+            {(exploration as ExplorationWithFlows).discovered_flows &&
+             (exploration as ExplorationWithFlows).discovered_flows!.length > 0 && (
+              <div className="mb-4">
+                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                  Discovered Flows
+                </div>
+                <div className="space-y-2">
+                  {(exploration as ExplorationWithFlows).discovered_flows!.map(
+                    (flow, i) => (
+                      <div
+                        key={i}
+                        className="p-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-[var(--fg)]">{flow.name}</span>
+                          <span
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-[var(--font-mono)] font-medium ${
+                              flow.complexity === "high"
+                                ? "bg-red-100 text-red-700"
+                                : flow.complexity === "medium"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-green-100 text-green-700"
+                            }`}
+                          >
+                            {flow.complexity}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[var(--muted)] font-[var(--font-mono)]">
+                          {flow.steps.join(" → ")}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-3">
               Proposed Scenarios ({exploration.proposed_scenarios!.length})
             </div>

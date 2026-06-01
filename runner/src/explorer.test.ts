@@ -101,7 +101,8 @@ describe("executeExploration", () => {
     const capturedPages = (client.completeExploration as Mock).mock.calls[0][1];
     expect(capturedPages).toHaveLength(1);
     expect(capturedPages[0].title).toBe("Test Page");
-    expect(capturedPages[0].structure_text).toContain("URL: https://example.com");
+    expect(capturedPages[0].semantic_description).toContain("Test Page");
+    expect(capturedPages[0].structure_text).toBe("");
   });
 
   it("skips noise URLs", async () => {
