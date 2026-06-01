@@ -12,6 +12,7 @@ export const createWorkspace = mutation({
       endpoint_url: v.string(),
       api_key: v.string(),
       model_name: v.string(),
+      stagehand_model_name: v.optional(v.string()),
     }),
   },
   handler: async (ctx, args) => {
@@ -54,6 +55,7 @@ export const updateWorkspace = mutation({
         endpoint_url: v.string(),
         api_key: v.optional(v.string()),
         model_name: v.string(),
+        stagehand_model_name: v.optional(v.string()),
       }),
     ),
   },
@@ -74,6 +76,7 @@ export const updateWorkspace = mutation({
         endpoint_url: args.ai_config.endpoint_url,
         api_key: resolvedKey,
         model_name: args.ai_config.model_name,
+        stagehand_model_name: args.ai_config.stagehand_model_name ?? workspace.ai_config.stagehand_model_name,
       };
     }
 

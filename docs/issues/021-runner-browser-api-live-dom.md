@@ -1,6 +1,6 @@
 # 021 — Runner Browser API for Live DOM Context
 
-**Status**: needs-triage
+**Status**: completed
 **Type**: Feature
 **Depends on**: 020 (AI generation actions, heal/regenerate actions, runner infrastructure)
 

@@ -78,6 +78,8 @@ export const getPendingExplorations = query({
         return {
           _id: exploration._id,
           url: exploration.url,
+          workspace_id: exploration.workspace_id,
+          project_id: exploration.project_id,
           auth_mode: project?.explore_auth_mode ?? "none",
           login_url: project?.explore_login_url,
           username: project?.explore_username,
@@ -85,6 +87,7 @@ export const getPendingExplorations = query({
           cookie_name: project?.explore_cookie_name,
           cookie_value: project?.explore_cookie_value,
           additional_urls: exploration.additional_urls,
+          interactive: exploration.interactive ?? false,
         };
       }),
     );

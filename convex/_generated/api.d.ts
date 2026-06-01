@@ -58,6 +58,7 @@ import type * as testHelpers from "../testHelpers.js";
 import type * as tests_mutations from "../tests/mutations.js";
 import type * as tests_queries from "../tests/queries.js";
 import type * as users_mutations from "../users/mutations.js";
+import type * as workspaces_actions from "../workspaces/actions.js";
 import type * as workspaces_mutations from "../workspaces/mutations.js";
 import type * as workspaces_queries from "../workspaces/queries.js";
 
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "tests/mutations": typeof tests_mutations;
   "tests/queries": typeof tests_queries;
   "users/mutations": typeof users_mutations;
+  "workspaces/actions": typeof workspaces_actions;
   "workspaces/mutations": typeof workspaces_mutations;
   "workspaces/queries": typeof workspaces_queries;
 }>;

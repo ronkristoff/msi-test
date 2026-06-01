@@ -133,6 +133,7 @@ export const getPendingWork = query({
           login_url: project?.explore_login_url ?? undefined,
           test_username: project?.explore_username ?? undefined,
           test_password: project?.explore_password ?? undefined,
+          test_data: project?.test_data ?? undefined,
         };
       }),
     );

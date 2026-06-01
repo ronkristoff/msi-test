@@ -37,7 +37,7 @@ End-to-end: Convex schema file (`convex/schema.ts`) defines all tables → index
 - [x] `integrations` — workspace_id, type (`slack | github`), config (typed union: `{webhook_url}` for slack, `{repo, webhook_secret}` for github), status (`active | inactive`); index: by_workspace_id
 - [x] `alert_rules` — workspace_id, integration_id, trigger_event (string, validated in mutation), threshold (optional, number), enabled (boolean); index: by_integration_id
 - [x] `run_heartbeats` — workspace_id, run_id, last_heartbeat_at (number); index: by_run_id
-- [ ] Schema deploys successfully to Convex dev (`pnpm dev:convex`)
+- [x] Schema deploys successfully to Convex dev (`pnpm dev:convex`)
 
 ## Blocked by
 

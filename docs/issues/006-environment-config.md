@@ -17,7 +17,7 @@ End-to-end: `/environments` page → CRUD for environments scoped to current pro
 - [x] User can delete an environment
 - [x] `getEnvironments` query returns environments scoped to project
 - [x] `createEnvironment` and `updateEnvironment` mutations validate required fields (name, base_url)
-- [ ] Environment selector dropdown is available when triggering a run (wired in later slice)
+- [x] Environment selector dropdown is available when triggering a run (wired in later slice)
 
 ## Blocked by
 

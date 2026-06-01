@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.65",
+    "@browserbasehq/stagehand": "^3.4.0",
     "@convex-dev/agent": "^0.6.1",
     "@convex-dev/better-auth": "^0.12.2",
     "@hookform/resolvers": "^5.4.0",

@@ -11,6 +11,7 @@ export type AiConfig = {
   endpoint_url: string;
   api_key: string;
   model_name: string;
+  stagehand_model_name?: string;
 };
 
 export async function getWorkspaceAiConfig(

@@ -11,13 +11,14 @@ End-to-end: `/settings` page → tabbed sections for AI Config, Profile, Workspa
 
 ## Acceptance criteria
 
-- [ ] `/settings` page renders with tabbed sections: AI Provider, Profile, Workspace
-- [ ] AI Provider tab: form with endpoint URL, API key (masked), model name — pre-filled from workspace config
-- [ ] `saveAIConfig` mutation updates workspace's ai_config fields
-- [ ] Profile tab: email and password update forms (delegates to Better Auth)
-- [ ] Workspace tab: workspace name editor
-- [ ] Changes save immediately with success/error feedback
-- [ ] Settings scoped to current workspace
+- [x] `/settings` page renders with tabbed sections: AI Provider, Profile, Workspace, Members
+- [x] AI Provider tab: form with endpoint URL, API key (masked), model name, preset dropdown, model dropdown — pre-filled from workspace config
+- [x] `saveAIConfig` mutation updates workspace's ai_config fields
+- [x] Profile tab: full name editor, email (disabled), password change (current + new) — delegates to Better Auth mutations
+- [x] Workspace tab: workspace name editor + danger zone with delete workspace (disabled)
+- [x] Members tab: invite via code, member list with roles
+- [x] Changes save with auto-dismiss success/error feedback (3s timer)
+- [x] Settings scoped to current workspace
 
 ## Blocked by
 

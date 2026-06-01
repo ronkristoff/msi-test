@@ -5,6 +5,8 @@ import * as path from "path";
 import mime from "mime";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { AiConfig } from "../../convex/ai/model";
+import type { CapturedPage } from "./types";
 
 export class RunnerConvexClient {
   private client: ConvexHttpClient;
@@ -163,12 +165,7 @@ export class RunnerConvexClient {
 
   async completeExploration(
     explorationId: string,
-    capturedPages: Array<{
-      url: string;
-      title: string;
-      screenshot_storage_id?: string;
-      structure_text: string;
-    }>,
+    capturedPages: CapturedPage[],
   ): Promise<void> {
     await this.client.action(api.explorations.actions.runnerCompleteExploration, {
       runner_secret: this.secret,
@@ -185,6 +182,13 @@ export class RunnerConvexClient {
       runner_secret: this.secret,
       exploration_id: explorationId as Id<"explorations">,
       error_message: errorMessage,
+    });
+  }
+
+  async getWorkspaceAiConfig(workspaceId: string): Promise<AiConfig> {
+    return this.client.action(api.workspaces.actions.runnerGetWorkspaceAiConfig, {
+      runner_secret: this.secret,
+      workspace_id: workspaceId as Id<"workspaces">,
     });
   }
 }

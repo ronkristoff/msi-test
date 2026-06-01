@@ -56,6 +56,7 @@ export default function OnboardingPage() {
           endpoint_url: data.endpoint_url,
           api_key: data.api_key,
           model_name: data.model_name,
+          stagehand_model_name: data.stagehand_model_name || undefined,
         },
       });
       setStep(3);

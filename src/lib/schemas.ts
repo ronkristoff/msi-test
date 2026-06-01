@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidAppUrl } from "./urls";
-import { NAME_MAX, PASSWORD_MIN } from "../../convex/lib/constraints";
+import { NAME_MAX, PASSWORD_MIN, TEST_DATA_MAX_KEYS, TEST_DATA_MAX_KEY_LEN, TEST_DATA_MAX_VALUE_LEN } from "../../convex/lib/constraints";
 
 export const loginFormSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -29,6 +29,7 @@ export const aiConfigSchema = z.object({
   endpoint_url: z.string().min(1, "Please enter a valid endpoint URL").url("Invalid endpoint URL"),
   api_key: z.string().min(1, "Please enter an API key"),
   model_name: z.string().min(1, "Model name is required"),
+  stagehand_model_name: z.string().optional(),
 });
 
 export type AIConfigFormValues = z.infer<typeof aiConfigSchema>;
@@ -91,3 +92,21 @@ export const exploreAuthSchema = z.discriminatedUnion("explore_auth_mode", [
 ]);
 
 export type ExploreAuthValues = z.infer<typeof exploreAuthSchema>;
+
+export const testDataEntrySchema = z.object({
+  key: z.string().min(1, "Key is required").max(TEST_DATA_MAX_KEY_LEN, `Key must be under ${TEST_DATA_MAX_KEY_LEN} characters`),
+  value: z.string().min(1, "Value is required").max(TEST_DATA_MAX_VALUE_LEN, `Value must be under ${TEST_DATA_MAX_VALUE_LEN} characters`),
+});
+
+export const testDataSchema = z.array(testDataEntrySchema)
+  .max(TEST_DATA_MAX_KEYS, `Maximum ${TEST_DATA_MAX_KEYS} entries allowed`)
+  .refine(
+    (entries) => {
+      const keys = entries.map((e) => e.key);
+      return new Set(keys).size === keys.length;
+    },
+    "Duplicate keys are not allowed",
+  );
+
+export type TestDataEntryValues = z.infer<typeof testDataEntrySchema>;
+export type TestDataValues = z.infer<typeof testDataSchema>;

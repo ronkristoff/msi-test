@@ -216,6 +216,7 @@ type ExplorationOverrides = Partial<{
   runner_id: string;
   progress_message: string;
   pages_captured: number;
+  interactive: boolean;
 }>;
 
 export async function seedExploration(
@@ -233,6 +234,7 @@ export async function seedExploration(
       runner_id: overrides?.runner_id,
       progress_message: overrides?.progress_message,
       pages_captured: overrides?.pages_captured,
+      interactive: overrides?.interactive,
     });
   });
 }

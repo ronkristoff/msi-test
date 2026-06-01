@@ -21,6 +21,7 @@ interface PendingWorkItem {
   login_url?: string;
   test_username?: string;
   test_password?: string;
+  test_data?: Record<string, string>;
 }
 
 export async function executeRun(
@@ -42,7 +43,7 @@ export async function executeRun(
     log(`Run ${work.run_id}: writing ${work.tests.length} test(s) to ${runDir}`);
 
     for (let i = 0; i < work.tests.length; i++) {
-      await writeTestFile(runDir, i, work.tests[i].playwright_code);
+      await writeTestFile(runDir, i, work.tests[i].playwright_code, work.test_data);
     }
 
     const reporterModulePath = path.resolve(__dirname, "reporter.ts");

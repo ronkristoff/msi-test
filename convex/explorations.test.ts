@@ -43,6 +43,9 @@ describe("explorations queries", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0].url).toBe("https://example.com");
     expect(pending[0].auth_mode).toBe("none");
+    expect(pending[0].workspace_id).toBe(workspaceId);
+    expect(pending[0].project_id).toBe(projectId);
+    expect(pending[0].interactive).toBe(false);
   });
 
   it("getPendingExplorations excludes non-pending explorations", async () => {

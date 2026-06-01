@@ -19,7 +19,11 @@ Single-context repo:
 ├── docs/adr/
 │   ├── 0001-separate-test-runner.md
 │   ├── 0002-runner-convex-subscriptions.md
-│   └── 0003-convex-agent-component.md
+│   ├── 0003-convex-agent-component.md
+│   ├── 0004-stagehand-browser-interactions.md
+│   ├── 0005-hybrid-test-format.md
+│   ├── 0006-convex-stagehand-lightweight-tasks.md
+│   └── 0007-scheduled-monitoring-crons.md
 └── src/
 ```
 

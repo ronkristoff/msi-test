@@ -1,6 +1,7 @@
 # 017 — CI & Slack Integrations
 
 **Type**: AFK
+**Status**: deferred (post-MVP — schema tables exist, no backend logic or UI)
 **Blocked by**: 002
 
 ## What to build

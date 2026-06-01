@@ -188,4 +188,92 @@ describe("projects mutations", () => {
     expect(project!.app_url).toBe("https://original.com");
     expect(project!.prd_text).toBe("Keep this");
   });
+
+  it("data layer: projects can store test_data as record", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "With TestData",
+        app_url: "https://testdata.com",
+        test_data: { employee_name: "John Doe", salary: "75000" },
+      });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.test_data).toEqual({ employee_name: "John Doe", salary: "75000" });
+  });
+
+  it("data layer: test_data can be updated via patch", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Update TestData",
+        app_url: "https://update.com",
+      });
+    });
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(projectId, {
+        test_data: { email: "test@example.com" },
+      });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.test_data).toEqual({ email: "test@example.com" });
+  });
+
+  it("data layer: test_data can be cleared via patch", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Clear TestData",
+        app_url: "https://clear.com",
+        test_data: { key: "value" },
+      });
+    });
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(projectId, { test_data: undefined });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.test_data).toBeUndefined();
+  });
+
+  it("data layer: projects without test_data have undefined field", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "No TestData",
+        app_url: "https://nodata.com",
+      });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.test_data).toBeUndefined();
+  });
 });

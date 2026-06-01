@@ -14,7 +14,7 @@ End-to-end: User navigates to `/projects/[id]/explore` → enters URL → Runner
 
 - [x] `/projects/[id]/explore` page has URL input and "Start Exploration" button
 - [x] Runner renders target app URL with Playwright, capturing SPA content after hydration
-- [ ] DOM snapshots and screenshots captured from each visited page *(DOM snapshots captured; screenshots now captured as PNG and uploaded to Convex storage — `screenshot_storage_id` field added to schema, resolved to URLs via `getExploration` query, displayed as thumbnail grid on explore page)*
+- [x] DOM snapshots and screenshots captured from each visited page *(DOM snapshots captured; screenshots captured as PNG and uploaded to Convex storage — `screenshot_storage_id` field added to schema, resolved to URLs via `getExploration` query, displayed as thumbnail grid on explore page)*
 - [x] Real-time progress indicator shows which page is being rendered
 - [x] Captured structure sent to Convex where Exploration Analysis Agent proposes testable scenarios
 - [x] Proposed scenarios displayed as selectable cards: name, description, flow summary

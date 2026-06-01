@@ -3,8 +3,28 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { getOwnedWorkspace, getOwnedEntity } from "../lib/requireAuth";
 import { validateProjectName, normalizeAppUrl } from "../lib/validation";
+import {
+  TEST_DATA_MAX_KEYS,
+  TEST_DATA_MAX_KEY_LEN,
+  TEST_DATA_MAX_VALUE_LEN,
+} from "../lib/constraints";
 
 const KEEP_SENTINEL = "___KEEP___";
+
+function validateTestData(data: Record<string, string>): void {
+  const keys = Object.keys(data);
+  if (keys.length > TEST_DATA_MAX_KEYS) {
+    throw new ConvexError(`Test data cannot exceed ${TEST_DATA_MAX_KEYS} entries`);
+  }
+  for (const key of keys) {
+    if (key.length > TEST_DATA_MAX_KEY_LEN) {
+      throw new ConvexError(`Test data key "${key.slice(0, 30)}..." exceeds ${TEST_DATA_MAX_KEY_LEN} characters`);
+    }
+    if (data[key].length > TEST_DATA_MAX_VALUE_LEN) {
+      throw new ConvexError(`Test data value for "${key}" exceeds ${TEST_DATA_MAX_VALUE_LEN} characters`);
+    }
+  }
+}
 
 export const createProject = mutation({
   args: {
@@ -13,6 +33,7 @@ export const createProject = mutation({
     app_url: v.string(),
     prd_text: v.optional(v.string()),
     prd_file_id: v.optional(v.id("_storage")),
+    test_data: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
@@ -22,6 +43,10 @@ export const createProject = mutation({
 
     const name = validateProjectName(args.name);
     const appUrl = normalizeAppUrl(args.app_url);
+
+    if (args.test_data) {
+      validateTestData(args.test_data);
+    }
 
     const existing = await ctx.db
       .query("projects")
@@ -39,6 +64,7 @@ export const createProject = mutation({
       app_url: appUrl,
       ...(args.prd_text?.trim() ? { prd_text: args.prd_text.trim() } : {}),
       ...(args.prd_file_id ? { prd_file_id: args.prd_file_id } : {}),
+      ...(args.test_data ? { test_data: args.test_data } : {}),
     });
   },
 });
@@ -59,6 +85,7 @@ export const updateProject = mutation({
     explore_password: v.optional(v.string()),
     explore_cookie_name: v.optional(v.string()),
     explore_cookie_value: v.optional(v.string()),
+    test_data: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
     const { entity: project } = await getOwnedEntity(ctx, args.project_id, "projects");
@@ -129,6 +156,15 @@ export const updateProject = mutation({
         updates.explore_login_url = undefined;
         updates.explore_username = undefined;
         updates.explore_password = undefined;
+      }
+    }
+
+    if (args.test_data !== undefined) {
+      if (Object.keys(args.test_data).length > 0) {
+        validateTestData(args.test_data);
+        updates.test_data = args.test_data;
+      } else {
+        updates.test_data = undefined;
       }
     }
 

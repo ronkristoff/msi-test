@@ -10,6 +10,7 @@ export default defineSchema({
       endpoint_url: v.string(),
       api_key: v.string(),
       model_name: v.string(),
+      stagehand_model_name: v.optional(v.string()),
     }),
   }).index("by_owner_id", ["owner_id"]).index("by_invite_code", ["invite_code"]),
 
@@ -49,6 +50,7 @@ export default defineSchema({
     explore_password: v.optional(v.string()),
     explore_cookie_name: v.optional(v.string()),
     explore_cookie_value: v.optional(v.string()),
+    test_data: v.optional(v.record(v.string(), v.string())),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_workspace_id_and_name", ["workspace_id", "name"]),
@@ -241,6 +243,7 @@ export default defineSchema({
     progress_message: v.optional(v.string()),
     pages_captured: v.optional(v.number()),
     runner_id: v.optional(v.string()),
+    interactive: v.optional(v.boolean()),
     captured_pages: v.optional(
       v.array(
         v.object({

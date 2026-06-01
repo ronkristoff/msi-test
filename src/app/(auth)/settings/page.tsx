@@ -69,6 +69,7 @@ function SettingsForm({
       endpoint_url: workspace.ai_config.endpoint_url,
       api_key: "",
       model_name: workspace.ai_config.model_name,
+      stagehand_model_name: workspace.ai_config.stagehand_model_name ?? "",
     },
   });
 
@@ -92,7 +93,12 @@ function SettingsForm({
     try {
       const resolvedKey = data.api_key || undefined;
       await updateWorkspace({
-        ai_config: { endpoint_url: data.endpoint_url, api_key: resolvedKey, model_name: data.model_name },
+        ai_config: {
+          endpoint_url: data.endpoint_url,
+          api_key: resolvedKey,
+          model_name: data.model_name,
+          stagehand_model_name: data.stagehand_model_name || undefined,
+        },
       });
       aiForm.reset({ ...data, api_key: "" });
       showMsg("success", "AI config saved");

@@ -3,6 +3,7 @@ import { executeRun } from "./executor";
 import { executeExploration } from "./explorer";
 import { BrowserSessionManager } from "./browser-sessions";
 import { createBrowserApiServer } from "./browser-api";
+import type { ExplorationWorkItem } from "./types";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 const RUNNER_SECRET = process.env.RUNNER_SECRET;
@@ -122,6 +123,8 @@ async function handleRun(work: { run_id: string; tests: unknown[] }) {
 async function handleExploration(exploration: {
   _id: string;
   url: string;
+  workspace_id: string;
+  project_id: string;
   auth_mode: string;
   login_url?: string;
   username?: string;
@@ -129,6 +132,7 @@ async function handleExploration(exploration: {
   cookie_name?: string;
   cookie_value?: string;
   additional_urls?: string[];
+  interactive?: boolean;
 }) {
   if (!(await claimWithRetry(
     () => client.claimExploration(exploration._id, RUNNER_ID),
@@ -138,21 +142,21 @@ async function handleExploration(exploration: {
   activeWork = { kind: "exploration", id: exploration._id };
   log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode})`);
 
-  await executeExploration(
-    client,
-    {
-      exploration_id: exploration._id,
-      url: exploration.url,
-      auth_mode: (exploration.auth_mode as "none" | "form" | "cookie") ?? "none",
-      login_url: exploration.login_url,
-      username: exploration.username,
-      password: exploration.password,
-      cookie_name: exploration.cookie_name,
-      cookie_value: exploration.cookie_value,
-      additional_urls: exploration.additional_urls,
-    },
-    log,
-  );
+  const work: ExplorationWorkItem = {
+    exploration_id: exploration._id,
+    url: exploration.url,
+    workspace_id: exploration.workspace_id,
+    auth_mode: (exploration.auth_mode as ExplorationWorkItem["auth_mode"]) ?? "none",
+    login_url: exploration.login_url,
+    username: exploration.username,
+    password: exploration.password,
+    cookie_name: exploration.cookie_name,
+    cookie_value: exploration.cookie_value,
+    additional_urls: exploration.additional_urls,
+    interactive: exploration.interactive ?? false,
+  };
+
+  await executeExploration(client, work, log);
 
   cleanupSession();
   log("Ready for next work");

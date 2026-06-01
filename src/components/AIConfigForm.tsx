@@ -137,6 +137,22 @@ export function AIConfigForm({
           <p className="text-xs text-[var(--danger)] mt-1">{errors.api_key.message}</p>
         )}
       </div>
+
+      <div className="mb-5">
+        <label className="block font-mono text-[11px] uppercase tracking-wider text-[var(--muted)] mb-2">
+          Stagehand Model{" "}
+          <span className="text-[var(--fg-2)] normal-case tracking-normal">optional</span>
+        </label>
+        <input
+          type="text"
+          placeholder="Defaults to primary model"
+          className={`w-full max-w-[480px] ${inputClass(false)}`}
+          {...register("stagehand_model_name")}
+        />
+        <p className="font-mono text-xs text-[var(--muted)] mt-1">
+          Separate model for browser reasoning. Uses a faster/cheaper model by default.
+        </p>
+      </div>
     </>
   );
 }

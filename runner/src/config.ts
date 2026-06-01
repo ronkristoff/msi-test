@@ -81,6 +81,7 @@ export async function writeTestFile(
   outputDir: string,
   index: number,
   code: string,
+  testData?: Record<string, string>,
 ): Promise<string> {
   const fileName = `test-${index}.spec.ts`;
   const filePath = path.join(outputDir, fileName);
@@ -94,8 +95,17 @@ export async function writeTestFile(
       return kept.length > 0 ? `import { ${kept.join(", ")} } from '@playwright/test';\n` : "";
     },
   );
-  const wrapped = `import { test } from './msitest-fixture';\n${cleaned}`;
-  await fs.writeFile(filePath, wrapped, "utf-8");
+  let processed = `import { test } from './msitest-fixture';\n${cleaned}`;
+  // Substitute %variable% placeholders with test data values.
+  // Replacement runs on the entire code string (including string literals and comments).
+  // This is intentional — variables are global substitutions for test configuration.
+  if (testData) {
+    for (const [key, value] of Object.entries(testData)) {
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      processed = processed.replaceAll(`%${escaped}%`, value);
+    }
+  }
+  await fs.writeFile(filePath, processed, "utf-8");
   return filePath;
 }
 

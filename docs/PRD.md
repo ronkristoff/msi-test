@@ -366,6 +366,47 @@ No prior art exists — this is a greenfield project with no existing test patte
 - Video playback in the run detail UI (video files are captured and stored, but the in-app player is post-MVP)
 - Mobile-responsive optimization beyond basic sidebar collapse
 
+## Post-MVP Additions
+
+The following features are planned after the MVP core (issues 001–018) is complete. They are tracked as issues in `docs/issues/` and documented as ADRs in `docs/adr/`.
+
+### Stagehand Integration (Issues 022–036)
+
+Integrate Stagehand (by Browserbase) for AI-powered browser automation. Stagehand replaces raw Playwright for exploration and enables a new hybrid test format. See ADR 0004 (Stagehand), ADR 0005 (hybrid format), ADR 0006 (Convex-Stagehand component).
+
+- **Smart Explorer** (024) — Stagehand's `agent()` autonomously navigates the target app, filling forms, clicking buttons, and discovering interactive flows. Replaces the MVP's static render-and-capture approach.
+- **Hybrid Test Format** (027) — Tests stored as natural language instructions + optional inline code assertions. Stagehand executes the NL steps by translating them into browser actions at runtime. Self-healing by default.
+- **Auto-Heal** (029–030) — AI automatically repairs failing tests. Healing confidence threshold determines auto-accept vs. human review. Learned healing persists fixes across runs.
+- **Autonomous Explorer** (034) — Full Stagehand agent that explores without user guidance. User says "test my app" and the system discovers, generates, and executes.
+- **Convex-Stagehand Component** (036) — Lightweight server-side browser tasks (URL checks, single-page extraction, change detection) without the Runner.
+
+### New Features (Issues 037–040)
+
+- **Feature Map Visualization** (037) — Interactive graph rendering of PRD features and use cases. Replaces flat scenario list on the Explore page. Coverage gaps visible at a glance.
+- **Scheduled Monitoring** (038) — Recurring test runs on a cadence (hourly/daily/weekly). Convex crons trigger runs automatically. Run-vs-run diff shows which tests flipped. See ADR 0007.
+- **Test Lists** (039) — Cross-project grouping of tests into named executable lists. Like playlists for tests. Used for targeted re-runs, CI gates, and scheduling targets.
+- **NL Chat Refinement** (040) — Chat interface for modifying tests via natural language. User describes changes, AI applies them. Makes test maintenance accessible to non-developers.
+
+### Long-Term Vision (Phase 3)
+
+See `docs/issues/stagehand-phase3-vision.md` for the full roadmap:
+
+- **Recording/Playback** — User walks through a flow in the browser; AI converts the recording into a test.
+- **SaaS on Coolify** — Runner deployed as container-per-job on Coolify. Isolated Chromium per run. Auto-scaling.
+- **Managed AI Option** — MSITest-provided LLM proxy for users who don't want BYOK. Zero-friction onboarding.
+- **Multi-Model Agent Orchestration** — Different models for different tasks (fast model for browser actions, smart model for generation, vision model for visual regression).
+- **Visual Regression Testing** — Screenshot comparison between runs. Vision model detects layout shifts, missing elements, color changes.
+- **Test Suite Optimization** — AI analyzes suite health, removes redundancy, prioritizes by impact, predicts flakiness.
+
+### Previously Out-of-Scope, Now Planned
+
+Several items from the original "Out of Scope" section are now planned:
+
+- ~~Scheduled/cron test runs~~ → Issue 038 + ADR 0007
+- ~~Fully autonomous app exploration~~ → Issue 034 (Stagehand agent)
+- ~~Browser sandboxing and Docker isolation~~ → Phase 3 (Coolify containers)
+- ~~Video playback in the run detail UI~~ → Planned (video files captured, player deferred)
+
 ## Further Notes
 
 - The project currently consists of 7 static HTML mockup files that define the visual direction. These will be consolidated and rebuilt as Next.js pages using the Airtable-inspired blue design system, rebranded from "TestPulse" to "MSITest".

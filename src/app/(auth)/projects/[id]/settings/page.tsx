@@ -5,13 +5,14 @@ import { useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
-import { api, asId } from "@/lib/convex";
+import { api, asId, type Id } from "@/lib/convex";
 import { Input, Select } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PRDInput } from "@/components/PRDInput";
 import { projectSettingsSchema, type ProjectSettingsValues } from "@/lib/schemas";
+import { TestDataSection } from "@/components/TestDataSection";
 import { useFileUpload, type PRDMode } from "@/lib/use-file-upload";
 import { normalizeAppUrl } from "@/lib/urls";
 import Link from "next/link";
@@ -30,6 +31,7 @@ interface ProjectWithAuth {
   explore_password?: string;
   explore_cookie_name?: string;
   explore_cookie_value?: string;
+  test_data?: Record<string, string>;
 }
 
 function asProjectWithAuth(p: unknown): ProjectWithAuth {
@@ -290,6 +292,11 @@ export default function ProjectSettingsPage() {
           {authSaving ? "Saving..." : "Save Auth Config"}
         </Button>
       </div>
+
+      <TestDataSection
+        projectId={asProjectWithAuth(project)._id as Id<"projects">}
+        initialEntries={asProjectWithAuth(project).test_data}
+      />
     </div>
   );
 }
