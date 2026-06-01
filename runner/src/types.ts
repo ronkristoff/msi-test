@@ -34,3 +34,33 @@ export interface ExplorationWorkItem {
   additional_urls?: string[];
   interactive: boolean;
 }
+
+export interface TestStep {
+  instruction: string;
+  assertion_code?: string;
+  expected_outcome?: string;
+}
+
+export interface RunTestItem {
+  _id: string;
+  name: string;
+  playwright_code: string;
+  execution_type: string | null;
+  steps: TestStep[] | null;
+}
+
+export interface RunWorkItem {
+  run_id: string;
+  workspace_id: string;
+  project_id: string;
+  environment_id: string | null;
+  base_url: string | null;
+  trigger_type: string;
+  tests: RunTestItem[];
+  run_result_ids: Array<{ _id: string; test_id: string }>;
+  auth_mode?: string;
+  login_url?: string;
+  test_username?: string;
+  test_password?: string;
+  test_data?: Record<string, string>;
+}

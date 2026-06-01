@@ -1,6 +1,7 @@
 import { Stagehand } from "@browserbasehq/stagehand";
 import type { AiConfig } from "../../convex/ai/model";
 
+export type StagehandInstance = Stagehand;
 export type { AiConfig as WorkspaceAiConfig };
 
 export function createStagehandConfig(config: AiConfig) {

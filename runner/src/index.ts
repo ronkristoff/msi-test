@@ -1,5 +1,6 @@
 import { RunnerConvexClient } from "./convex-client";
-import { executeRun } from "./executor";
+import { executeRun, type RunWorkItem } from "./executor";
+import { executeStagehandTests } from "./stagehand-executor";
 import { executeExploration } from "./explorer";
 import { BrowserSessionManager } from "./browser-sessions";
 import { createBrowserApiServer } from "./browser-api";
@@ -90,7 +91,7 @@ async function poll() {
   }
 }
 
-async function handleRun(work: { run_id: string; tests: unknown[] }) {
+async function handleRun(work: RunWorkItem) {
   if (!(await claimWithRetry(
     () => client.claimRun(work.run_id, RUNNER_ID),
     work.run_id,
@@ -114,7 +115,21 @@ async function handleRun(work: { run_id: string; tests: unknown[] }) {
     log(`Initial heartbeat failed: ${err}`);
   }
 
-  await executeRun(client, work as Parameters<typeof executeRun>[1], log);
+  const hasStagehand = work.tests.some((t) => t.execution_type === "stagehand");
+  const hasPlaywright = work.tests.some((t) => t.execution_type !== "stagehand");
+
+  if (hasStagehand) {
+    log(`Run ${work.run_id}: dispatching to Stagehand executor`);
+    await executeStagehandTests(client, work, log);
+  }
+
+  if (hasPlaywright) {
+    if (hasStagehand) {
+      log(`Run ${work.run_id}: Stagehand tests done, but run already completed — Playwright tests skipped`);
+    } else {
+      await executeRun(client, work, log);
+    }
+  }
 
   cleanupSession();
   log("Ready for next work");

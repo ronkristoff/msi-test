@@ -3,30 +3,13 @@ import * as path from "path";
 import { spawn } from "child_process";
 import { RunnerConvexClient } from "./convex-client";
 import { generatePlaywrightConfig, writeTestFile, createTempRunDir, cleanupDir } from "./config";
+import type { RunWorkItem } from "./types";
 
-interface PendingWorkItem {
-  run_id: string;
-  workspace_id: string;
-  project_id: string;
-  environment_id: string | null;
-  base_url: string | null;
-  trigger_type: string;
-  tests: Array<{
-    _id: string;
-    name: string;
-    playwright_code: string;
-  }>;
-  run_result_ids: Array<{ _id: string; test_id: string }>;
-  auth_mode?: string;
-  login_url?: string;
-  test_username?: string;
-  test_password?: string;
-  test_data?: Record<string, string>;
-}
+export type { RunWorkItem };
 
 export async function executeRun(
   client: RunnerConvexClient,
-  work: PendingWorkItem,
+  work: RunWorkItem,
   log: (msg: string) => void,
 ): Promise<void> {
   const runDir = await createTempRunDir();
@@ -159,7 +142,7 @@ export async function executeRun(
   }
 }
 
-function buildIndexMapping(work: PendingWorkItem): Map<number, string> {
+function buildIndexMapping(work: RunWorkItem): Map<number, string> {
   const map = new Map<number, string>();
   for (let i = 0; i < work.tests.length; i++) {
     const resultEntry = work.run_result_ids.find(
@@ -174,7 +157,7 @@ function buildIndexMapping(work: PendingWorkItem): Map<number, string> {
 
 async function processStepResults(
   client: RunnerConvexClient,
-  work: PendingWorkItem,
+  work: RunWorkItem,
   reporterDir: string,
   indexToResultId: Map<number, string>,
   log: (msg: string) => void,
@@ -361,7 +344,7 @@ async function uploadConsoleLogs(
   return result;
 }
 
-function runPlaywright(cwd: string, work: PendingWorkItem, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
+function runPlaywright(cwd: string, work: RunWorkItem, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
   const projectRoot = path.resolve(__dirname, "../..");
 
   const authEnv: Record<string, string> = {};

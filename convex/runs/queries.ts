@@ -98,6 +98,8 @@ export const getPendingWork = query({
           _id: string;
           name: string;
           playwright_code: string;
+          execution_type: string | null;
+          steps: Array<{ instruction: string; assertion_code?: string; expected_outcome?: string }> | null;
         }> = (
           await Promise.all(
             runResults.map(async (rr) => {
@@ -106,7 +108,9 @@ export const getPendingWork = query({
               return {
                 _id: test._id,
                 name: test.name,
-                playwright_code: test.playwright_code,
+                playwright_code: test.playwright_code ?? "",
+                execution_type: test.execution_type ?? null,
+                steps: test.steps ?? null,
               };
             }),
           )
