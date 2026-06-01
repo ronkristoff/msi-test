@@ -2,12 +2,13 @@ import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { getOwnedEntity, getUserName } from "../lib/requireAuth";
-import { validateRequiredField } from "../lib/validation";
+import { validateRequiredField, testStepValidator } from "../lib/validation";
 
 export const updateTestCode = mutation({
   args: {
     test_id: v.id("tests"),
-    playwright_code: v.string(),
+    playwright_code: v.optional(v.string()),
+    steps: v.optional(v.array(testStepValidator)),
     name: v.optional(v.string()),
     status: v.optional(v.union(v.literal("draft"), v.literal("approved"))),
     last_healed_at: v.optional(v.number()),
@@ -23,9 +24,13 @@ export const updateTestCode = mutation({
       throw new ConvexError(`Test is locked by ${holderName}`);
     }
 
-    const code = validateRequiredField(args.playwright_code, "Playwright code");
-
-    const updates: Record<string, unknown> = { playwright_code: code };
+    const updates: Record<string, unknown> = {};
+    if (args.playwright_code !== undefined) {
+      updates.playwright_code = validateRequiredField(args.playwright_code, "Playwright code");
+    }
+    if (args.steps !== undefined) {
+      updates.steps = args.steps;
+    }
     if (args.name !== undefined) {
       updates.name = validateRequiredField(args.name, "Test name");
     }
@@ -90,7 +95,11 @@ export const createTestFromGeneration = internalMutation({
   args: {
     suite_id: v.id("suites"),
     name: v.string(),
-    playwright_code: v.string(),
+    playwright_code: v.optional(v.string()),
+    execution_type: v.optional(
+      v.union(v.literal("playwright"), v.literal("stagehand")),
+    ),
+    steps: v.optional(v.array(testStepValidator)),
     source_type: v.union(
       v.literal("url_exploration"),
       v.literal("prd"),
@@ -112,6 +121,8 @@ export const createTestFromGeneration = internalMutation({
       name: args.name.trim(),
       description: args.description?.trim() || undefined,
       playwright_code: args.playwright_code,
+      execution_type: args.execution_type ?? "playwright",
+      steps: args.steps,
       source_type: args.source_type,
       status: "draft",
     });

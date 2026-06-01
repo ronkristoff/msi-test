@@ -173,5 +173,109 @@ describe("tests mutations", () => {
       const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
       expect(test!.name).toBe("signup flow");
     });
+
+    it("defaults execution_type to playwright when not specified", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      const testId = await t.mutation(internal.tests.mutations.createTestFromGeneration, {
+        suite_id: suiteId,
+        name: "legacy test",
+        playwright_code: "code",
+        source_type: "prd",
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
+      expect(test!.execution_type).toBe("playwright");
+      expect(test!.steps).toBeUndefined();
+    });
+
+    it("creates stagehand test with steps and no playwright_code", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      const steps = [
+        { instruction: "Navigate to the login page", expected_outcome: "Login form is visible" },
+        { instruction: "Enter valid credentials and submit", assertion_code: "expect(await page.textContent('.welcome')).toContain('Dashboard')", expected_outcome: "User is redirected to dashboard" },
+      ];
+
+      const testId = await t.mutation(internal.tests.mutations.createTestFromGeneration, {
+        suite_id: suiteId,
+        name: "stagehand login test",
+        execution_type: "stagehand",
+        steps,
+        source_type: "url_exploration",
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
+      expect(test!.execution_type).toBe("stagehand");
+      expect(test!.playwright_code).toBeUndefined();
+      expect(test!.steps).toHaveLength(2);
+      expect(test!.steps![0].instruction).toBe("Navigate to the login page");
+      expect(test!.steps![1].assertion_code).toContain("expect");
+      expect(test!.steps![0].assertion_code).toBeUndefined();
+    });
+
+    it("creates hybrid test with both steps and playwright_code", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { suiteId } = await seedSuite(t, workspaceId);
+
+      const steps = [
+        { instruction: "Navigate to /settings", expected_outcome: "Settings page loads" },
+      ];
+
+      const testId = await t.mutation(internal.tests.mutations.createTestFromGeneration, {
+        suite_id: suiteId,
+        name: "hybrid test",
+        playwright_code: "test('settings', async ({ page }) => { await page.goto('/settings'); });",
+        execution_type: "stagehand",
+        steps,
+        source_type: "natural_language",
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId as Id<"tests">));
+      expect(test!.execution_type).toBe("stagehand");
+      expect(test!.playwright_code).toContain("settings");
+      expect(test!.steps).toHaveLength(1);
+    });
+  });
+
+  describe("updateTestCode with steps", () => {
+    it("updates steps on an existing test", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { testId } = await seedTestDoc(t, workspaceId);
+
+      const newSteps = [
+        { instruction: "Go to homepage", expected_outcome: "Homepage renders" },
+        { instruction: "Click sign up link" },
+      ];
+
+      await t.run(async (ctx) => {
+        await ctx.db.patch(testId, {
+          execution_type: "stagehand" as const,
+          steps: newSteps,
+        });
+      });
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId));
+      expect(test!.steps).toHaveLength(2);
+      expect(test!.steps![0].instruction).toBe("Go to homepage");
+      expect(test!.steps![1].expected_outcome).toBeUndefined();
+    });
+
+    it("legacy tests without execution_type are backward compatible", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const { testId } = await seedTestDoc(t, workspaceId);
+
+      const test = await t.run(async (ctx) => ctx.db.get(testId));
+      expect(test!.playwright_code).toBeDefined();
+      expect(test!.execution_type).toBeUndefined();
+      expect(test!.steps).toBeUndefined();
+    });
   });
 });

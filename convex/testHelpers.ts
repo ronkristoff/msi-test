@@ -58,6 +58,8 @@ type TestOverrides = Partial<{
   name: string;
   status: "draft" | "approved";
   source_type: "prd" | "url_exploration" | "natural_language";
+  execution_type: "playwright" | "stagehand";
+  steps: { instruction: string; assertion_code?: string; expected_outcome?: string }[];
 }>;
 
 export async function seedTestDoc(t: TestCtx, workspaceId: string, overrides?: TestOverrides) {
@@ -77,7 +79,9 @@ export async function seedTestDoc(t: TestCtx, workspaceId: string, overrides?: T
       workspace_id: workspaceId,
       suite_id: suiteId,
       name: overrides?.name ?? "Test Case",
-      playwright_code: "import { test } from '@playwright/test';\ntest('example', async ({ page }) => {});",
+      playwright_code: overrides?.execution_type === "stagehand" && overrides?.steps ? undefined : "import { test } from '@playwright/test';\ntest('example', async ({ page }) => {});",
+      execution_type: overrides?.execution_type,
+      steps: overrides?.steps,
       source_type: overrides?.source_type ?? "prd",
       status: overrides?.status ?? "draft",
     });
@@ -272,4 +276,42 @@ export async function seedRunWithTwoTests(t: TestCtx) {
   });
   const runId = await seedRun(t, workspaceId, projectId, suiteId, null);
   return { workspaceId, projectId, suiteId, testId1, testId2, runId };
+}
+
+export async function seedStagehandTest(
+  t: TestCtx,
+  workspaceId: string,
+  overrides?: Partial<{
+    name: string;
+    steps: { instruction: string; assertion_code?: string; expected_outcome?: string }[];
+    status: "draft" | "approved";
+  }>,
+) {
+  return t.run(async (ctx) => {
+    const projectId = await ctx.db.insert("projects", {
+      workspace_id: workspaceId,
+      name: "Test Project",
+      app_url: "https://example.com",
+    });
+    const suiteId = await ctx.db.insert("suites", {
+      workspace_id: workspaceId,
+      project_id: projectId,
+      name: "Test Suite",
+      source_type: "manual",
+    });
+    const steps = overrides?.steps ?? [
+      { instruction: "Navigate to /login", expected_outcome: "Login page is visible" },
+      { instruction: "Enter credentials and submit", assertion_code: "expect(await page.textContent('.status')).toBe('ok')" },
+    ];
+    const testId = await ctx.db.insert("tests", {
+      workspace_id: workspaceId,
+      suite_id: suiteId,
+      name: overrides?.name ?? "Stagehand Test",
+      execution_type: "stagehand" as const,
+      steps,
+      source_type: "prd",
+      status: overrides?.status ?? "draft",
+    });
+    return { projectId, suiteId, testId };
+  });
 }

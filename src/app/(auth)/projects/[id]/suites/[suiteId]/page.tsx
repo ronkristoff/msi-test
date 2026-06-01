@@ -70,8 +70,10 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
 }) {
   const [expanded, setExpanded] = useState(false);
   const [localCode, setLocalCode] = useState<string | null>(null);
-  const isDirty = localCode !== null && localCode !== test.playwright_code;
-  const displayCode = localCode ?? test.playwright_code;
+  const [viewMode, setViewMode] = useState<"code" | "steps">("code");
+  const isStagehand = test.execution_type === "stagehand" && test.steps && test.steps.length > 0;
+  const isDirty = localCode !== null && localCode !== (test.playwright_code ?? "");
+  const displayCode = localCode ?? test.playwright_code ?? "";
 
   const recentlyHealed = test.last_healed_at !== undefined && test.last_healed_at > 0;
 
@@ -196,6 +198,11 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
             <StatusPill variant="neutral" showDot={false}>
               {SOURCE_TYPE_LABELS[test.source_type] ?? test.source_type}
             </StatusPill>
+            {test.execution_type && (
+              <StatusPill variant={test.execution_type === "stagehand" ? "success" : "neutral"} showDot={test.execution_type === "stagehand"}>
+                {test.execution_type}
+              </StatusPill>
+            )}
           </div>
         </button>
 
@@ -230,22 +237,81 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
             )}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
-                  Editor
-                </label>
-                <textarea
-                  value={displayCode}
-                  onChange={(e) => setLocalCode(e.target.value)}
-                  readOnly={!!(test.locked_by && test.locked_by !== currentUserId)}
-                  className={`w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${test.locked_by && test.locked_by !== currentUserId ? "opacity-60 cursor-not-allowed" : ""}`}
-                  spellCheck={false}
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]">
+                    Editor
+                  </label>
+                  {isStagehand && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setViewMode("steps")}
+                        className={`text-[10px] font-[var(--font-mono)] uppercase tracking-[0.04em] px-2 py-0.5 rounded transition-colors ${viewMode === "steps" ? "bg-[var(--accent)] text-white" : "bg-[var(--border-soft)] text-[var(--muted)] hover:text-[var(--fg)]"}`}
+                      >
+                        Steps
+                      </button>
+                      <button
+                        onClick={() => setViewMode("code")}
+                        className={`text-[10px] font-[var(--font-mono)] uppercase tracking-[0.04em] px-2 py-0.5 rounded transition-colors ${viewMode === "code" ? "bg-[var(--accent)] text-white" : "bg-[var(--border-soft)] text-[var(--muted)] hover:text-[var(--fg)]"}`}
+                      >
+                        Code
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {viewMode === "steps" && test.steps ? (
+                  <div className="min-h-[300px] bg-[#0d1117] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 overflow-y-auto space-y-3">
+                    {test.steps.map((step, i) => (
+                      <div key={i} className="border-l-2 border-[var(--accent)] pl-3">
+                        <div className="flex items-start gap-2">
+                          <span className="font-[var(--font-mono)] text-[10px] text-[var(--muted)] shrink-0 mt-0.5">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm text-[#e6edf3]">{step.instruction}</p>
+                            {step.expected_outcome && (
+                              <p className="text-xs text-[#8b949e] mt-0.5">Expected: {step.expected_outcome}</p>
+                            )}
+                            {step.assertion_code && (
+                              <pre className="text-[11px] font-[var(--font-mono)] text-[#79c0ff] mt-1 bg-[#161b22] rounded px-2 py-1 overflow-x-auto">
+                                {step.assertion_code}
+                              </pre>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <textarea
+                    value={displayCode}
+                    onChange={(e) => setLocalCode(e.target.value)}
+                    readOnly={!!(test.locked_by && test.locked_by !== currentUserId)}
+                    className={`w-full min-h-[300px] font-[var(--font-mono)] text-base bg-[#0d1117] text-[#e6edf3] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${test.locked_by && test.locked_by !== currentUserId ? "opacity-60 cursor-not-allowed" : ""}`}
+                    spellCheck={false}
+                  />
+                )}
               </div>
               <div>
                 <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
                   Preview
                 </label>
-                <CodePreview code={displayCode} />
+                {viewMode === "steps" && test.steps ? (
+                  <div className="min-h-[300px] bg-[#0d1117] rounded-[var(--radius-sm)] p-4 overflow-y-auto">
+                    <div className="space-y-2">
+                      {test.steps.map((step, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="font-[var(--font-mono)] text-[10px] text-[var(--muted)]">{i + 1}.</span>
+                          <span className="text-sm text-[#e6edf3]">{step.instruction}</span>
+                          {step.assertion_code && (
+                            <span className="text-[10px] text-[#79c0ff] bg-[#161b22] rounded px-1">assert</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <CodePreview code={displayCode} />
+                )}
               </div>
             </div>
 

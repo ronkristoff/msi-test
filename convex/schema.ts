@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator } from "./lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, testStepValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -90,7 +90,11 @@ export default defineSchema({
     suite_id: v.id("suites"),
     name: v.string(),
     description: v.optional(v.string()),
-    playwright_code: v.string(),
+    playwright_code: v.optional(v.string()),
+    execution_type: v.optional(
+      v.union(v.literal("playwright"), v.literal("stagehand")),
+    ),
+    steps: v.optional(v.array(testStepValidator)),
     source_type: v.union(
       v.literal("url_exploration"),
       v.literal("prd"),

@@ -19,6 +19,12 @@ export const failureAnalysisSchema = z.object({
   confidenceScore: z.number().min(0).max(1),
 });
 
+export const hybridTestStepSchema = z.object({
+  instruction: z.string(),
+  assertion_code: z.string().optional(),
+  expected_outcome: z.string().optional(),
+});
+
 export const TEST_GENERATION_PROMPT = `You are MSITest's Test Generation Agent. You write Playwright test code for web applications.
 
 Given a description of user flows, page structure, or product requirements, you generate complete, runnable Playwright test code.
@@ -74,12 +80,42 @@ Common failure patterns to check:
 - State leakage between tests
 - Environment differences (viewport, auth state)`;
 
+export const HYBRID_TEST_GENERATION_PROMPT = `You are MSITest's Hybrid Test Generation Agent. You generate tests in a hybrid natural-language + code format for browser-based test execution.
+
+For each test, you produce an array of steps. Each step has:
+- "instruction": A clear natural language instruction describing a browser interaction (e.g. "Click the 'Login' button", "Navigate to /dashboard", "Fill in the email field with 'test@example.com'")
+- "assertion_code": (optional) A Playwright code assertion for complex data checks (e.g. "expect(await page.textContent('.count')).toBe('5')"). Only include when a simple visual check is insufficient.
+- "expected_outcome": (optional) A human-readable description of what should happen after this step
+
+Rules for instructions:
+- Each instruction should be a single, atomic browser action
+- Use exact text labels, button names, and field names from the page context
+- Navigation steps: "Navigate to /path" or "Click the 'Settings' link"
+- Interaction steps: "Click the 'Submit' button", "Type 'hello' into the search field"
+- Verification steps: "Verify the success message is visible"
+
+Rules for assertion_code:
+- Only use for data assertions that go beyond simple visibility checks
+- Use Playwright-style assertions: expect(locator).toBeVisible(), toHaveText(), toContainText()
+- Use semantic locators: page.getByRole(), page.getByText(), page.getByLabel()
+- NEVER use raw CSS selectors or XPath
+
+Format: Respond with ONLY a valid JSON array of step objects. No markdown, no code fences, no explanation.`;
+
 export function createTestGenerationAgent(model: AgentModel) {
   return new Agent(components.agent, {
     name: "Test Generation",
     languageModel: model,
     instructions: TEST_GENERATION_PROMPT,
     tools: createToolDefinitions(),
+  });
+}
+
+export function createHybridTestGenerationAgent(model: AgentModel) {
+  return new Agent(components.agent, {
+    name: "Hybrid Test Generation",
+    languageModel: model,
+    instructions: HYBRID_TEST_GENERATION_PROMPT,
   });
 }
 
@@ -127,7 +163,7 @@ export function extractMultipleTests(response: string): string[] {
 }
 
 export function deriveTestName(code: string, index?: number): string {
-  const match = code.match(/test\s*\(\s*['"`]([^'"`]+?)['"`]/);
+  const match = code.match(/test\s*\(\s*['"\x60]([^'"\x60]+?)['"\x60]/);
   if (match) return match[1];
   return index !== undefined ? `Generated Test ${index + 1}` : "Generated Test";
 }

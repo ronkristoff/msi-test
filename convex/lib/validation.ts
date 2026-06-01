@@ -59,6 +59,12 @@ export const capturedPageValidator = v.object({
   interactive_elements: v.optional(v.array(interactiveElementValidator)),
 });
 
+export const testStepValidator = v.object({
+  instruction: v.string(),
+  assertion_code: v.optional(v.string()),
+  expected_outcome: v.optional(v.string()),
+});
+
 export const discoveredFlowValidator = v.object({
   name: v.string(),
   description: v.optional(v.string()),

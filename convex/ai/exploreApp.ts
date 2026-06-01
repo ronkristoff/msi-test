@@ -4,7 +4,8 @@ import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal, api } from "../_generated/api";
-import { createExplorationAnalysisAgent, createTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema } from "./agents";
+import { createExplorationAnalysisAgent, createTestGenerationAgent, createHybridTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema, hybridTestStepSchema } from "./agents";
+import { extractJsonFromAiResponse } from "./parse";
 import { classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext } from "./authContext";
@@ -169,19 +170,20 @@ export const generateExplorationTests = action({
 
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();
-    const allTestBlocks: { name: string; code: string; area: string }[] = [];
+    const allTestBlocks: { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[] = [];
 
     for (const scenario of args.selected_scenarios) {
       try {
-        const agent = createTestGenerationAgent(
-          (await import("./model")).getWorkspaceModel(aiConfig),
-        );
-        const { thread } = await agent.createThread(ctx, {
-          title: `Test Generation — ${scenario.name}`,
-        });
+        const model = (await import("./model")).getWorkspaceModel(aiConfig);
 
-        const result = await thread.generateText({
-          prompt: `Generate a single Playwright test for the following scenario.
+        const [playwrightResult, hybridResult] = await Promise.all([
+          (async () => {
+            const agent = createTestGenerationAgent(model);
+            const { thread } = await agent.createThread(ctx, {
+              title: `Test Generation — ${scenario.name}`,
+            });
+            return thread.generateText({
+              prompt: `Generate a single Playwright test for the following scenario.
 
 Application URL: ${exploration.url}
 ${authContext}
@@ -201,13 +203,45 @@ Generate a single, self-contained Playwright test. Rules:
 - Never use waitForTimeout() or arbitrary sleeps
 - Only interact with elements and assert on values explicitly shown in the page context — do NOT invent or guess selectors
 - Wrap the test in a single markdown code fence with language "typescript"`,
-        });
+            });
+          })(),
+          (async () => {
+            try {
+              const hybridAgent = createHybridTestGenerationAgent(model);
+              const { thread } = await hybridAgent.createThread(ctx, {
+                title: `Hybrid Steps — ${scenario.name}`,
+              });
+              return await thread.generateText({
+                prompt: `Generate test steps for the following scenario.
 
-        const blocks = extractMultipleTests(result.text);
+Application URL: ${exploration.url}
+${authContext}
+Scenario: ${scenario.name}
+Description: ${scenario.description}
+Flow: ${scenario.flow_summary}
+
+Page structure context:
+${pagesContext}
+${flowContextSection}
+Generate 3-8 steps that cover this scenario. Use exact element labels and text from the page context.`,
+              });
+            } catch (err) {
+              console.error(`[generateExplorationTests] Hybrid step generation failed for "${scenario.name}":`, err);
+              return null;
+            }
+          })(),
+        ]);
+
+        const blocks = extractMultipleTests(playwrightResult.text);
+        const hybridSteps = hybridResult
+          ? extractJsonFromAiResponse(hybridResult.text, hybridTestStepSchema.array()) ?? undefined
+          : undefined;
+
         for (let i = 0; i < blocks.length; i++) {
           allTestBlocks.push({
             name: deriveTestName(blocks[i], i),
             code: blocks[i],
+            steps: hybridSteps,
             area: scenario.area,
           });
         }
@@ -217,7 +251,7 @@ Generate a single, self-contained Playwright test. Rules:
       }
     }
 
-    const areaGroups = new Map<string, { name: string; code: string; area: string }[]>();
+    const areaGroups = new Map<string, { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[]>();
     for (const block of allTestBlocks) {
       const existing = areaGroups.get(block.area) ?? [];
       existing.push(block);
@@ -238,6 +272,7 @@ Generate a single, self-contained Playwright test. Rules:
           suite_id: suiteId as Id<"suites">,
           name: block.name,
           playwright_code: block.code,
+          steps: block.steps,
           source_type: "url_exploration",
         });
         testIds.push(testId);
