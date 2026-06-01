@@ -36,11 +36,7 @@ export const regenerateTest = action({
 });
 
 async function regenerateTestInner(ctx: ActionCtx, args: { test_id: Id<"tests"> }): Promise<{ testId: string; newName: string }> {
-    const test: {
-      suite_id: Id<"suites">;
-      name: string;
-      playwright_code: string;
-    } | null = await ctx.runQuery(internal.tests.queries.getTestInternal, {
+    const test = await ctx.runQuery(internal.tests.queries.getTestInternal, {
       test_id: args.test_id,
     });
 
@@ -117,7 +113,7 @@ Generate an improved version as a single Playwright test. Rules:
     }
 
     const newName = deriveTestName(code) ?? test.name;
-    const diff = computeDiff(test.playwright_code, code);
+    const diff = computeDiff(test.playwright_code ?? "", code);
 
     await ctx.runMutation(api.tests.mutations.updateTestCode, {
       test_id: args.test_id,

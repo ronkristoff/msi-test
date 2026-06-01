@@ -11,7 +11,6 @@ import { classifyAiError } from "./errors";
 import { formatCapturedPagesForPrompt } from "./formatPages";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
-import { getLiveSnapshot, extractTargetUrl, interactAndCapture, extractInteractionsFromTestCode } from "./browserClient";
 
 export const healTest = action({
   args: {
@@ -86,41 +85,6 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
       }
     }
 
-    const targetUrl = extractTargetUrl(test.playwright_code, project.app_url);
-    const authConfig = {
-      auth_mode: (project as Record<string, unknown>).explore_auth_mode as string ?? "none",
-      login_url: (project as Record<string, unknown>).explore_login_url as string | undefined,
-      username: (project as Record<string, unknown>).explore_username as string | undefined,
-      password: (project as Record<string, unknown>).explore_password as string | undefined,
-      cookie_name: (project as Record<string, unknown>).explore_cookie_name as string | undefined,
-      cookie_value: (project as Record<string, unknown>).explore_cookie_value as string | undefined,
-      app_url: project.app_url,
-    };
-
-    const liveSnapshot = await getLiveSnapshot({
-      projectId: suite.project_id,
-      url: targetUrl,
-      authConfig,
-    });
-
-    let interactionSnapshots: string[] = [];
-    if (liveSnapshot) {
-      const interactions = extractInteractionsFromTestCode(test.playwright_code, liveSnapshot.snapshot);
-      if (interactions.length > 0) {
-        const stepResults = await interactAndCapture({
-          projectId: suite.project_id,
-          url: targetUrl,
-          authConfig,
-          actions: interactions,
-        });
-        if (stepResults && stepResults.length > 1) {
-          interactionSnapshots = stepResults
-            .slice(1)
-            .map((s, i) => `--- After interaction ${i + 1} ---\nURL: ${s.url}\nTitle: ${s.title}\n${s.snapshot}`);
-        }
-      }
-    }
-
     const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
       workspace_id: project.workspace_id,
     });
@@ -149,8 +113,7 @@ ${test.playwright_code}
 
 Error from test run:
 ${errorMessage}
-${liveSnapshot ? `\nLive DOM Context (current page state — use these real elements and values):\nURL: ${liveSnapshot.url}\nTitle: ${liveSnapshot.title}\n${liveSnapshot.snapshot}` : pagesContext ? `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}` : ""}
-${interactionSnapshots.length > 0 ? `\nCaptured interaction states (elements visible after clicking/filling on the live page):\n${interactionSnapshots.join("\n\n")}` : ""}
+${pagesContext ? `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}` : ""}
 ${args.user_hint ? `\nUser feedback about this test failure:\n${args.user_hint}` : ""}
 
 Fix the test based on the error. Rules:
@@ -166,15 +129,13 @@ For ALL errors:
 - Never use waitForTimeout(), arbitrary sleeps, or waitForLoadState('networkidle')
 - Wrap the test in a single markdown code fence with language "typescript"
 
-CRITICAL — Only use locators for elements that exist in the snapshots above. If you cannot see an element (dialog, form field, button) in ANY of the provided snapshots, do NOT invent or guess a locator for it. If a step cannot be verified, remove that assertion rather than guessing.
+CRITICAL — Only use locators for elements that you can verify exist from the test code, the page context (if provided), or the error message. Do NOT invent or guess locators. If a step cannot be verified, remove that assertion rather than guessing.
 
 For text/value mismatch errors:
 - Use the RECEIVED value (not the expected one) — the received value is what the page actually shows
-- If a locator is wrong, check the page context for the correct selector
 
 For TimeoutError (element not found within timeout):
-- Check the snapshots — if the element doesn't appear in any snapshot, the test may be testing a feature that requires specific user actions first. Simplify the test to only assert what's visible in the snapshots.
-- If the element IS in an interaction snapshot, use the exact locator from that snapshot
+- Simplify the test to only assert what the existing code structure suggests should be present
 - After login or any navigation, add await page.waitForLoadState('domcontentloaded') before interacting with new content
 - After page.goto(), add await expect(locator).toBeVisible({ timeout: 15000 }) before clicking anything
 
@@ -214,7 +175,7 @@ For form submissions and mutations (clicking Create/Save/Submit buttons):
     }
 
     const newName = deriveTestName(code) ?? test.name;
-    const diff = computeDiff(test.playwright_code, code);
+    const diff = computeDiff(test.playwright_code ?? "", code);
 
     await ctx.runMutation(api.tests.mutations.updateTestCode, {
       test_id: args.test_id,

@@ -1,7 +1,7 @@
 # 033 — Remove browser-api and browser-sessions
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 **Blocked by**: 024
 
 ## What to build
@@ -10,13 +10,13 @@ Stagehand replaces all browser session management. Delete `runner/src/browser-se
 
 ## Acceptance criteria
 
-- [ ] `runner/src/browser-sessions.ts` deleted
-- [ ] `runner/src/browser-api.ts` deleted
-- [ ] `convex/ai/browserClient.ts` deleted
-- [ ] All imports and references to deleted files cleaned up
-- [ ] Runner no longer starts an HTTP server for browser control
-- [ ] Related tests (`browser-api.test.ts`, `browser-sessions.test.ts`) removed or replaced
-- [ ] No dead code remaining in Runner or Convex referencing the old browser API
+- [x] `runner/src/browser-sessions.ts` deleted
+- [x] `runner/src/browser-api.ts` deleted
+- [x] `convex/ai/browserClient.ts` deleted
+- [x] All imports and references to deleted files cleaned up
+- [x] Runner no longer starts an HTTP server for browser control
+- [x] Related tests (`browser-api.test.ts`, `browser-sessions.test.ts`) removed or replaced
+- [x] No dead code remaining in Runner or Convex referencing the old browser API
 
 ## Blocked by
 

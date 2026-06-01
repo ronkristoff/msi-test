@@ -2,13 +2,10 @@ import { RunnerConvexClient } from "./convex-client";
 import { executeRun, type RunWorkItem } from "./executor";
 import { executeStagehandTests } from "./stagehand-executor";
 import { executeExploration } from "./explorer";
-import { BrowserSessionManager } from "./browser-sessions";
-import { createBrowserApiServer } from "./browser-api";
 import type { ExplorationWorkItem } from "./types";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 const RUNNER_SECRET = process.env.RUNNER_SECRET;
-const RUNNER_API_PORT = parseInt(process.env.RUNNER_API_PORT ?? "8931", 10);
 const RUNNER_ID = `runner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -23,7 +20,6 @@ if (!RUNNER_SECRET) {
 }
 
 const client = new RunnerConvexClient(CONVEX_URL, RUNNER_SECRET);
-const browserSessionManager = new BrowserSessionManager(log);
 
 type ActiveWork =
   | { kind: "run"; id: string }
@@ -33,7 +29,6 @@ type ActiveWork =
 let activeWork: ActiveWork = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-let apiServer: ReturnType<typeof createBrowserApiServer> | null = null;
 let shuttingDown = false;
 
 function log(msg: string) {
@@ -203,14 +198,6 @@ async function shutdown() {
 
   await forceCleanupWork(activeWork);
 
-  await browserSessionManager.closeAll();
-
-  if (apiServer) {
-    await new Promise<void>((resolve) => {
-      apiServer!.close(() => resolve());
-    });
-  }
-
   process.exit(0);
 }
 
@@ -220,12 +207,6 @@ process.on("SIGTERM", shutdown);
 log(`MSITest Runner started (id: ${RUNNER_ID})`);
 log(`Convex URL: ${CONVEX_URL}`);
 log(`Polling every ${POLL_INTERVAL_MS}ms`);
-
-apiServer = createBrowserApiServer(browserSessionManager, RUNNER_SECRET, log);
-apiServer.listen(RUNNER_API_PORT, () => {
-  log(`Browser API listening on port ${RUNNER_API_PORT}`);
-});
-browserSessionManager.startIdleSweep();
 
 poll();
 pollTimer = setInterval(poll, POLL_INTERVAL_MS);
