@@ -6,6 +6,7 @@ export interface InteractiveElement {
 
 export interface DiscoveredFlow {
   name: string;
+  description?: string;
   steps: string[];
   pages_involved: number[];
   complexity: "low" | "medium" | "high";

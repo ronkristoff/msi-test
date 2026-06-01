@@ -254,6 +254,7 @@ export default defineSchema({
           description: v.string(),
           flow_summary: v.string(),
           area: v.string(),
+          related_flows: v.optional(v.array(v.string())),
         }),
       ),
     ),

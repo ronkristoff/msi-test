@@ -10,38 +10,17 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useErrorLogger } from "@/lib/error-logger";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
-
-interface Scenario {
-  name: string;
-  description: string;
-  flow_summary: string;
-  area: string;
-}
-
-interface CapturedPageWithUrl {
-  url: string;
-  title: string;
-  structure_text: string;
-  screenshot_storage_id?: string;
-  screenshot_url: string | null;
-  semantic_description?: string;
-  interactive_elements?: Array<{
-    selector: string;
-    description: string;
-    element_type: string;
-  }>;
-}
-
-interface DiscoveredFlow {
-  name: string;
-  steps: string[];
-  pages_involved: number[];
-  complexity: "low" | "medium" | "high";
-}
-
-interface ExplorationWithFlows {
-  discovered_flows?: DiscoveredFlow[];
-}
+import { FlowCard } from "./FlowCard";
+import { ScenarioList } from "./ScenarioList";
+import {
+  type Scenario,
+  type CapturedPageWithUrl,
+  type DiscoveredFlow,
+  type SelectionMode,
+  makeToggleHandler,
+  toggleAll,
+  matchScenariosToFlows,
+} from "./types";
 
 export default function ExplorePage() {
   const params = useParams<{ id: string }>();
@@ -55,6 +34,8 @@ export default function ExplorePage() {
   const [error, setError] = useState<string | null>(null);
   const [explorationId, setExplorationId] = useState<string | null>(null);
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
+  const [selectedFlows, setSelectedFlows] = useState<Set<number>>(new Set());
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("flows");
   const [generating, setGenerating] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
 
@@ -83,9 +64,30 @@ export default function ExplorePage() {
     effectiveExplorationId ? { exploration_id: asId(effectiveExplorationId, "explorations") } : "skip",
   );
 
+  const discoveredFlows = useMemo<DiscoveredFlow[]>(
+    () => (exploration as { discovered_flows?: DiscoveredFlow[] } | null)?.discovered_flows ?? [],
+    [exploration],
+  );
+
+  const capturedPages = useMemo<CapturedPageWithUrl[]>(
+    () => (exploration?.captured_pages as CapturedPageWithUrl[] | undefined) ?? [],
+    [exploration],
+  );
+
+  const scenarios = useMemo<Scenario[]>(
+    () => (exploration?.proposed_scenarios as Scenario[] | undefined) ?? [],
+    [exploration],
+  );
+
+  const hasFlows = discoveredFlows.length > 0;
+
+  const toggleFlow = useMemo(() => makeToggleHandler(setSelectedFlows), []);
+  const toggleScenario = useMemo(() => makeToggleHandler(setSelectedScenarios), []);
+
   const handleStartExploration = useCallback(async () => {
     setError(null);
     setSelectedScenarios(new Set());
+    setSelectedFlows(new Set());
     setExplorationId(null);
     setUserDismissed(false);
     try {
@@ -106,20 +108,39 @@ export default function ExplorePage() {
     }
   }, [createExploration, projectId, goal, additionalUrlInput, logError]);
 
-  const handleToggleScenario = useCallback((index: number) => {
-    setSelectedScenarios((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }, []);
+  const matchedScenarios = useMemo(() => {
+    if (selectionMode !== "flows" || selectedFlows.size === 0) return [];
+    const selectedFlowNames = discoveredFlows
+      .filter((_: DiscoveredFlow, i: number) => selectedFlows.has(i))
+      .map((f) => f.name);
+    return matchScenariosToFlows(selectedFlowNames, scenarios);
+  }, [selectionMode, selectedFlows, discoveredFlows, scenarios]);
+
+  const totalSelected = selectionMode === "flows" ? matchedScenarios.length : selectedScenarios.size;
 
   const handleGenerateTests = useCallback(async () => {
-    if (!exploration?.proposed_scenarios || !user) return;
-    const selected = exploration.proposed_scenarios.filter((_: Scenario, i: number) =>
-      selectedScenarios.has(i),
-    );
+    if (!user) return;
+
+    let selected: Scenario[];
+    let flowContext: string | undefined;
+
+    if (selectionMode === "flows" && selectedFlows.size > 0) {
+      selected = matchedScenarios.length > 0 ? matchedScenarios : scenarios;
+      const selectedFlowData = discoveredFlows.filter((_: DiscoveredFlow, i: number) =>
+        selectedFlows.has(i),
+      );
+      flowContext = selectedFlowData
+        .map(
+          (f) =>
+            `Flow: ${f.name}\nComplexity: ${f.complexity}\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.map((pi) => capturedPages[pi]?.title ?? `Page ${pi}`).join(", ")}`,
+        )
+        .join("\n\n");
+    } else {
+      selected = scenarios.filter((_: Scenario, i: number) =>
+        selectedScenarios.has(i),
+      );
+    }
+
     if (selected.length === 0) return;
 
     setGenerating(true);
@@ -139,6 +160,7 @@ export default function ExplorePage() {
         exploration_id: asId(effectiveExplorationId!, "explorations"),
         selected_scenarios: selected,
         suite_ids: suiteResults,
+        flow_context: flowContext,
       }).catch((err) => {
         logError(err instanceof Error ? err.message : "Test generation failed", {
           severity: "error",
@@ -152,7 +174,7 @@ export default function ExplorePage() {
     } finally {
       setGenerating(false);
     }
-  }, [exploration, selectedScenarios, createSuitesForExploration, generateTests, effectiveExplorationId, router, params.id, logError, user, projectId]);
+  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTests, effectiveExplorationId, router, params.id, logError, user, projectId]);
 
   if (project === undefined) {
     return <PageSkeleton />;
@@ -183,7 +205,7 @@ export default function ExplorePage() {
     exploration?.status === "captured" ||
     exploration?.status === "analyzing";
 
-  const showScenarios = exploration?.status === "analyzed" && exploration.proposed_scenarios;
+  const showScenarios = exploration?.status === "analyzed" && scenarios.length > 0;
 
   return (
     <div className="max-w-[720px]">
@@ -286,13 +308,13 @@ export default function ExplorePage() {
 
         {showScenarios && (
           <div className="mb-5">
-            {exploration.captured_pages && exploration.captured_pages.length > 0 && (
+            {capturedPages.length > 0 && (
               <div className="mb-4">
                 <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                  Captured Pages ({exploration.captured_pages.length})
+                  Captured Pages ({capturedPages.length})
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {(exploration.captured_pages as CapturedPageWithUrl[]).map((page, i) =>
+                  {capturedPages.map((page, i) =>
                     page.screenshot_url ? (
                       <a
                         key={i}
@@ -329,91 +351,110 @@ export default function ExplorePage() {
               </div>
             )}
 
-            {(exploration as ExplorationWithFlows).discovered_flows &&
-             (exploration as ExplorationWithFlows).discovered_flows!.length > 0 && (
+            {hasFlows && (
               <div className="mb-4">
-                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                  Discovered Flows
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]">
+                    Discovered Flows ({discoveredFlows.length})
+                  </div>
+                  {selectionMode === "flows" && (
+                    <button
+                      type="button"
+                      onClick={() => toggleAll(setSelectedFlows, selectedFlows, discoveredFlows.length)}
+                      className="text-[10px] font-[var(--font-mono)] text-[var(--accent)] hover:underline"
+                    >
+                      {selectedFlows.size === discoveredFlows.length ? "Deselect all" : "Select all"}
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  {(exploration as ExplorationWithFlows).discovered_flows!.map(
-                    (flow, i) => (
-                      <div
-                        key={i}
-                        className="p-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium text-[var(--fg)]">{flow.name}</span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-[var(--font-mono)] font-medium ${
-                              flow.complexity === "high"
-                                ? "bg-red-100 text-red-700"
-                                : flow.complexity === "medium"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-green-100 text-green-700"
-                            }`}
-                          >
-                            {flow.complexity}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-[var(--muted)] font-[var(--font-mono)]">
-                          {flow.steps.join(" → ")}
-                        </div>
-                      </div>
-                    ),
-                  )}
+                  {discoveredFlows.map((flow, i) => (
+                    <FlowCard
+                      key={i}
+                      flow={flow}
+                      index={i}
+                      selected={selectedFlows.has(i)}
+                      mode={selectionMode}
+                      capturedPages={capturedPages}
+                      onToggle={toggleFlow}
+                    />
+                  ))}
                 </div>
               </div>
             )}
 
-            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-3">
-              Proposed Scenarios ({exploration.proposed_scenarios!.length})
-            </div>
-            <div className="space-y-3 mb-4">
-              {exploration.proposed_scenarios!.map((scenario: Scenario, i: number) => (
-                <label
-                  key={i}
-                  className={`flex items-start gap-3 p-3 rounded-[var(--radius-sm)] border cursor-pointer transition-colors duration-[var(--motion-fast)] ${
-                    selectedScenarios.has(i)
-                      ? "border-[var(--accent)] bg-[var(--accent)]/5"
-                      : "border-[var(--border)] hover:border-[var(--border-strong)]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedScenarios.has(i)}
-                    onChange={() => handleToggleScenario(i)}
-                    className="mt-0.5 accent-[var(--accent)]"
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium text-[var(--fg)]">{scenario.name}</div>
-                      <span className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--accent)]">
-                        {scenario.area}
-                      </span>
-                    </div>
-                    <div className="text-xs text-[var(--muted)] mt-1">{scenario.description}</div>
-                    <div className="text-xs text-[var(--muted)] mt-1 font-[var(--font-mono)] whitespace-pre-wrap">
-                      {scenario.flow_summary}
-                    </div>
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-3">
+                {hasFlows && (
+                  <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setSelectionMode("flows")}
+                      className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
+                        selectionMode === "flows"
+                          ? "bg-[var(--accent)] text-white"
+                          : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                      }`}
+                    >
+                      Select Flows
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectionMode("scenarios")}
+                      className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
+                        selectionMode === "scenarios"
+                          ? "bg-[var(--accent)] text-white"
+                          : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                      }`}
+                    >
+                      Select Scenarios
+                    </button>
                   </div>
-                </label>
-              ))}
+                )}
+                {!hasFlows && (
+                  <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]">
+                    Proposed Scenarios ({scenarios.length})
+                  </div>
+                )}
+              </div>
             </div>
+
+            {(selectionMode === "scenarios" || !hasFlows) && (
+              <ScenarioList
+                scenarios={scenarios}
+                selectedIndices={selectedScenarios}
+                onToggle={toggleScenario}
+                onSelectAll={() => toggleAll(setSelectedScenarios, selectedScenarios, scenarios.length)}
+                totalScenarios={scenarios.length}
+              />
+            )}
+
+            {selectionMode === "flows" && selectedFlows.size > 0 && (
+              <div className="mb-4 p-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]">
+                <div className="text-xs text-[var(--muted)]">
+                  {selectedFlows.size} flow{selectedFlows.size !== 1 ? "s" : ""} selected
+                  {matchedScenarios.length > 0
+                    ? ` — ${matchedScenarios.length} matching scenario${matchedScenarios.length !== 1 ? "s" : ""} will be generated.`
+                    : " — all scenarios will be generated (no specific matches found)."}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <Button
                 onClick={handleGenerateTests}
-                disabled={selectedScenarios.size === 0 || generating}
+                disabled={totalSelected === 0 || generating}
               >
                 {generating
                   ? "Generating..."
-                  : `Generate Tests from Selected (${selectedScenarios.size})`}
+                  : `Generate Tests from Selected (${totalSelected})`}
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
                   setExplorationId(null);
                   setSelectedScenarios(new Set());
+                  setSelectedFlows(new Set());
                   setGoal("");
                   setAdditionalUrlInput("");
                   setUserDismissed(true);

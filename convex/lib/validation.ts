@@ -61,6 +61,7 @@ export const capturedPageValidator = v.object({
 
 export const discoveredFlowValidator = v.object({
   name: v.string(),
+  description: v.optional(v.string()),
   steps: v.array(v.string()),
   pages_involved: v.array(v.number()),
   complexity: v.union(

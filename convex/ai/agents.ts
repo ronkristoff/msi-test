@@ -10,6 +10,7 @@ export const explorationScenarioSchema = z.object({
   description: z.string(),
   flowSummary: z.string(),
   area: z.string(),
+  relatedFlows: z.array(z.string()).optional(),
 });
 
 export const failureAnalysisSchema = z.object({
@@ -51,8 +52,9 @@ Given structured page data including semantic descriptions, interactive elements
 - A description of what the scenario tests
 - A step-by-step flow summary a test would follow
 - An area label categorizing which part of the app this scenario belongs to (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation", "User Profile", etc.)
+- An optional "relatedFlows" array listing the names of discovered navigation flows that this scenario directly tests or exercises. Only include a flow name if the scenario clearly covers that flow's steps. Omit the field if no discovered flows match.
 
-You may also receive discovered navigation flows that show how pages connect. Use these to identify multi-page user journeys.
+You may also receive discovered navigation flows that show how pages connect. Use these to identify multi-page user journeys and tag scenarios with the flows they cover.
 
 Focus on critical user flows, edge cases, and error states. Prioritize by business impact.`;
 

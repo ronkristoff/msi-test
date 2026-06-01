@@ -81,7 +81,8 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
 - "name": string — concise scenario name
 - "description": string — what the scenario tests
 - "flowSummary": string — step-by-step flow summary
-- "area": string — app area category (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation")`,
+- "area": string — app area category (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation")
+- "relatedFlows": array of strings (optional) — names of discovered flows this scenario covers. Only include if the scenario clearly exercises a listed flow's steps.`,
       });
 
       const text = result.text.trim();
@@ -96,6 +97,7 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
         description: s.description,
         flow_summary: s.flowSummary,
         area: s.area,
+        related_flows: s.relatedFlows,
       }));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -123,6 +125,7 @@ export const generateExplorationTests = action({
         description: v.string(),
         flow_summary: v.string(),
         area: v.string(),
+        related_flows: v.optional(v.array(v.string())),
       }),
     ),
     suite_ids: v.array(
@@ -131,6 +134,7 @@ export const generateExplorationTests = action({
         suite_id: v.id("suites"),
       }),
     ),
+    flow_context: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
@@ -159,6 +163,10 @@ export const generateExplorationTests = action({
 
     const pagesContext = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 3000);
 
+    const flowContextSection = args.flow_context
+      ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
+      : "";
+
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();
     const allTestBlocks: { name: string; code: string; area: string }[] = [];
@@ -183,7 +191,7 @@ Flow: ${scenario.flow_summary}
 
 Page structure context:
 ${pagesContext}
-
+${flowContextSection}
 Generate a single, self-contained Playwright test. Rules:
 - Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
 - Navigate to ${exploration.url} at the start using page.goto()
