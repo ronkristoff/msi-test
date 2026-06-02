@@ -54,6 +54,7 @@ export default defineSchema({
     explore_cookie_name: v.optional(v.string()),
     explore_cookie_value: v.optional(v.string()),
     test_data: v.optional(v.record(v.string(), v.string())),
+    status: v.optional(v.union(v.literal("active"), v.literal("archived"))),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_workspace_id_and_name", ["workspace_id", "name"]),

@@ -4,17 +4,23 @@ import { getOptionalOwnedWorkspace, getOptionalOwnedEntity } from "../lib/requir
 import { maskApiKey } from "../lib/validation";
 
 export const getProjects = query({
-  args: { workspace_id: v.id("workspaces") },
+  args: {
+    workspace_id: v.id("workspaces"),
+    status: v.optional(v.union(v.literal("active"), v.literal("archived"))),
+  },
   handler: async (ctx, args) => {
     const result = await getOptionalOwnedWorkspace(ctx);
     if (!result) return [];
     if (args.workspace_id !== result.workspace._id) return [];
 
-    return ctx.db
+    const all = await ctx.db
       .query("projects")
       .withIndex("by_workspace_id", (q) => q.eq("workspace_id", args.workspace_id))
       .order("desc")
       .collect();
+
+    if (args.status === "archived") return all.filter((p) => p.status === "archived");
+    return all.filter((p) => p.status !== "archived");
   },
 });
 

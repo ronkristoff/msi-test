@@ -276,4 +276,124 @@ describe("projects mutations", () => {
 
     expect(project!.test_data).toBeUndefined();
   });
+
+  it("archiveProject rejects unauthenticated user", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Proj",
+        app_url: "https://proj.com",
+      });
+    });
+
+    await expect(
+      t.mutation(api.projects.mutations.archiveProject, {
+        project_id: projectId,
+      }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("unarchiveProject rejects unauthenticated user", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Proj",
+        app_url: "https://proj.com",
+        status: "archived",
+      });
+    });
+
+    await expect(
+      t.mutation(api.projects.mutations.unarchiveProject, {
+        project_id: projectId,
+      }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("data layer: archive sets status to archived", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "To Archive",
+        app_url: "https://archive.com",
+      });
+    });
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(projectId, { status: "archived" });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.status).toBe("archived");
+  });
+
+  it("data layer: unarchive clears status", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    const projectId = await t.run(async (ctx) => {
+      return ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "To Restore",
+        app_url: "https://restore.com",
+        status: "archived",
+      });
+    });
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(projectId, { status: undefined });
+    });
+
+    const project = await t.run(async (ctx) => {
+      return ctx.db.get(projectId);
+    });
+
+    expect(project!.status).toBeUndefined();
+  });
+
+  it("data layer: getProjects filters out archived", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Active",
+        app_url: "https://active.com",
+      });
+      await ctx.db.insert("projects", {
+        workspace_id: workspaceId,
+        name: "Archived",
+        app_url: "https://archived.com",
+        status: "archived",
+      });
+    });
+
+    const all = await t.run(async (ctx) => {
+      return ctx.db
+        .query("projects")
+        .withIndex("by_workspace_id", (q) => q.eq("workspace_id", workspaceId))
+        .collect();
+    });
+
+    const active = all.filter((p) => p.status !== "archived");
+    const archived = all.filter((p) => p.status === "archived");
+
+    expect(active).toHaveLength(1);
+    expect(active[0].name).toBe("Active");
+    expect(archived).toHaveLength(1);
+    expect(archived[0].name).toBe("Archived");
+  });
 });

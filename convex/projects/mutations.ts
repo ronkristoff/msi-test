@@ -171,3 +171,19 @@ export const updateProject = mutation({
     await ctx.db.patch(args.project_id, updates);
   },
 });
+
+export const archiveProject = mutation({
+  args: { project_id: v.id("projects") },
+  handler: async (ctx, args) => {
+    await getOwnedEntity(ctx, args.project_id, "projects");
+    await ctx.db.patch(args.project_id, { status: "archived" });
+  },
+});
+
+export const unarchiveProject = mutation({
+  args: { project_id: v.id("projects") },
+  handler: async (ctx, args) => {
+    await getOwnedEntity(ctx, args.project_id, "projects");
+    await ctx.db.patch(args.project_id, { status: undefined });
+  },
+});
