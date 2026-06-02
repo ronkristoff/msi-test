@@ -33,6 +33,9 @@ export interface ExplorationWorkItem {
   cookie_value?: string;
   additional_urls?: string[];
   interactive: boolean;
+  exploration_mode: "scripted" | "autonomous";
+  max_steps?: number;
+  goal?: string;
 }
 
 export interface TestStep {

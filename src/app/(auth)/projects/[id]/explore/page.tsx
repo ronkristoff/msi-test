@@ -41,10 +41,13 @@ export default function ExplorePage() {
 
   const [goal, setGoal] = useState("");
   const [additionalUrlInput, setAdditionalUrlInput] = useState("");
+  const [explorationMode, setExplorationMode] = useState<"scripted" | "autonomous">("scripted");
+  const [maxSteps, setMaxSteps] = useState(25);
 
   const url = project?.app_url ?? "";
 
   const createExploration = useMutation(api.explorations.mutations.createExploration);
+  const cancelExploration = useMutation(api.explorations.mutations.cancelExploration);
   const createSuitesForExploration = useMutation(api.suites.mutations.createSuitesForExploration);
   const generateTests = useAction(api.ai.exploreApp.generateExplorationTests);
   const user = useQuery(api.workspaces.queries.getCurrentUser);
@@ -99,6 +102,8 @@ export default function ExplorePage() {
         project_id: projectId,
         goal: goal.trim() || undefined,
         additional_urls: additionalUrls.length > 0 ? additionalUrls : undefined,
+        exploration_mode: explorationMode,
+        ...(explorationMode === "autonomous" ? { max_steps: maxSteps } : {}),
       });
       setExplorationId(id);
     } catch (err) {
@@ -106,7 +111,7 @@ export default function ExplorePage() {
       setError(msg);
       logError(msg, { severity: "error", context: { source: "ExplorePage" } });
     }
-  }, [createExploration, projectId, goal, additionalUrlInput, logError]);
+  }, [createExploration, projectId, goal, additionalUrlInput, explorationMode, maxSteps, logError]);
 
   const matchedScenarios = useMemo(() => {
     if (selectionMode !== "flows" || selectedFlows.size === 0) return [];
@@ -115,6 +120,19 @@ export default function ExplorePage() {
       .map((f) => f.name);
     return matchScenariosToFlows(selectedFlowNames, scenarios);
   }, [selectionMode, selectedFlows, discoveredFlows, scenarios]);
+
+  const handleCancel = useCallback(async () => {
+    if (!effectiveExplorationId) return;
+    try {
+      await cancelExploration({ exploration_id: asId(effectiveExplorationId, "explorations") });
+      setExplorationId(null);
+      setUserDismissed(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to cancel";
+      setError(msg);
+      logError(msg, { severity: "error", context: { source: "ExplorePage.handleCancel" } });
+    }
+  }, [cancelExploration, effectiveExplorationId, logError]);
 
   const totalSelected = selectionMode === "flows" ? matchedScenarios.length : selectedScenarios.size;
 
@@ -237,12 +255,75 @@ export default function ExplorePage() {
 
             <div className="mb-4">
               <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                Goal / Focus (optional)
+                Explorer Mode
+              </div>
+              <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExplorationMode("scripted")}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    explorationMode === "scripted"
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  Smart Explorer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExplorationMode("autonomous")}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    explorationMode === "autonomous"
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  Agent Explorer
+                </button>
+              </div>
+              {explorationMode === "scripted" && (
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  BFS crawl that visits pages, extracts structure, and discovers navigation flows.
+                </p>
+              )}
+              {explorationMode === "autonomous" && (
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  AI agent autonomously explores the app, discovering hidden flows, error states, and dynamic interactions.
+                </p>
+              )}
+            </div>
+
+            {explorationMode === "autonomous" && (
+              <div className="mb-4">
+                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                  Max Steps
+                </div>
+                <input
+                  type="number"
+                  min={5}
+                  max={100}
+                  value={maxSteps}
+                  onChange={(e) => setMaxSteps(Number(e.target.value))}
+                  className="w-24 font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Maximum agent steps (5–100). More steps = deeper exploration but longer runtime.
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                {explorationMode === "autonomous" ? "Goal / Instruction" : "Goal / Focus"} (optional)
               </div>
               <textarea
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
-                placeholder={"e.g., Focus on checkout and payment flows"}
+                placeholder={
+                  explorationMode === "autonomous"
+                    ? "e.g., Explore the checkout process end-to-end, including cart, payment, and order confirmation"
+                    : "e.g., Focus on checkout and payment flows"
+                }
                 className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               />
             </div>
@@ -287,6 +368,11 @@ export default function ExplorePage() {
                 {exploration.pages_captured} page{exploration.pages_captured !== 1 ? "s" : ""} captured
               </div>
             )}
+            <div className="mt-3">
+              <Button variant="secondary" onClick={handleCancel}>
+                Cancel Exploration
+              </Button>
+            </div>
           </div>
         )}
 

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockCreateExploration = vi.fn();
+const mockCancelExploration = vi.fn();
 const mockGenerateTests = vi.fn();
 let mockQueryResults: Record<string, unknown> = {};
 
@@ -20,6 +21,7 @@ vi.mock("convex/react", () => ({
   useMutation: vi.fn((_ref: unknown) => {
     const key = String(_ref);
     if (key.includes("createExploration")) return mockCreateExploration;
+    if (key.includes("cancelExploration")) return mockCancelExploration;
     if (key.includes("createSuitesForExploration")) return vi.fn().mockResolvedValue([{ area: "Auth", suite_id: "s1" }]);
     return vi.fn();
   }),
@@ -39,7 +41,7 @@ vi.mock("@/lib/convex", () => ({
         getExploration: "explorations.queries.getExploration",
         getLatestActiveExploration: "explorations.queries.getLatestActiveExploration",
       },
-      mutations: { createExploration: "explorations.mutations.createExploration" },
+      mutations: { createExploration: "explorations.mutations.createExploration", cancelExploration: "explorations.mutations.cancelExploration" },
     },
     suites: {
       mutations: {
@@ -99,6 +101,7 @@ const analyzedNoFlows = {
 describe("ExplorePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCancelExploration.mockResolvedValue(undefined);
     mockQueryResults = { project: undefined, exploration: undefined, user: { _id: "user1", name: "Test" }, latestActive: null };
   });
 
@@ -125,14 +128,105 @@ describe("ExplorePage", () => {
     expect(screen.getByRole("button", { name: /start exploration/i })).toBeInTheDocument();
   });
 
-  it("calls createExploration on button click", async () => {
+  it("calls createExploration with exploration_mode scripted by default", async () => {
     mockQueryResults.project = projectData;
     mockCreateExploration.mockResolvedValue("exploration-1");
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
     await userEvent.click(screen.getByRole("button", { name: /start exploration/i }));
-    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1" });
+    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1", exploration_mode: "scripted" });
+  });
+
+  it("renders Smart Explorer and Agent Explorer mode buttons", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+    expect(screen.getByRole("button", { name: /smart explorer/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /agent explorer/i })).toBeInTheDocument();
+  });
+
+  it("shows max steps input only in autonomous mode", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.queryByText(/maximum agent steps/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
+    expect(screen.getByText(/maximum agent steps/i)).toBeInTheDocument();
+  });
+
+  it("calls createExploration with autonomous mode and max_steps", async () => {
+    mockQueryResults.project = projectData;
+    mockCreateExploration.mockResolvedValue("exploration-2");
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
+    await userEvent.click(screen.getByRole("button", { name: /start exploration/i }));
+    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1", exploration_mode: "autonomous", max_steps: 25 });
+  });
+
+  it("shows cancel button during exploration", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = {
+      _id: "expl-active",
+      status: "capturing",
+      progress_message: "Crawling...",
+      pages_captured: 2,
+    };
+    mockQueryResults.latestActive = { _id: "expl-active" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.getByRole("button", { name: /cancel exploration/i })).toBeInTheDocument();
+  });
+
+  it("calls cancelExploration on cancel click", async () => {
+    mockQueryResults.project = projectData;
+    mockCancelExploration.mockResolvedValue(undefined);
+    mockQueryResults.exploration = {
+      _id: "expl-active",
+      status: "capturing",
+      progress_message: "Crawling...",
+      pages_captured: 2,
+    };
+    mockQueryResults.latestActive = { _id: "expl-active" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel exploration/i }));
+    expect(mockCancelExploration).toHaveBeenCalledWith({ exploration_id: "expl-active" });
+  });
+
+  it("shows BFS description for Smart Explorer mode", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+    expect(screen.getByText(/BFS crawl that visits pages/)).toBeInTheDocument();
+  });
+
+  it("shows AI agent description for Agent Explorer mode", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
+    expect(screen.getByText(/AI agent autonomously explores/)).toBeInTheDocument();
+  });
+
+  it("changes goal label based on mode", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.getByText(/goal \/ focus/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
+    expect(screen.getByText(/goal \/ instruction/i)).toBeInTheDocument();
   });
 
   it("shows Cancel link back to project", async () => {

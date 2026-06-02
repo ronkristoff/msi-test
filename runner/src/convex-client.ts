@@ -200,6 +200,13 @@ export class RunnerConvexClient {
     });
   }
 
+  async getExplorationStatus(explorationId: string): Promise<{ status: string; error_message?: string }> {
+    return this.client.action(api.explorations.actions.runnerGetExplorationStatus, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+    });
+  }
+
   async recordHealingHistory(args: {
     workspace_id: string;
     test_id: string;

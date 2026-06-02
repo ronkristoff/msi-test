@@ -2,11 +2,19 @@ import { z } from "zod";
 import { RunnerConvexClient } from "./convex-client";
 import { initStagehand } from "./stagehand";
 import { discoverFlows } from "./flowDiscovery";
+import {
+  type Stagehand,
+  normalizeUrl,
+  isSameOrigin,
+  buildSemanticDescription,
+  captureScreenshot,
+  handleFormLogin,
+  sleep,
+  NAVIGATION_TIMEOUT_MS,
+} from "./explorer-utils";
 import type { CapturedPage, ExplorationWorkItem, InteractiveElement } from "./types";
 
 const MAX_PAGES = 15;
-const HYDRATION_WAIT_MS = 2_000;
-const NAVIGATION_TIMEOUT_MS = 30_000;
 
 const NOISE_PATTERNS = [
   /privacy/i,
@@ -30,8 +38,6 @@ const NOISE_PATTERNS = [
 const linksSchema = z.object({
   links: z.array(z.object({ text: z.string(), href: z.string() })),
 });
-
-type Stagehand = Awaited<ReturnType<typeof initStagehand>>;
 
 export async function executeExploration(
   client: RunnerConvexClient,
@@ -96,15 +102,10 @@ export async function executeExploration(
         const result = await visitPage(stagehand, normalized, work.interactive, log);
         if (!result) continue;
 
-        const captured = await capturePage({
-          stagehand,
-          url: normalized,
-          title: result.title,
-          pageText: result.pageText,
-          interactiveElements: result.interactiveElements,
-          client,
-          log,
-        });
+        const captured = await buildCapturedPage(
+          stagehand, normalized, result.title, result.pageText,
+          result.interactiveElements, client, log,
+        );
         capturedPages.push(captured);
 
         linkGraph.set(normalized, result.links.map((l) => l.href));
@@ -153,76 +154,16 @@ export async function executeExploration(
   }
 }
 
-async function handleFormLogin(
+async function buildCapturedPage(
   stagehand: Stagehand,
-  work: ExplorationWorkItem,
+  url: string,
+  title: string,
+  pageText: string,
+  interactiveElements: InteractiveElement[],
   client: RunnerConvexClient,
   log: (msg: string) => void,
 ): Promise<CapturedPage> {
-  const loginUrl = work.login_url || work.url;
-
-  log(`Exploration ${work.exploration_id}: navigating to login page ${loginUrl}`);
-  const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
-  await page.goto(loginUrl, { timeoutMs: NAVIGATION_TIMEOUT_MS });
-  await sleep(page);
-
-  const title = await page.title();
-  const extraction = await stagehand.extract();
-
-  log(`Exploration ${work.exploration_id}: performing Stagehand act() login at ${loginUrl}`);
-  await stagehand.act(
-    "Fill in the username/email field with the provided username and the password field with the provided password, then click the submit/login button",
-    {
-      variables: {
-        username: work.username!,
-        password: work.password!,
-      },
-    },
-  );
-
-  await sleep(page);
-  log(`Exploration ${work.exploration_id}: login act() completed, current URL: ${page.url()}`);
-
-  return capturePage({
-    stagehand,
-    url: loginUrl,
-    title,
-    pageText: extraction.pageText,
-    interactiveElements: [],
-    client,
-    log,
-  });
-}
-
-interface CapturePageArgs {
-  stagehand: Stagehand;
-  url: string;
-  title: string;
-  pageText: string;
-  interactiveElements: InteractiveElement[];
-  client: RunnerConvexClient;
-  log: (msg: string) => void;
-}
-
-async function capturePage({
-  stagehand,
-  url,
-  title,
-  pageText,
-  interactiveElements,
-  client,
-  log,
-}: CapturePageArgs): Promise<CapturedPage> {
-  let screenshotStorageId: string | undefined;
-  try {
-    const page = stagehand.context.activePage();
-    if (page) {
-      const buffer = await page.screenshot({ type: "png" });
-      screenshotStorageId = await client.uploadBuffer(buffer, "image/png");
-    }
-  } catch (err) {
-    log(`  Screenshot failed for ${url}: ${err}`);
-  }
+  const screenshotStorageId = await captureScreenshot(stagehand, client, log);
 
   return {
     url,
@@ -339,14 +280,6 @@ async function exploreInteractiveElements(
   return explored;
 }
 
-function buildSemanticDescription(title: string, pageText: string): string {
-  const textSnippet = pageText.slice(0, 300).trim();
-  if (textSnippet) {
-    return `${title}: ${textSnippet}`;
-  }
-  return title;
-}
-
 function buildInteractiveElements(
   actions: Array<{ selector: string; description: string }>,
 ): InteractiveElement[] {
@@ -370,28 +303,6 @@ function inferElementType(description: string): string {
   if (/\b(tab)\b/.test(lower)) return "tab";
   if (/\b(search)\b/.test(lower)) return "search";
   return "interactive";
-}
-
-async function sleep(page: { waitForTimeout?: (ms: number) => Promise<void> }): Promise<void> {
-  await page.waitForTimeout?.(HYDRATION_WAIT_MS);
-}
-
-function normalizeUrl(raw: string): string | null {
-  try {
-    const parsed = new URL(raw);
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-function isSameOrigin(url: string, origin: string): boolean {
-  try {
-    return new URL(url).origin === origin;
-  } catch {
-    return false;
-  }
 }
 
 function isNoiseUrl(url: string): boolean {

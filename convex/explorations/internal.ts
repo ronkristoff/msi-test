@@ -93,6 +93,15 @@ export const updateExplorationStatus = internalMutation({
   },
 });
 
+export const getExplorationStatus = internalQuery({
+  args: { exploration_id: v.id("explorations") },
+  handler: async (ctx, args) => {
+    const exploration = await ctx.db.get(args.exploration_id);
+    if (!exploration) return { status: "failed" as const };
+    return { status: exploration.status, error_message: exploration.error_message };
+  },
+});
+
 export const getExplorationAuthConfig = internalQuery({
   args: { exploration_id: v.id("explorations") },
   handler: async (ctx, args) => {

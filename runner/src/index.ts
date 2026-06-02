@@ -2,6 +2,7 @@ import { RunnerConvexClient } from "./convex-client";
 import { executeRun, type RunWorkItem } from "./executor";
 import { executeStagehandTests } from "./stagehand-executor";
 import { executeExploration } from "./explorer";
+import { executeAutonomousExploration } from "./autonomous-explorer";
 import type { ExplorationWorkItem } from "./types";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -143,6 +144,9 @@ async function handleExploration(exploration: {
   cookie_value?: string;
   additional_urls?: string[];
   interactive?: boolean;
+  exploration_mode?: string;
+  max_steps?: number;
+  goal?: string;
 }) {
   if (!(await claimWithRetry(
     () => client.claimExploration(exploration._id, RUNNER_ID),
@@ -150,7 +154,7 @@ async function handleExploration(exploration: {
   ))) return;
 
   activeWork = { kind: "exploration", id: exploration._id };
-  log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode})`);
+  log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode}, mode: ${exploration.exploration_mode ?? "scripted"})`);
 
   const work: ExplorationWorkItem = {
     exploration_id: exploration._id,
@@ -164,9 +168,16 @@ async function handleExploration(exploration: {
     cookie_value: exploration.cookie_value,
     additional_urls: exploration.additional_urls,
     interactive: exploration.interactive ?? false,
+    exploration_mode: (exploration.exploration_mode as "scripted" | "autonomous") ?? "scripted",
+    max_steps: exploration.max_steps,
+    goal: exploration.goal,
   };
 
-  await executeExploration(client, work, log);
+  if (work.exploration_mode === "autonomous") {
+    await executeAutonomousExploration(client, work, log);
+  } else {
+    await executeExploration(client, work, log);
+  }
 
   cleanupSession();
   log("Ready for next work");

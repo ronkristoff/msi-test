@@ -58,6 +58,19 @@ export const runnerCompleteExploration = action({
   },
 });
 
+export const runnerGetExplorationStatus = action({
+  args: {
+    runner_secret: v.string(),
+    exploration_id: v.id("explorations"),
+  },
+  handler: async (ctx, args) => {
+    validateRunnerSecret(args.runner_secret);
+    return ctx.runQuery(internal.explorations.internal.getExplorationStatus, {
+      exploration_id: args.exploration_id,
+    });
+  },
+});
+
 export const runnerFailExploration = action({
   args: {
     runner_secret: v.string(),

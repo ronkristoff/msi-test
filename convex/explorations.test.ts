@@ -361,4 +361,74 @@ describe("explorations internal mutations", () => {
     expect(result!.discovered_flows).toHaveLength(1);
     expect(result!.discovered_flows![0].name).toBe("Home Flow");
   });
+
+  it("cancelExploration rejects unauthenticated user", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId, {
+      status: "pending",
+    });
+
+    await expect(
+      t.mutation(api.explorations.mutations.cancelExploration, {
+        exploration_id: explorationId,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("cancelExploration logic sets status to failed for pending exploration", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId, {
+      status: "pending",
+    });
+
+    await t.mutation(internal.explorations.internal.updateExplorationStatus, {
+      exploration_id: explorationId,
+      status: "failed",
+      error_message: "Cancelled by user",
+    });
+
+    const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
+    expect(exploration!.status).toBe("failed");
+    expect(exploration!.error_message).toBe("Cancelled by user");
+  });
+
+  it("getPendingExplorations includes exploration_mode and max_steps", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    await t.run(async (ctx) => {
+      return ctx.db.insert("explorations", {
+        workspace_id: workspaceId,
+        project_id: projectId,
+        url: "https://example.com",
+        status: "pending",
+        exploration_mode: "autonomous",
+        max_steps: 30,
+        goal: "Explore checkout",
+      });
+    });
+
+    const pending = await t.query(api.explorations.queries.getPendingExplorations, {});
+    expect(pending).toHaveLength(1);
+    expect(pending[0].exploration_mode).toBe("autonomous");
+    expect(pending[0].max_steps).toBe(30);
+    expect(pending[0].goal).toBe("Explore checkout");
+  });
+
+  it("getPendingExplorations defaults exploration_mode to scripted", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    await seedExploration(t, workspaceId, projectId, { status: "pending" });
+
+    const pending = await t.query(api.explorations.queries.getPendingExplorations, {});
+    expect(pending).toHaveLength(1);
+    expect(pending[0].exploration_mode).toBe("scripted");
+  });
 });

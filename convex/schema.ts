@@ -255,6 +255,10 @@ export default defineSchema({
     pages_captured: v.optional(v.number()),
     runner_id: v.optional(v.string()),
     interactive: v.optional(v.boolean()),
+    exploration_mode: v.optional(
+      v.union(v.literal("scripted"), v.literal("autonomous")),
+    ),
+    max_steps: v.optional(v.number()),
     captured_pages: v.optional(v.array(capturedPageValidator)),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
     proposed_scenarios: v.optional(

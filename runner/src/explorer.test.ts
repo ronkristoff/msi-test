@@ -7,6 +7,15 @@ vi.mock("./stagehand", () => ({
   initStagehand: vi.fn(),
 }));
 
+vi.mock("./explorer-utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./explorer-utils")>();
+  return {
+    ...actual,
+    captureScreenshot: vi.fn().mockResolvedValue("storage-id-1"),
+    handleFormLogin: vi.fn(),
+  };
+});
+
 function createMockPage() {
   return {
     goto: vi.fn().mockResolvedValue(null),
@@ -132,8 +141,9 @@ describe("executeExploration", () => {
     expect(urls).toContain("https://example.com/about");
   });
 
-  it("performs form login via act() with variables", async () => {
+  it("delegates form login to handleFormLogin with credentials", async () => {
     const { initStagehand } = await import("./stagehand");
+    const { handleFormLogin } = await import("./explorer-utils");
     const { stagehand, client, work } = createTestContext({
       work: {
         auth_mode: "form",
@@ -143,17 +153,20 @@ describe("executeExploration", () => {
       },
     });
     (initStagehand as Mock).mockResolvedValue(stagehand);
+    (handleFormLogin as Mock).mockResolvedValue({
+      url: "https://example.com/login",
+      title: "Login",
+      structure_text: "",
+      semantic_description: "Login",
+    });
 
     await executeExploration(client, work, log);
 
-    expect(stagehand.act).toHaveBeenCalledWith(
-      expect.stringContaining("username"),
-      expect.objectContaining({
-        variables: {
-          username: "user@test.com",
-          password: "pass123",
-        },
-      }),
+    expect(handleFormLogin).toHaveBeenCalledWith(
+      stagehand,
+      work,
+      client,
+      log,
     );
   });
 

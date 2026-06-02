@@ -88,6 +88,9 @@ export const getPendingExplorations = query({
           cookie_value: project?.explore_cookie_value,
           additional_urls: exploration.additional_urls,
           interactive: exploration.interactive ?? false,
+          exploration_mode: exploration.exploration_mode ?? "scripted",
+          max_steps: exploration.max_steps,
+          goal: exploration.goal,
         };
       }),
     );
