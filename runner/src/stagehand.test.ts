@@ -1,17 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createStagehandConfig, initStagehand } from "../src/stagehand";
+import { initStagehandConfig, initStagehand } from "../src/stagehand";
 import type { AiConfig } from "../../convex/ai/model";
 
+const mockInit = vi.fn().mockResolvedValue(undefined);
+const mockClose = vi.fn().mockResolvedValue(undefined);
+let lastStagehandArgs: Record<string, unknown> = {};
+
 vi.mock("@browserbasehq/stagehand", () => {
-  const mockInit = vi.fn().mockResolvedValue(undefined);
-  const mockClose = vi.fn().mockResolvedValue(undefined);
   class MockStagehand {
     init = mockInit;
     close = mockClose;
-    context = { pages: vi.fn().mockReturnValue([]) };
+    constructor(args: Record<string, unknown>) {
+      lastStagehandArgs = { ...args };
+    }
   }
-  return { Stagehand: MockStagehand };
+  return { Stagehand: MockStagehand, LLMClient: class {} };
 });
+
+vi.mock("@ai-sdk/openai", () => {
+  function mockCreateOpenAI() {
+    return Object.assign(
+      function fakeProvider(modelName: string) {
+        return { type: "language-model-v3", modelId: modelName, provider: "openai", specificationVersion: "v3" };
+      },
+      {
+        chat(modelName: string) {
+          return { type: "language-model-v3", modelId: modelName, provider: "openai.chat", specificationVersion: "v3" };
+        },
+      },
+    );
+  }
+  return { createOpenAI: mockCreateOpenAI };
+});
+
+vi.mock("ai", () => ({
+  generateText: vi.fn(),
+  generateObject: vi.fn(),
+}));
+
+vi.mock("@ai-sdk/provider-utils", () => ({
+  toJsonSchema: vi.fn((s) => s),
+}));
 
 const BASE_CONFIG: AiConfig = {
   endpoint_url: "https://api.openai.com/v1",
@@ -19,44 +48,35 @@ const BASE_CONFIG: AiConfig = {
   model_name: "gpt-4o",
 };
 
-describe("createStagehandConfig", () => {
-  it("uses primary model when no stagehand model specified", () => {
-    const config = createStagehandConfig(BASE_CONFIG);
-    expect(config.env).toBe("LOCAL");
-    expect(config.model).toEqual({
-      modelName: "gpt-4o",
-      apiKey: "sk-test-key-12345",
-      baseURL: "https://api.openai.com/v1",
-    });
+describe("initStagehandConfig", () => {
+  it("sets env to LOCAL", () => {
+    expect(initStagehandConfig(BASE_CONFIG).env).toBe("LOCAL");
   });
 
-  it("uses stagehand_model_name when specified", () => {
-    const config = createStagehandConfig({
-      ...BASE_CONFIG,
-      stagehand_model_name: "gpt-4o-mini",
-    });
-    expect(config.model.modelName).toBe("gpt-4o-mini");
+  it("enables experimental mode and disables API", () => {
+    const config = initStagehandConfig(BASE_CONFIG);
+    expect(config.experimental).toBe(true);
+    expect(config.disableAPI).toBe(true);
   });
 
-  it("falls back to primary model when stagehand_model_name is empty", () => {
-    const config = createStagehandConfig({
-      ...BASE_CONFIG,
-      stagehand_model_name: "",
-    });
-    expect(config.model.modelName).toBe("gpt-4o");
-  });
-
-  it("passes endpoint_url as baseURL", () => {
-    const config = createStagehandConfig({
-      ...BASE_CONFIG,
-      endpoint_url: "https://custom.proxy.com/v1",
-    });
-    expect(config.model.baseURL).toBe("https://custom.proxy.com/v1");
+  it("runs browser headless", () => {
+    expect(initStagehandConfig(BASE_CONFIG).localBrowserLaunchOptions).toEqual({ headless: true });
   });
 
   it("disables pino logging", () => {
-    const config = createStagehandConfig(BASE_CONFIG);
-    expect(config.disablePino).toBe(true);
+    expect(initStagehandConfig(BASE_CONFIG).disablePino).toBe(true);
+  });
+
+  it("sets verbose to 1", () => {
+    expect(initStagehandConfig(BASE_CONFIG).verbose).toBe(1);
+  });
+
+  it("includes cacheDir when provided", () => {
+    expect(initStagehandConfig(BASE_CONFIG, "/tmp/cache/proj-1").cacheDir).toBe("/tmp/cache/proj-1");
+  });
+
+  it("sets cacheDir to undefined when not provided", () => {
+    expect(initStagehandConfig(BASE_CONFIG).cacheDir).toBeUndefined();
   });
 });
 
@@ -65,59 +85,53 @@ describe("initStagehand", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    lastStagehandArgs = {};
   });
 
   it("creates and initializes a Stagehand instance", async () => {
     const stagehand = await initStagehand(BASE_CONFIG, log);
     expect(stagehand).toBeDefined();
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("Initializing Stagehand"),
-    );
+    expect(mockInit).toHaveBeenCalled();
   });
 
-  it("logs the model name and endpoint", async () => {
+  it("logs model name and endpoint", async () => {
     await initStagehand(BASE_CONFIG, log);
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("model=gpt-4o"),
-    );
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("endpoint=https://api.openai.com/v1"),
-    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("model=gpt-4o"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("endpoint=https://api.openai.com/v1"));
   });
 
-  it("logs the stagehand model when specified", async () => {
-    await initStagehand(
-      { ...BASE_CONFIG, stagehand_model_name: "gpt-4o-mini" },
-      log,
-    );
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("model=gpt-4o-mini"),
-    );
+  it("prefers stagehand_model_name over model_name", async () => {
+    await initStagehand({ ...BASE_CONFIG, stagehand_model_name: "gpt-4o-mini" }, log);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("model=gpt-4o-mini"));
   });
 
-  it("passes cacheDir to Stagehand config", async () => {
+  it("passes cacheDir to config", async () => {
     await initStagehand(BASE_CONFIG, log, "/tmp/test-cache/proj-1");
-    expect(log).toHaveBeenCalledWith(
-      expect.stringContaining("cacheDir=/tmp/test-cache/proj-1"),
-    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("cacheDir=/tmp/test-cache/proj-1"));
   });
 
   it("omits cacheDir log when not provided", async () => {
     await initStagehand(BASE_CONFIG, log);
-    expect(log).not.toHaveBeenCalledWith(
-      expect.stringContaining("cacheDir="),
-    );
-  });
-});
-
-describe("createStagehandConfig with cacheDir", () => {
-  it("includes cacheDir when provided", () => {
-    const config = createStagehandConfig(BASE_CONFIG, "/tmp/cache/proj-1");
-    expect(config.cacheDir).toBe("/tmp/cache/proj-1");
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining("cacheDir="));
   });
 
-  it("sets cacheDir to undefined when not provided", () => {
-    const config = createStagehandConfig(BASE_CONFIG);
-    expect(config.cacheDir).toBeUndefined();
+  it("creates ZAiClient with .chat() model", async () => {
+    await initStagehand(BASE_CONFIG, log);
+    const llmClient = lastStagehandArgs.llmClient as { type: string; hasVision: boolean };
+    expect(llmClient).toBeDefined();
+    expect(llmClient.type).toBe("openai");
+    expect(llmClient.hasVision).toBe(true);
+  });
+
+  it("creates ZAiClient for Z.AI config", async () => {
+    const zaiConfig: AiConfig = {
+      endpoint_url: "https://api.z.ai/api/coding/paas/v4",
+      api_key: "zai-key",
+      model_name: "glm-4.5-air",
+    };
+    await initStagehand(zaiConfig, log);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("model=glm-4.5-air"));
+    const llmClient = lastStagehandArgs.llmClient as { type: string };
+    expect(llmClient.type).toBe("openai");
   });
 });

@@ -54,6 +54,8 @@ export async function captureScreenshot(
   return undefined;
 }
 
+const MAX_LOGIN_SUBMIT_RETRIES = 2;
+
 export async function handleFormLogin(
   stagehand: Stagehand,
   work: ExplorationWorkItem,
@@ -67,28 +69,47 @@ export async function handleFormLogin(
   await page.goto(loginUrl, { timeoutMs: NAVIGATION_TIMEOUT_MS });
   await sleep(page);
 
+  const preLoginUrl = normalizeUrl(page.url()) ?? loginUrl;
+
+  log(`Exploration ${work.exploration_id}: filling username`);
+  await stagehand.act(
+    "type the username %username% into the username or email input field",
+    { variables: { username: work.username! } },
+  );
+  await sleep(page);
+
+  log(`Exploration ${work.exploration_id}: filling password`);
+  await stagehand.act(
+    "type the password %password% into the password input field",
+    { variables: { password: work.password! } },
+  );
+  await sleep(page);
+
+  for (let attempt = 1; attempt <= MAX_LOGIN_SUBMIT_RETRIES + 1; attempt++) {
+    log(`Exploration ${work.exploration_id}: clicking submit (attempt ${attempt})`);
+    await stagehand.act("click the submit, login, or sign-in button");
+    await sleep(page);
+
+    const currentUrl = normalizeUrl(page.url());
+    if (currentUrl && currentUrl !== preLoginUrl) {
+      log(`Exploration ${work.exploration_id}: login succeeded, redirected to ${currentUrl}`);
+      break;
+    }
+    if (attempt <= MAX_LOGIN_SUBMIT_RETRIES) {
+      log(`Exploration ${work.exploration_id}: URL unchanged after submit, retrying...`);
+    } else {
+      log(`Exploration ${work.exploration_id}: login may have failed — still on ${currentUrl}`);
+    }
+  }
+
+  const postLoginUrl = page.url();
   const title = await page.title();
   const extraction = await stagehand.extract();
   const pageText = getPageText(extraction);
-
-  log(`Exploration ${work.exploration_id}: performing Stagehand act() login at ${loginUrl}`);
-  await stagehand.act(
-    "Fill in the username/email field with the provided username and the password field with the provided password, then click the submit/login button",
-    {
-      variables: {
-        username: work.username!,
-        password: work.password!,
-      },
-    },
-  );
-
-  await sleep(page);
-  log(`Exploration ${work.exploration_id}: login act() completed, current URL: ${page.url()}`);
-
   const screenshotStorageId = await captureScreenshot(stagehand, client, log);
 
   return {
-    url: loginUrl,
+    url: postLoginUrl,
     title,
     structure_text: "",
     screenshot_storage_id: screenshotStorageId,

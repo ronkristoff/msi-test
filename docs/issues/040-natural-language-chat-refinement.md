@@ -1,7 +1,7 @@
 # 040 — Natural Language Chat Refinement
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 **Blocked by**: 005, 004
 
 ## What to build

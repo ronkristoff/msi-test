@@ -64,6 +64,7 @@ export const storeProposedScenarios = internalMutation({
         description: v.string(),
         flow_summary: v.string(),
         area: v.string(),
+        related_flows: v.optional(v.array(v.string())),
       }),
     ),
   },

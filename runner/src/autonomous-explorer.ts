@@ -46,6 +46,8 @@ export async function executeAutonomousExploration(
     const linkGraph = new Map<string, string[]>();
     let previousUrl: string | null = null;
 
+    let skipNavigation = false;
+
     if (work.auth_mode === "form" && work.username && work.password) {
       const loginPage = await handleFormLogin(stagehand, work, client, log);
       capturedPages.push(loginPage);
@@ -56,6 +58,12 @@ export async function executeAutonomousExploration(
         `Agent logged in: ${loginPage.title}`,
         capturedPages.length,
       );
+
+      const normalizedLoginUrl = normalizeUrl(work.login_url || work.url);
+      if (normalizedLoginUrl && normalizeUrl(loginPage.url) === normalizedLoginUrl) {
+        throw new Error("Login failed — still on login page after all attempts");
+      }
+      skipNavigation = isSameOrigin(loginPage.url, new URL(work.url).origin);
     } else if (work.auth_mode === "cookie" && work.cookie_name && work.cookie_value) {
       await stagehand.context.addCookies([{
         url: work.url,
@@ -65,11 +73,13 @@ export async function executeAutonomousExploration(
     }
 
     const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
-    await page.goto(work.url, { timeoutMs: NAVIGATION_TIMEOUT_MS });
-    await sleep(page);
+    if (!skipNavigation) {
+      await page.goto(work.url, { timeoutMs: NAVIGATION_TIMEOUT_MS });
+      await sleep(page);
+    }
 
     const origin = new URL(work.url).origin;
-    const instruction = buildInstruction(work);
+    const instruction = buildInstruction(work) + buildReauthInstruction(work);
     const vars = buildVariables(work);
 
     const cancelPollTimer = setInterval(async () => {
@@ -169,6 +179,13 @@ export async function executeAutonomousExploration(
   } finally {
     if (stagehand) await stagehand.close({ force: true }).catch(() => {});
   }
+}
+
+export function buildReauthInstruction(work: ExplorationWorkItem): string {
+  if (work.auth_mode === "form" && work.username && work.password) {
+    return "\n\nIf you are redirected to a login or sign-in page during exploration, log back in using username %username% and password %password%.";
+  }
+  return "";
 }
 
 export function buildInstruction(work: ExplorationWorkItem): string {

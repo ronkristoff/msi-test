@@ -102,11 +102,21 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
       });
 
       const text = result.text.trim();
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
+      const jsonStart = text.indexOf("[");
+      if (jsonStart === -1) {
         throw new Error("AI response did not contain a JSON array");
       }
-      const parsed = JSON.parse(jsonMatch[0]);
+      let depth = 0;
+      let jsonEnd = -1;
+      for (let i = jsonStart; i < text.length; i++) {
+        if (text[i] === "[") depth++;
+        if (text[i] === "]") depth--;
+        if (depth === 0) { jsonEnd = i; break; }
+      }
+      if (jsonEnd === -1) {
+        throw new Error("AI response contained unclosed JSON array");
+      }
+      const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
       const validated = explorationScenarioSchema.array().parse(parsed);
       scenarios = validated.map((s) => ({
         name: s.name,
