@@ -65,7 +65,7 @@ export const runnerGetExplorationStatus = action({
     runner_secret: v.string(),
     exploration_id: v.id("explorations"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<unknown> => {
     validateRunnerSecret(args.runner_secret);
     return ctx.runQuery(internal.explorations.internal.getExplorationStatus, {
       exploration_id: args.exploration_id,

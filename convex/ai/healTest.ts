@@ -11,6 +11,7 @@ import { classifyAiError } from "./errors";
 import { formatCapturedPagesForPrompt } from "./formatPages";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
+import { resolveTestContext } from "./resolveContext";
 
 export const healTest = action({
   args: {
@@ -39,29 +40,7 @@ export const healTest = action({
 });
 
 async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error_message?: string; user_hint?: string }): Promise<{ testId: string; newName: string }> {
-    const test = await ctx.runQuery(internal.tests.queries.getTestInternal, {
-      test_id: args.test_id,
-    });
-
-    if (!test) {
-      throw new ConvexError("Test not found");
-    }
-
-    const suite = await ctx.runQuery(api.suites.queries.getSuite, {
-      suite_id: test.suite_id,
-    });
-
-    if (!suite) {
-      throw new ConvexError("Suite not found");
-    }
-
-    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
-      project_id: suite.project_id,
-    });
-
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
+    const { test, suite, project, aiConfig } = await resolveTestContext(ctx, args.test_id);
 
     let errorMessage = args.error_message;
     if (!errorMessage) {
@@ -84,10 +63,6 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
         pagesContext = formatCapturedPagesForPrompt(latest.captured_pages.slice(0, 5), 2000);
       }
     }
-
-    const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
-      workspace_id: project.workspace_id,
-    });
 
     let responseText = "";
     try {
@@ -202,7 +177,7 @@ export const healAllFailed = action({
       throw new ConvexError("Run not found");
     }
 
-    const failedResults = run.results.filter((r) => r.status === "failed");
+    const failedResults = run.results.filter((r: { status: string }) => r.status === "failed");
 
     if (failedResults.length === 0) {
       throw new ConvexError("No failed tests in this run");
@@ -214,8 +189,8 @@ export const healAllFailed = action({
       const errorParts: string[] = [];
       if (result.error_message) errorParts.push(result.error_message);
       const failedStepErrors = result.steps
-        .filter((s) => s.error_message)
-        .map((s) => `Step ${s.step_number} (${s.command}): ${s.error_message}`);
+        .filter((s: { error_message: string | null }) => s.error_message)
+        .map((s: { step_number: number; command: string; error_message: string | null }) => `Step ${s.step_number} (${s.command}): ${s.error_message}`);
       if (failedStepErrors.length > 0) errorParts.push(failedStepErrors.join("\n"));
 
       try {

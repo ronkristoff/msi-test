@@ -10,6 +10,7 @@ import { createAiError, classifyAiError } from "./errors";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
 import { ConvexError } from "convex/values";
+import { resolveTestContext } from "./resolveContext";
 
 export const regenerateTest = action({
   args: {
@@ -36,33 +37,7 @@ export const regenerateTest = action({
 });
 
 async function regenerateTestInner(ctx: ActionCtx, args: { test_id: Id<"tests"> }): Promise<{ testId: string; newName: string }> {
-    const test = await ctx.runQuery(internal.tests.queries.getTestInternal, {
-      test_id: args.test_id,
-    });
-
-    if (!test) {
-      throw new ConvexError("Test not found");
-    }
-
-    const suite = await ctx.runQuery(api.suites.queries.getSuite, {
-      suite_id: test.suite_id,
-    });
-
-    if (!suite) {
-      throw new ConvexError("Suite not found");
-    }
-
-    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
-      project_id: suite.project_id,
-    });
-
-    if (!project) {
-      throw new ConvexError("Project not found");
-    }
-
-    const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
-      workspace_id: project.workspace_id,
-    });
+    const { test, project, aiConfig } = await resolveTestContext(ctx, args.test_id);
 
     let responseText: string;
     try {

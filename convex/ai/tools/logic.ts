@@ -9,7 +9,7 @@ export async function readExistingTestsLogic(
     .query("tests")
     .withIndex("by_suite_id", (q) => q.eq("suite_id", suiteId))
     .collect();
-  return tests.map((t) => ({ name: t.name, playwright_code: t.playwright_code }));
+  return tests.map((t) => ({ name: t.name, playwright_code: t.playwright_code ?? "" }));
 }
 
 export async function readProjectContextLogic(
@@ -27,7 +27,7 @@ export async function readTestCodeLogic(
 ): Promise<{ name: string; playwright_code: string } | null> {
   const test = await ctx.db.get(testId);
   if (!test) return null;
-  return { name: test.name, playwright_code: test.playwright_code };
+  return { name: test.name, playwright_code: test.playwright_code ?? "" };
 }
 
 export function readPreviousExplorationsLogic(): [] {

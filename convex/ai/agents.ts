@@ -150,6 +150,36 @@ export function createFailureAnalysisAgent(model: AgentModel) {
   });
 }
 
+export const TEST_REFINEMENT_PROMPT = `You are MSITest's Test Refinement Agent. You modify existing Playwright test code based on user requests.
+
+Given the current test code and a user's change request, you return the modified test code along with a summary of what changed.
+
+Rules:
+1. Understand the current test structure and intent before making changes
+2. Apply the user's requested change precisely — do not refactor unrelated code
+3. Return the FULL modified test code (not just the changed portion)
+4. Never break existing imports, test structure, or unrelated functionality
+5. Keep the test as a single test() call — no test.describe(), beforeEach(), or afterEach()
+6. Use semantic locators (getByRole, getByLabel, getByPlaceholder, getByText) first, then getByTestId
+7. Never use raw CSS selectors or XPath
+8. Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText()
+9. Never use waitForTimeout() or arbitrary sleeps
+10. Wrap the modified test in a markdown code fence with language "typescript"
+
+After the code fence, provide a brief summary of changes in this format:
+---CHANGES---
+- Description of change 1
+- Description of change 2
+---END CHANGES---`;
+
+export function createRefineAgent(model: AgentModel) {
+  return new Agent(components.agent, {
+    name: "Test Refinement",
+    languageModel: model,
+    instructions: TEST_REFINEMENT_PROMPT,
+  });
+}
+
 const CODE_FENCE_RE = /```(?:typescript|ts|tsx|javascript|js|jsx)?\s*\r?\n([\s\S]*?)```/;
 
 export function extractPlaywrightCode(response: string): string | null {

@@ -71,7 +71,7 @@ export const analyzeExploration = internalAction({
       const pagesDescription = formatCapturedPagesForPrompt(exploration.captured_pages, 2000);
 
       const flowsDescription = exploration.discovered_flows
-        ?.map((f) => `Flow: ${f.name} (${f.complexity})\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.join(", ")}`)
+        ?.map((f: { name: string; complexity: string; steps: string[]; pages_involved: number[] }) => `Flow: ${f.name} (${f.complexity})\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.join(", ")}`)
         .join("\n\n") ?? "";
 
       const prdText = project?.prd_text;
@@ -80,7 +80,7 @@ export const analyzeExploration = internalAction({
         : "";
 
       const prdCoverageSection = exploration.prd_coverage
-        ? `\nPRD keyword coverage (preliminary):\n${exploration.prd_coverage.map((c) => `- ${c.feature}: ${c.found ? "Found" : "NOT FOUND"}`).join("\n")}\n`
+        ? `\nPRD keyword coverage (preliminary):\n${exploration.prd_coverage.map((c: { feature: string; found: boolean }) => `- ${c.feature}: ${c.found ? "Found" : "NOT FOUND"}`).join("\n")}\n`
         : "";
 
       const result = await thread.generateText({

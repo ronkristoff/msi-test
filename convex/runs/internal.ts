@@ -105,7 +105,7 @@ async function aggregateAndFinalize(
   let pass_count = 0;
   let fail_count = 0;
   let skip_count = 0;
-  let healed_count = 0;
+  const healed_count = 0;
   let total_duration_ms = 0;
 
   for (const r of results) {
@@ -116,7 +116,6 @@ async function aggregateAndFinalize(
       total_duration_ms += r.duration_ms;
       if (r.status === "passed") pass_count++;
       else if (r.status === "failed") fail_count++;
-      else if (r.status === "healed") healed_count++;
       else skip_count++;
     }
   }

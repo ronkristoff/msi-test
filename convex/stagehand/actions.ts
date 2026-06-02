@@ -1,12 +1,10 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
 import { isBrowserbaseConfigured, createStagehand, type GuardResult } from "./lib";
 import { z } from "zod";
-
-type ActionCtx = Parameters<Parameters<typeof action>[0]["handler"]>[0];
 
 type ReachabilityResult =
   | { available: false; reason: string }
@@ -38,7 +36,7 @@ async function requireStagehand(ctx: ActionCtx): Promise<GuardResult> {
   if (!isBrowserbaseConfigured()) {
     return { ok: false, result: { available: false, reason: "Browserbase not configured" } };
   }
-  const workspace = await ctx.runQuery(api.workspaces.getWorkspaceForUser, {});
+  const workspace = await ctx.runQuery(api.workspaces.queries.getWorkspaceForUser, {});
   if (!workspace || workspace.stagehand_enabled !== true) {
     return { ok: false, result: { available: false, reason: "Stagehand not enabled for this workspace" } };
   }
@@ -54,7 +52,7 @@ export const checkUrlReachability = action({
     const guard = await requireStagehand(ctx);
     if (!guard.ok) return guard.result;
 
-    const project = await ctx.runQuery(api.projects.getProject, {
+    const project = await ctx.runQuery(api.projects.queries.getProject, {
       project_id: args.project_id,
     });
     const targetUrl = args.url?.trim() || project?.app_url;
@@ -122,7 +120,7 @@ export const detectPageChanges = action({
     const guard = await requireStagehand(ctx);
     if (!guard.ok) return guard.result;
 
-    const project = await ctx.runQuery(api.projects.getProject, {
+    const project = await ctx.runQuery(api.projects.queries.getProject, {
       project_id: args.project_id,
     });
     if (!project) {
