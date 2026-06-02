@@ -78,3 +78,9 @@ export const discoveredFlowValidator = v.object({
     v.literal("high"),
   ),
 });
+
+export const prdCoverageItemValidator = v.object({
+  feature: v.string(),
+  found: v.boolean(),
+  evidence: v.optional(v.string()),
+});

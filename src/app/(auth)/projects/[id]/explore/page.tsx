@@ -16,6 +16,7 @@ import {
   type Scenario,
   type CapturedPageWithUrl,
   type DiscoveredFlow,
+  type PrdCoverageItem,
   type SelectionMode,
   makeToggleHandler,
   toggleAll,
@@ -70,6 +71,16 @@ export default function ExplorePage() {
   const discoveredFlows = useMemo<DiscoveredFlow[]>(
     () => (exploration as { discovered_flows?: DiscoveredFlow[] } | null)?.discovered_flows ?? [],
     [exploration],
+  );
+
+  const prdCoverage = useMemo<PrdCoverageItem[]>(
+    () => (exploration as { prd_coverage?: PrdCoverageItem[] } | null)?.prd_coverage ?? [],
+    [exploration],
+  );
+
+  const prdGaps = useMemo(
+    () => prdCoverage.filter((c) => !c.found),
+    [prdCoverage],
   );
 
   const capturedPages = useMemo<CapturedPageWithUrl[]>(
@@ -466,6 +477,38 @@ export default function ExplorePage() {
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {prdCoverage.length > 0 && (
+              <div className="mb-4">
+                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                  PRD Coverage ({prdCoverage.filter((c) => c.found).length}/{prdCoverage.length} features found)
+                </div>
+                <div className="space-y-1">
+                  {prdCoverage.map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 text-xs px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-elevated)]"
+                    >
+                      <span className={`inline-block w-2 h-2 rounded-full ${item.found ? "bg-green-500" : "bg-red-400"}`} />
+                      <span className={item.found ? "text-[var(--fg)]" : "text-[var(--fg)] font-medium"}>
+                        {item.feature}
+                      </span>
+                      {!item.found && (
+                        <span className="text-[var(--muted)] ml-auto">Not found during exploration</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {prdGaps.length > 0 && (
+                  <div className="mt-2 p-2 rounded-[var(--radius-sm)] border border-amber-300/30 bg-amber-50/10">
+                    <p className="text-xs text-amber-600">
+                      {prdGaps.length} PRD feature{prdGaps.length !== 1 ? "s" : ""} not found during exploration.
+                      The AI will still propose scenarios for these gaps.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

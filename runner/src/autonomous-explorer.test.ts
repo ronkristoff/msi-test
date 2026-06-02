@@ -44,6 +44,40 @@ describe("buildInstruction", () => {
     const instruction = buildInstruction(work);
     expect(instruction).toContain("https://app.mysite.com");
   });
+
+  it("includes PRD section when prd_text is provided", () => {
+    const work = createBaseWork({ prd_text: "Feature: User checkout with credit card and PayPal" });
+    const instruction = buildInstruction(work);
+    expect(instruction).toContain("PRD / Product Requirements");
+    expect(instruction).toContain("User checkout with credit card and PayPal");
+    expect(instruction).toContain("guide your exploration");
+  });
+
+  it("does not include PRD section when prd_text is absent", () => {
+    const work = createBaseWork();
+    const instruction = buildInstruction(work);
+    expect(instruction).not.toContain("PRD / Product Requirements");
+  });
+
+  it("truncates long PRD text to 3000 chars", () => {
+    const longPrd = "x".repeat(5000);
+    const work = createBaseWork({ prd_text: longPrd });
+    const instruction = buildInstruction(work);
+    const prdMatch = instruction.match(/PRD \/ Product Requirements:\n([\s\S]*?)\n\nIMPORTANT/);
+    expect(prdMatch).toBeTruthy();
+    expect(prdMatch![1].length).toBeLessThanOrEqual(3000);
+  });
+
+  it("includes both goal and PRD when both provided", () => {
+    const work = createBaseWork({
+      goal: "Focus on checkout",
+      prd_text: "Checkout feature with tax withholding",
+    });
+    const instruction = buildInstruction(work);
+    expect(instruction).toContain("Focus on checkout");
+    expect(instruction).toContain("PRD / Product Requirements");
+    expect(instruction).toContain("tax withholding");
+  });
 });
 
 describe("buildVariables", () => {

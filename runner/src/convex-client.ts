@@ -6,7 +6,13 @@ import mime from "mime";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { AiConfig } from "../../convex/ai/model";
-import type { CapturedPage, DiscoveredFlow } from "./types";
+import type { CapturedPage, DiscoveredFlow, PrdCoverageItem } from "./types";
+
+export interface CompleteExplorationOpts {
+  capturedPages: CapturedPage[];
+  discoveredFlows?: DiscoveredFlow[];
+  prdCoverage?: PrdCoverageItem[];
+}
 
 export class RunnerConvexClient {
   private client: ConvexHttpClient;
@@ -171,17 +177,17 @@ export class RunnerConvexClient {
 
   async completeExploration(
     explorationId: string,
-    capturedPages: CapturedPage[],
-    discoveredFlows?: DiscoveredFlow[],
+    opts: CompleteExplorationOpts,
   ): Promise<void> {
     await this.client.action(api.explorations.actions.runnerCompleteExploration, {
       runner_secret: this.secret,
       exploration_id: explorationId as Id<"explorations">,
-      captured_pages: capturedPages.map((p) => ({
+      captured_pages: opts.capturedPages.map((p) => ({
         ...p,
         screenshot_storage_id: p.screenshot_storage_id as Id<"_storage"> | undefined,
       })),
-      discovered_flows: discoveredFlows,
+      discovered_flows: opts.discoveredFlows,
+      prd_coverage: opts.prdCoverage,
     });
   }
 

@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator, testStepValidator } from "./lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, prdCoverageItemValidator, testStepValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -261,6 +261,7 @@ export default defineSchema({
     max_steps: v.optional(v.number()),
     captured_pages: v.optional(v.array(capturedPageValidator)),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
+    prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
     proposed_scenarios: v.optional(
       v.array(
         v.object({

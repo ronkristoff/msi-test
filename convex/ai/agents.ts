@@ -62,6 +62,12 @@ Given structured page data including semantic descriptions, interactive elements
 
 You may also receive discovered navigation flows that show how pages connect. Use these to identify multi-page user journeys and tag scenarios with the flows they cover.
 
+When PRD / product requirements are provided:
+- Cross-reference discovered pages and flows against PRD features
+- Prioritize scenarios that test PRD-described features
+- If a PRD feature was not found during exploration, include a scenario for it anyway (marked in the description as "PRD requirement — not found during exploration")
+- Note coverage gaps in your scenario descriptions
+
 Focus on critical user flows, edge cases, and error states. Prioritize by business impact.`;
 
 export const FAILURE_ANALYSIS_PROMPT = `You are MSITest's Failure Analysis Agent. You diagnose why Playwright tests fail.

@@ -1,3 +1,9 @@
+export interface PrdCoverageItem {
+  feature: string;
+  found: boolean;
+  evidence?: string;
+}
+
 export interface Scenario {
   name: string;
   description: string;

@@ -1,6 +1,7 @@
 import { RunnerConvexClient } from "./convex-client";
 import { initStagehand } from "./stagehand";
 import { discoverFlows } from "./flowDiscovery";
+import { buildPrdCoverage, buildPrdInstructionSection } from "./prd-utils";
 import {
   type Stagehand,
   normalizeUrl,
@@ -153,7 +154,11 @@ export async function executeAutonomousExploration(
     const actionFlows = extractFlowsFromActions(result.actions as AgentAction[], capturedPages);
     const allFlows = deduplicateFlows([...linkBasedFlows, ...actionFlows]);
 
-    await client.completeExploration(work.exploration_id, capturedPages, allFlows);
+    await client.completeExploration(work.exploration_id, {
+      capturedPages,
+      discoveredFlows: allFlows,
+      prdCoverage: buildPrdCoverage(work.prd_text, capturedPages, allFlows),
+    });
     log(`Autonomous exploration ${work.exploration_id}: completed`);
   } catch (err) {
     log(`Autonomous exploration ${work.exploration_id}: error: ${err}`);
@@ -169,10 +174,12 @@ export async function executeAutonomousExploration(
 export function buildInstruction(work: ExplorationWorkItem): string {
   const goal = work.goal?.trim();
   const origin = new URL(work.url).origin;
+  const prdSection = buildPrdInstructionSection(work.prd_text);
+
   if (goal) {
-    return `${goal}\n\nStart from ${work.url}. Explore thoroughly within this application only (stay on origin ${origin}).`;
+    return `${goal}${prdSection}\n\nStart from ${work.url}. Explore thoroughly within this application only (stay on origin ${origin}).`;
   }
-  return `${DEFAULT_INSTRUCTION}\n\nStart from ${work.url}. Stay within the same origin (${origin}).`;
+  return `${DEFAULT_INSTRUCTION}${prdSection}\n\nStart from ${work.url}. Stay within the same origin (${origin}).`;
 }
 
 export function buildVariables(work: ExplorationWorkItem): Record<string, string> | undefined {

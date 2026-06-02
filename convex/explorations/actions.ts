@@ -4,7 +4,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { validateRunnerSecret } from "../lib/runner";
-import { capturedPageValidator, discoveredFlowValidator } from "../lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, prdCoverageItemValidator } from "../lib/validation";
 
 export const runnerClaimExploration = action({
   args: {
@@ -44,6 +44,7 @@ export const runnerCompleteExploration = action({
     exploration_id: v.id("explorations"),
     captured_pages: v.array(capturedPageValidator),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
+    prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
@@ -51,6 +52,7 @@ export const runnerCompleteExploration = action({
       exploration_id: args.exploration_id,
       captured_pages: args.captured_pages,
       discovered_flows: args.discovered_flows,
+      prd_coverage: args.prd_coverage,
     });
     await ctx.runAction(internal.ai.exploreApp.analyzeExploration, {
       exploration_id: args.exploration_id,

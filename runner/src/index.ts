@@ -147,6 +147,7 @@ async function handleExploration(exploration: {
   exploration_mode?: string;
   max_steps?: number;
   goal?: string;
+  prd_text?: string;
 }) {
   if (!(await claimWithRetry(
     () => client.claimExploration(exploration._id, RUNNER_ID),
@@ -171,6 +172,7 @@ async function handleExploration(exploration: {
     exploration_mode: (exploration.exploration_mode as "scripted" | "autonomous") ?? "scripted",
     max_steps: exploration.max_steps,
     goal: exploration.goal,
+    prd_text: exploration.prd_text,
   };
 
   if (work.exploration_mode === "autonomous") {

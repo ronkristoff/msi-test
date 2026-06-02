@@ -91,6 +91,7 @@ export const getPendingExplorations = query({
           exploration_mode: exploration.exploration_mode ?? "scripted",
           max_steps: exploration.max_steps,
           goal: exploration.goal,
+          prd_text: project?.prd_text,
         };
       }),
     );

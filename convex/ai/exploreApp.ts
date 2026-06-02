@@ -13,6 +13,8 @@ import { formatCapturedPagesForPrompt } from "./formatPages";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 
+const PRD_ANALYSIS_LIMIT = 4000;
+
 async function markAllSuitesFailed(
   ctx: ActionCtx,
   suiteIds: { area: string; suite_id: Id<"suites"> }[],
@@ -53,6 +55,10 @@ export const analyzeExploration = internalAction({
       workspace_id: exploration.workspace_id,
     });
 
+    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
+      project_id: exploration.project_id,
+    });
+
     let scenarios: { name: string; description: string; flow_summary: string; area: string }[];
     try {
       const agent = createExplorationAnalysisAgent(
@@ -68,6 +74,15 @@ export const analyzeExploration = internalAction({
         ?.map((f) => `Flow: ${f.name} (${f.complexity})\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.join(", ")}`)
         .join("\n\n") ?? "";
 
+      const prdText = project?.prd_text;
+      const prdSection = prdText
+        ? `\nPRD / Product Requirements:\n${prdText.slice(0, PRD_ANALYSIS_LIMIT)}\n\nIMPORTANT: Cross-reference the discovered pages and flows against the PRD above. For each PRD feature:\n- If found during exploration, note it in the scenario description\n- If NOT found, still propose a scenario for it and mark it as "PRD requirement — not found during exploration"\n`
+        : "";
+
+      const prdCoverageSection = exploration.prd_coverage
+        ? `\nPRD keyword coverage (preliminary):\n${exploration.prd_coverage.map((c) => `- ${c.feature}: ${c.found ? "Found" : "NOT FOUND"}`).join("\n")}\n`
+        : "";
+
       const result = await thread.generateText({
         prompt: `Analyze the following web application pages captured from ${exploration.url}.
 
@@ -76,7 +91,7 @@ Identify the most testable user scenarios. For each scenario provide a name, des
 Captured pages:
 ${pagesDescription}
 ${flowsDescription ? `\nDiscovered navigation flows:\n${flowsDescription}\n` : ""}
-${exploration.goal ? `User's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
+${prdSection}${prdCoverageSection}${exploration.goal ? `User's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
 
 IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
 - "name": string — concise scenario name
@@ -168,6 +183,10 @@ export const generateExplorationTests = action({
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
       : "";
 
+    const prdSection = project?.prd_text
+      ? `\nPRD / Product Requirements:\n${project.prd_text.slice(0, PRD_ANALYSIS_LIMIT)}\n`
+      : "";
+
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();
     const allTestBlocks: { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[] = [];
@@ -193,7 +212,7 @@ Flow: ${scenario.flow_summary}
 
 Page structure context:
 ${pagesContext}
-${flowContextSection}
+${flowContextSection}${prdSection}
 Generate a single, self-contained Playwright test. Rules:
 - Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
 - Navigate to ${exploration.url} at the start using page.goto()
@@ -222,7 +241,7 @@ Flow: ${scenario.flow_summary}
 
 Page structure context:
 ${pagesContext}
-${flowContextSection}
+${flowContextSection}${prdSection}
 Generate 3-8 steps that cover this scenario. Use exact element labels and text from the page context.`,
               });
             } catch (err) {

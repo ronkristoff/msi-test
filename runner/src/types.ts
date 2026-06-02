@@ -21,6 +21,12 @@ export interface CapturedPage {
   interactive_elements?: InteractiveElement[];
 }
 
+export interface PrdCoverageItem {
+  feature: string;
+  found: boolean;
+  evidence?: string;
+}
+
 export interface ExplorationWorkItem {
   exploration_id: string;
   url: string;
@@ -36,6 +42,7 @@ export interface ExplorationWorkItem {
   exploration_mode: "scripted" | "autonomous";
   max_steps?: number;
   goal?: string;
+  prd_text?: string;
 }
 
 export interface TestStep {

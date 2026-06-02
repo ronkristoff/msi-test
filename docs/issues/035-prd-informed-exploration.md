@@ -1,7 +1,7 @@
 # 035 — PRD-informed exploration
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: ready-for-review
 **Blocked by**: 034
 
 ## What to build
@@ -10,14 +10,14 @@ When a project has a PRD, pass PRD context to the Stagehand agent during explora
 
 ## Acceptance criteria
 
-- [ ] PRD text passed as context to Stagehand agent during exploration
-- [ ] Agent specifically navigates to and verifies features described in the PRD
-- [ ] Exploration output includes PRD coverage report: which requirements were found, which weren't
-- [ ] Gaps flagged: "PRD mentions X feature — not found during exploration"
-- [ ] Works with both Smart Explorer and Autonomous Explorer modes
-- [ ] PRD is optional — exploration works without it (same as today)
-- [ ] PRD context doesn't replace discovery — agent still explores beyond PRD scope
-- [ ] Test: mock PRD text, verify agent targets described features
+- [x] PRD text passed as context to Stagehand agent during exploration
+- [x] Agent specifically navigates to and verifies features described in the PRD
+- [x] Exploration output includes PRD coverage report: which requirements were found, which weren't
+- [x] Gaps flagged: "PRD mentions X feature — not found during exploration"
+- [x] Works with both Smart Explorer and Autonomous Explorer modes
+- [x] PRD is optional — exploration works without it (same as today)
+- [x] PRD context doesn't replace discovery — agent still explores beyond PRD scope
+- [x] Test: mock PRD text, verify agent targets described features
 
 ## Blocked by
 

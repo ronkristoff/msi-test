@@ -12,6 +12,7 @@ import {
   sleep,
   NAVIGATION_TIMEOUT_MS,
 } from "./explorer-utils";
+import { extractPrdKeywords, sortQueueByPrdRelevance, buildPrdCoverage } from "./prd-utils";
 import type { CapturedPage, ExplorationWorkItem, InteractiveElement } from "./types";
 
 const MAX_PAGES = 15;
@@ -56,6 +57,7 @@ export async function executeExploration(
     const capturedPages: CapturedPage[] = [];
     const visited = new Set<string>();
     const linkGraph = new Map<string, string[]>();
+    const linkObjectsBySource = new Map<string, Array<{ text: string; href: string }>>();
 
     if (work.auth_mode === "form" && work.username && work.password) {
       const loginPage = await handleFormLogin(stagehand, work, client, log);
@@ -75,6 +77,7 @@ export async function executeExploration(
 
     const queue: string[] = [];
     const origin = new URL(work.url).origin;
+    const prdKeywords = work.prd_text ? extractPrdKeywords(work.prd_text) : [];
 
     if (work.additional_urls?.length) {
       for (const extraUrl of work.additional_urls) {
@@ -109,6 +112,7 @@ export async function executeExploration(
         capturedPages.push(captured);
 
         linkGraph.set(normalized, result.links.map((l) => l.href));
+        linkObjectsBySource.set(normalized, result.links);
 
         await client.updateExplorationProgress(
           work.exploration_id,
@@ -129,6 +133,10 @@ export async function executeExploration(
             queue.push(linkNormalized);
           }
         }
+
+        if (prdKeywords.length > 0) {
+          sortQueueByPrdRelevance(queue, linkObjectsBySource, prdKeywords);
+        }
       } catch (err) {
         log(`Exploration ${work.exploration_id}: error visiting ${normalized}: ${err}`);
       }
@@ -141,7 +149,11 @@ export async function executeExploration(
       linkGraph,
     );
 
-    await client.completeExploration(work.exploration_id, capturedPages, discoveredFlows);
+    await client.completeExploration(work.exploration_id, {
+      capturedPages,
+      discoveredFlows,
+      prdCoverage: buildPrdCoverage(work.prd_text, capturedPages, discoveredFlows),
+    });
     log(`Exploration ${work.exploration_id}: completed`);
   } catch (err) {
     log(`Exploration ${work.exploration_id}: error: ${err}`);

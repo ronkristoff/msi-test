@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator } from "../lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, prdCoverageItemValidator } from "../lib/validation";
 
 export const claimExploration = internalMutation({
   args: {
@@ -41,6 +41,7 @@ export const completeExplorationCapture = internalMutation({
     exploration_id: v.id("explorations"),
     captured_pages: v.array(capturedPageValidator),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
+    prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.exploration_id, {
@@ -49,6 +50,7 @@ export const completeExplorationCapture = internalMutation({
       pages_captured: args.captured_pages.length,
       progress_message: "Capture complete, starting analysis...",
       ...(args.discovered_flows !== undefined ? { discovered_flows: args.discovered_flows } : {}),
+      ...(args.prd_coverage !== undefined ? { prd_coverage: args.prd_coverage } : {}),
     });
   },
 });
@@ -127,10 +129,12 @@ export const getExplorationForAnalysis = internalQuery({
     if (!exploration) return null;
     return {
       workspace_id: exploration.workspace_id,
+      project_id: exploration.project_id,
       url: exploration.url,
       goal: exploration.goal,
       captured_pages: exploration.captured_pages ?? [],
       discovered_flows: exploration.discovered_flows,
+      prd_coverage: exploration.prd_coverage,
     };
   },
 });
