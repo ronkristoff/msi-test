@@ -14,6 +14,7 @@ export default defineSchema({
       stagehand_model_name: v.optional(v.string()),
     }),
     heal_confidence_threshold: v.optional(v.number()),
+    stagehand_enabled: v.optional(v.boolean()),
   }).index("by_owner_id", ["owner_id"]).index("by_invite_code", ["invite_code"]),
 
   workspace_members: defineTable({

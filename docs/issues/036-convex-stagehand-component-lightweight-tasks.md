@@ -1,8 +1,8 @@
 # 036 — Convex Stagehand component for lightweight tasks
 
 **Type**: AFK
-**Status**: needs-triage
-**Blocked by**: 022
+**Status**: completed
+**Blocked by**: 022 (completed)
 
 ## What to build
 
@@ -10,13 +10,13 @@ Install the `@browserbasehq/convex-stagehand` Convex component for lightweight s
 
 ## Acceptance criteria
 
-- [ ] `@browserbasehq/convex-stagehand` installed and registered in `convex.config.ts`
-- [ ] Browserbase env vars documented (`BROWSERBASE_API_KEY`, `MODEL_API_KEY`)
-- [ ] URL reachability check: before exploration, verify the app URL is accessible
-- [ ] Single-page extraction: extract page title and basic structure without full exploration
-- [ ] Page change detection: compare current page structure with last exploration snapshot
-- [ ] System works fully without this component — graceful fallback if Browserbase not configured
-- [ ] Optional feature flag or workspace setting to enable/disable
+- [x] `@browserbasehq/convex-stagehand` installed and registered in `convex.config.ts`
+- [x] Browserbase env vars documented (`BROWSERBASE_API_KEY`, `MODEL_API_KEY`)
+- [x] URL reachability check: before exploration, verify the app URL is accessible
+- [x] Single-page extraction: extract page title and basic structure without full exploration
+- [x] Page change detection: compare current page structure with last exploration snapshot
+- [x] System works fully without this component — graceful fallback if Browserbase not configured
+- [x] Optional feature flag or workspace setting to enable/disable
 
 ## Blocked by
 

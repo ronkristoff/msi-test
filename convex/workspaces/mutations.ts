@@ -59,6 +59,7 @@ export const updateWorkspace = mutation({
       }),
     ),
     heal_confidence_threshold: v.optional(v.number()),
+    stagehand_enabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { workspace } = await getOwnedWorkspace(ctx);
@@ -85,6 +86,9 @@ export const updateWorkspace = mutation({
         throw new ConvexError("Confidence threshold must be between 0 and 1");
       }
       updates.heal_confidence_threshold = args.heal_confidence_threshold;
+    }
+    if (args.stagehand_enabled !== undefined) {
+      updates.stagehand_enabled = args.stagehand_enabled;
     }
 
     await ctx.db.patch(workspace._id, updates);
