@@ -1,36 +1,22 @@
-export function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString("en-US", {
+export function statusVariant(status: string | null) {
+  if (!status || status === "cancelled" || status === "timed_out") return "neutral" as const;
+  if (status === "passed") return "success" as const;
+  if (status === "running") return "running" as const;
+  return "danger" as const;
+}
+
+export function formatTime(ms: number | null) {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-export function formatDuration(ms: number | undefined): string {
-  if (ms == null || ms === 0) return "—";
+export function formatDuration(ms: number | null) {
+  if (!ms) return "—";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
-}
-
-export function formatElapsedTime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}m ${remaining}s`;
-}
-
-export function formatRelativeTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

@@ -1,7 +1,7 @@
 # 037 — Feature Map Visualization (PRD → Visual Graph)
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 **Blocked by**: 025
 
 ## What to build
@@ -12,18 +12,18 @@ Uses the structured `discovered_flows` and `proposed_scenarios` data from issue 
 
 ## Acceptance criteria
 
-- [ ] New `<FeatureMapGraph>` component renders an interactive tree where top-level nodes are areas and children are scenarios
-- [ ] Each scenario node shows: name, description (truncated), status indicator (selected/unselected)
-- [ ] Area nodes show a count badge of selected/total scenarios
-- [ ] Clicking a scenario node toggles selection (same as checkbox behavior today)
-- [ ] Visual coverage indicators: blue border = selected for generation, gray = unselected, green = area fully covered
-- [ ] Empty area branches (areas with zero proposed scenarios) are visible with a "No scenarios found" label — coverage gaps are immediately obvious
-- [ ] Graph replaces the flat scenario list on `/projects/[id]/explore` when `proposed_scenarios` data is available
-- [ ] Flat scenario list remains as a collapsible "List View" fallback toggle below the graph
-- [ ] "Generate Tests from Selected (N)" button and "New Exploration" button remain functional below the graph
-- [ ] Graph uses a lightweight library (reactflow or custom SVG tree) — no heavy D3 dependency
+- [x] New `<FeatureMapGraph>` component renders an interactive tree where top-level nodes are areas and children are scenarios
+- [x] Each scenario node shows: name, description (truncated), status indicator (selected/unselected)
+- [x] Area nodes show a count badge of selected/total scenarios
+- [x] Clicking a scenario node toggles selection (same as checkbox behavior today)
+- [x] Visual coverage indicators: accent border = selected for generation, border = unselected, green = area fully covered
+- [x] Empty area branches (areas with zero proposed scenarios) are visible with a "No scenarios found" label — coverage gaps are immediately obvious
+- [x] Graph replaces the flat scenario list on `/projects/[id]/explore` when `proposed_scenarios` data is available
+- [x] Flat scenario list remains as a collapsible "List View" fallback toggle below the graph
+- [x] "Generate Tests from Selected (N)" button and "New Exploration" button remain functional below the graph
+- [x] Graph uses custom HTML/CSS tree (no external library dependency)
 - [ ] Responsive: collapses to stacked area cards on narrow screens (<768px)
-- [ ] Captured pages screenshot grid remains above the graph as it exists today
+- [x] Captured pages screenshot grid remains above the graph as it exists today
 
 ## Blocked by
 

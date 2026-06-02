@@ -12,6 +12,7 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { FlowCard } from "./FlowCard";
 import { ScenarioList } from "./ScenarioList";
+import { FeatureMapGraph } from "./FeatureMapGraph";
 import {
   type Scenario,
   type CapturedPageWithUrl,
@@ -21,6 +22,8 @@ import {
   makeToggleHandler,
   toggleAll,
   matchScenariosToFlows,
+  toggleArea,
+  areasWithoutScenarios,
 } from "./types";
 
 export default function ExplorePage() {
@@ -39,6 +42,7 @@ export default function ExplorePage() {
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("flows");
   const [generating, setGenerating] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
+  const [showListView, setShowListView] = useState(false);
 
   const [goal, setGoal] = useState("");
   const [additionalUrlInput, setAdditionalUrlInput] = useState("");
@@ -93,10 +97,21 @@ export default function ExplorePage() {
     [exploration],
   );
 
+  const emptyAreas = useMemo(
+    () => areasWithoutScenarios(scenarios, prdGaps.map((g) => g.feature)),
+    [scenarios, prdGaps],
+  );
+
   const hasFlows = discoveredFlows.length > 0;
+  const showScenarioSelection = selectionMode === "scenarios" || !hasFlows;
 
   const toggleFlow = useMemo(() => makeToggleHandler(setSelectedFlows), []);
   const toggleScenario = useMemo(() => makeToggleHandler(setSelectedScenarios), []);
+
+  const handleToggleArea = useCallback(
+    (area: string) => toggleArea(setSelectedScenarios, scenarios, area),
+    [scenarios],
+  );
 
   const handleStartExploration = useCallback(async () => {
     setError(null);
@@ -545,10 +560,29 @@ export default function ExplorePage() {
                     Proposed Scenarios ({scenarios.length})
                   </div>
                 )}
+                {showScenarioSelection && (
+                  <button
+                    type="button"
+                    onClick={() => setShowListView((v) => !v)}
+                    className="ml-auto text-[10px] font-[var(--font-mono)] text-[var(--accent)] hover:underline"
+                  >
+                    {showListView ? "Map View" : "List View"}
+                  </button>
+                )}
               </div>
             </div>
 
-            {(selectionMode === "scenarios" || !hasFlows) && (
+            {showScenarioSelection && !showListView && (
+              <FeatureMapGraph
+                scenarios={scenarios}
+                emptyAreas={emptyAreas}
+                selectedIndices={selectedScenarios}
+                onToggleScenario={toggleScenario}
+                onToggleArea={handleToggleArea}
+              />
+            )}
+
+            {showScenarioSelection && showListView && (
               <ScenarioList
                 scenarios={scenarios}
                 selectedIndices={selectedScenarios}

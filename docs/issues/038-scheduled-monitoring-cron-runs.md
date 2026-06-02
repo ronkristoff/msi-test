@@ -1,7 +1,7 @@
 # 038 — Scheduled Monitoring / Cron Runs
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 **Blocked by**: 009
 
 ## What to build

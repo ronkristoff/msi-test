@@ -116,6 +116,7 @@ export default defineSchema({
     workspace_id: v.id("workspaces"),
     suite_id: v.optional(v.id("suites")),
     test_id: v.optional(v.id("tests")),
+    test_list_id: v.optional(v.id("test_lists")),
     rerun_of_run_id: v.optional(v.id("runs")),
     rerun_of_test_id: v.optional(v.id("tests")),
     project_id: v.id("projects"),
@@ -123,9 +124,11 @@ export default defineSchema({
     trigger_type: v.union(
       v.literal("manual"),
       v.literal("ci"),
+      v.literal("scheduled"),
       v.literal("rerun"),
     ),
     triggered_by: v.optional(v.string()),
+    schedule_id: v.optional(v.id("schedules")),
     branch: v.optional(v.string()),
     commit: v.optional(v.string()),
     status: v.union(
@@ -149,7 +152,8 @@ export default defineSchema({
     .index("by_project_id", ["project_id"])
     .index("by_project_id_and_status", ["project_id", "status"])
     .index("by_suite_id", ["suite_id"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_schedule_id", ["schedule_id"]),
 
   run_results: defineTable({
     workspace_id: v.id("workspaces"),
@@ -290,6 +294,39 @@ export default defineSchema({
     .index("by_regression_suite_id", ["regression_suite_id"])
     .index("by_member_suite_id", ["member_suite_id"])
     .index("by_member_test_id", ["member_test_id"]),
+
+  schedules: defineTable({
+    workspace_id: v.id("workspaces"),
+    name: v.string(),
+    suite_id: v.id("suites"),
+    environment_id: v.id("environments"),
+    cadence: v.object({ seconds: v.number() }),
+    enabled: v.boolean(),
+    last_run_at: v.optional(v.number()),
+    next_run_at: v.optional(v.number()),
+    created_by: v.string(),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_next_run_at", ["next_run_at"])
+    .index("by_suite_id", ["suite_id"]),
+
+  test_lists: defineTable({
+    workspace_id: v.id("workspaces"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    created_by: v.string(),
+  }).index("by_workspace_id", ["workspace_id"]),
+
+  test_list_members: defineTable({
+    workspace_id: v.id("workspaces"),
+    test_list_id: v.id("test_lists"),
+    test_id: v.id("tests"),
+    source_suite_id: v.id("suites"),
+    source_project_id: v.id("projects"),
+    added_at: v.number(),
+  })
+    .index("by_test_list_id", ["test_list_id"])
+    .index("by_test_id", ["test_id"]),
 
   healing_history: defineTable({
     workspace_id: v.id("workspaces"),

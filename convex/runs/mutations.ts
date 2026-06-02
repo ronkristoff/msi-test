@@ -1,17 +1,19 @@
-import { mutation, type DatabaseReader } from "../_generated/server";
+import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { getOwnedEntity, getOwnedWorkspace, getUserName } from "../lib/requireAuth";
+import { resolveSuiteTestIds } from "../lib/resolveSuiteTests";
 
 export const triggerRun = mutation({
   args: {
     project_id: v.id("projects"),
     suite_id: v.optional(v.id("suites")),
     test_id: v.optional(v.id("tests")),
+    test_list_id: v.optional(v.id("test_lists")),
     environment_id: v.id("environments"),
     trigger_type: v.optional(
-      v.union(v.literal("manual"), v.literal("ci"), v.literal("rerun")),
+      v.union(v.literal("manual"), v.literal("ci"), v.literal("scheduled"), v.literal("rerun")),
     ),
   },
   handler: async (ctx, args) => {
@@ -27,29 +29,37 @@ export const triggerRun = mutation({
       }
     }
     if (args.test_id) await getOwnedEntity(ctx, args.test_id, "tests");
+    if (args.test_list_id) await getOwnedEntity(ctx, args.test_list_id, "test_lists");
     if (args.environment_id) await getOwnedEntity(ctx, args.environment_id, "environments");
 
-    if (!args.suite_id && !args.test_id) {
-      throw new ConvexError("Must provide either suite_id or test_id");
+    const targetCount = [args.suite_id, args.test_id, args.test_list_id].filter(Boolean).length;
+    if (targetCount === 0) {
+      throw new ConvexError("Must provide suite_id, test_id, or test_list_id");
     }
-    if (args.suite_id && args.test_id) {
-      throw new ConvexError("Provide suite_id or test_id, not both");
+    if (targetCount > 1) {
+      throw new ConvexError("Provide only one of suite_id, test_id, or test_list_id");
     }
 
     let testIds: Id<"tests">[];
-    if (args.suite_id) {
-      const suite = await ctx.db.get(args.suite_id);
-      if (!suite) throw new ConvexError("Suite not found");
+    if (args.test_list_id) {
+      const members = await ctx.db
+        .query("test_list_members")
+        .withIndex("by_test_list_id", (q) => q.eq("test_list_id", args.test_list_id!))
+        .collect();
 
-      if (suite.suite_type === "regression") {
-        testIds = await resolveRegressionTests(ctx, args.suite_id, suite.project_id, suite.auto_include_all);
-      } else {
-        const tests = await ctx.db
-          .query("tests")
-          .withIndex("by_suite_id", (q) => q.eq("suite_id", args.suite_id!))
-          .collect();
-        testIds = tests.filter((t) => t.status === "approved").map((t) => t._id);
+      const validated: Id<"tests">[] = [];
+      for (const member of members) {
+        const test = await ctx.db.get(member.test_id);
+        if (test && test.status === "approved") {
+          validated.push(test._id);
+        }
       }
+      if (validated.length === 0) {
+        throw new ConvexError("No approved tests in this test list");
+      }
+      testIds = validated;
+    } else if (args.suite_id) {
+      testIds = await resolveSuiteTestIds(ctx.db, args.suite_id);
 
       if (testIds.length === 0) {
         throw new ConvexError("No approved tests in this suite");
@@ -68,6 +78,7 @@ export const triggerRun = mutation({
       project_id: project._id,
       suite_id: args.suite_id,
       test_id: args.test_id,
+      test_list_id: args.test_list_id,
       environment_id: args.environment_id,
       trigger_type: args.trigger_type ?? "manual",
       status: "running",
@@ -118,7 +129,7 @@ export const rerunTest = mutation({
 
     const firstResult = originalResults[0];
     const testIds =
-      originalRun.test_id && !originalRun.suite_id
+      originalRun.test_id && !originalRun.suite_id && !originalRun.test_list_id
         ? [originalRun.test_id]
         : originalResults.map((r) => r.test_id);
 
@@ -127,6 +138,7 @@ export const rerunTest = mutation({
       project_id: originalRun.project_id,
       suite_id: originalRun.suite_id,
       test_id: originalRun.test_id ?? firstResult.test_id,
+      test_list_id: originalRun.test_list_id,
       rerun_of_run_id: args.run_id,
       rerun_of_test_id: originalRun.test_id ?? firstResult.test_id,
       environment_id: args.environment_id ?? originalRun.environment_id,
@@ -149,60 +161,6 @@ export const rerunTest = mutation({
     return runId;
   },
 });
-
-async function resolveRegressionTests(
-  ctx: { db: DatabaseReader },
-  regressionSuiteId: Id<"suites">,
-  projectId: Id<"projects">,
-  autoIncludeAll?: boolean,
-): Promise<Id<"tests">[]> {
-  const testIdSet = new Set<string>();
-
-  const members = await ctx.db
-    .query("suite_members")
-    .withIndex("by_regression_suite_id", (q) =>
-      q.eq("regression_suite_id", regressionSuiteId),
-    )
-    .collect();
-
-  const suiteIdsToInclude = new Set<string>();
-
-  for (const member of members) {
-    if (member.member_suite_id) {
-      suiteIdsToInclude.add(member.member_suite_id);
-    }
-    if (member.member_test_id) {
-      const test = await ctx.db.get(member.member_test_id);
-      if (test && test.status === "approved") {
-        testIdSet.add(test._id);
-      }
-    }
-  }
-
-  if (autoIncludeAll) {
-    const allFunctional = await ctx.db
-      .query("suites")
-      .withIndex("by_project_id_and_suite_type", (q) =>
-        q.eq("project_id", projectId).eq("suite_type", "functional"),
-      )
-      .collect();
-    for (const fs of allFunctional) {
-      suiteIdsToInclude.add(fs._id);
-    }
-  }
-
-  for (const suiteId of suiteIdsToInclude) {
-    const tests = await ctx.db
-      .query("tests")
-      .withIndex("by_suite_id", (q) => q.eq("suite_id", suiteId as Id<"suites">))
-      .collect();
-    for (const t of tests) {
-      if (t.status === "approved") testIdSet.add(t._id);
-    }
-  }
-
-  return [...testIdSet] as Id<"tests">[];
-}
 
 export const runAllTests = mutation({
   args: {

@@ -7,3 +7,4 @@ export { StatCard } from "./StatCard";
 export { EmptyState } from "./EmptyState";
 export { Card } from "./Card";
 export { Skeleton, RunDetailSkeleton, PageSkeleton } from "./Skeleton";
+export { Toggle } from "./Toggle";

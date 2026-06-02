@@ -58,6 +58,15 @@ const NAV_SECTIONS: NavSection[] = [
           </svg>
         ),
       },
+      {
+        href: "/monitoring",
+        label: "Monitoring",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -79,6 +88,16 @@ const NAV_SECTIONS: NavSection[] = [
         icon: (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+          </svg>
+        ),
+      },
+      {
+        href: "/test-lists",
+        label: "Test Lists",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+            <rect x="9" y="3" width="6" height="4" rx="1" />
           </svg>
         ),
       },

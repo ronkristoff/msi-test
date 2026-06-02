@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { matchScenariosToFlows } from "./types";
+import { describe, expect, it, vi } from "vitest";
+import { matchScenariosToFlows, indicesForArea, toggleArea, areasWithoutScenarios } from "./types";
 import type { Scenario } from "./types";
 
 const scenarios: Scenario[] = [
@@ -45,5 +45,76 @@ describe("matchScenariosToFlows", () => {
     ]);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("A");
+  });
+});
+
+describe("indicesForArea", () => {
+  it("returns indices for scenarios in the given area", () => {
+    const result = indicesForArea(scenarios, "Shopping");
+    expect(result).toEqual([1, 2]);
+  });
+
+  it("returns empty array for area with no scenarios", () => {
+    const result = indicesForArea(scenarios, "Checkout");
+    expect(result).toEqual([]);
+  });
+
+  it("returns single index for area with one scenario", () => {
+    const result = indicesForArea(scenarios, "Auth");
+    expect(result).toEqual([0]);
+  });
+});
+
+describe("toggleArea", () => {
+  it("selects all scenarios in an area when none selected", () => {
+    const setter = vi.fn();
+    toggleArea(setter, scenarios, "Shopping");
+    expect(setter).toHaveBeenCalled();
+    const updater = setter.mock.calls[0][0];
+    const result = updater(new Set());
+    expect(result).toEqual(new Set([1, 2]));
+  });
+
+  it("deselects all scenarios in an area when all selected", () => {
+    const setter = vi.fn();
+    toggleArea(setter, scenarios, "Shopping");
+    const updater = setter.mock.calls[0][0];
+    const result = updater(new Set([1, 2]));
+    expect(result).toEqual(new Set());
+  });
+
+  it("selects remaining scenarios when some already selected", () => {
+    const setter = vi.fn();
+    toggleArea(setter, scenarios, "Shopping");
+    const updater = setter.mock.calls[0][0];
+    const result = updater(new Set([1]));
+    expect(result).toEqual(new Set([1, 2]));
+  });
+
+  it("does nothing for area with no scenarios", () => {
+    const setter = vi.fn();
+    toggleArea(setter, scenarios, "Checkout");
+    const updater = setter.mock.calls[0][0];
+    const result = updater(new Set([0]));
+    expect(result).toEqual(new Set([0]));
+  });
+});
+
+describe("areasWithoutScenarios", () => {
+  it("returns gap features that have no matching scenario area", () => {
+    const prdGaps = ["Checkout", "Payments"];
+    const result = areasWithoutScenarios(scenarios, prdGaps);
+    expect(result).toEqual(["Checkout", "Payments"]);
+  });
+
+  it("excludes gap features that already have scenarios", () => {
+    const prdGaps = ["Auth", "Checkout"];
+    const result = areasWithoutScenarios(scenarios, prdGaps);
+    expect(result).toEqual(["Checkout"]);
+  });
+
+  it("returns empty array when no gaps", () => {
+    const result = areasWithoutScenarios(scenarios, []);
+    expect(result).toEqual([]);
   });
 });

@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
 import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { AddToListModal } from "@/components/AddToListModal";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { useErrorLogger } from "@/lib/error-logger";
 import { hasAiConfig } from "@/lib/ai-presets";
@@ -21,26 +23,6 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import { SuiteStatusBanners } from "@/components/SuiteStatusBanners";
 
 hljs.registerLanguage("javascript", javascript);
-
-function ConfirmDialog({ title, message, onConfirm, onCancel }: {
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 max-w-[400px] w-full shadow-[var(--elev-raised)]" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-2">{title}</h3>
-        <p className="text-sm text-[var(--muted)] mb-5">{message}</p>
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
-          <Button variant="danger" size="sm" onClick={onConfirm}>Delete</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CodePreview({ code }: { code: string }) {
   const codeRef = useRef<HTMLElement>(null);
@@ -71,6 +53,7 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
   const [expanded, setExpanded] = useState(false);
   const [localCode, setLocalCode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"code" | "steps">("code");
+  const [showAddToList, setShowAddToList] = useState(false);
   const isStagehand = test.execution_type === "stagehand" && test.steps && test.steps.length > 0;
   const isDirty = localCode !== null && localCode !== (test.playwright_code ?? "");
   const displayCode = localCode ?? test.playwright_code ?? "";
@@ -397,6 +380,13 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
                 {test.status === "draft" ? "Approve" : "Revert to Draft"}
               </Button>
               <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAddToList(true)}
+              >
+                Add to List
+              </Button>
+              <Button
                 variant="danger"
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
@@ -419,6 +409,10 @@ function TestAccordionItem({ test, environments, onRunTest, workspace, currentUs
           }}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+
+      {showAddToList && (
+        <AddToListModal testId={test._id} onClose={() => setShowAddToList(false)} />
       )}
     </>
   );

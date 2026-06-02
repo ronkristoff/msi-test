@@ -111,3 +111,20 @@ export const testDataSchema = z.array(testDataEntrySchema)
 
 export type TestDataEntryValues = z.infer<typeof testDataEntrySchema>;
 export type TestDataValues = z.infer<typeof testDataSchema>;
+
+export const CADENCE_PRESETS = [
+  { label: "Every hour", seconds: 3600 },
+  { label: "Every 6 hours", seconds: 21600 },
+  { label: "Every 12 hours", seconds: 43200 },
+  { label: "Daily", seconds: 86400 },
+  { label: "Weekly", seconds: 604800 },
+] as const;
+
+export const scheduleSchema = z.object({
+  name: z.string().trim().min(1, "Schedule name is required").max(NAME_MAX, `Name must be under ${NAME_MAX} characters`),
+  suite_id: z.string().min(1, "Suite is required"),
+  environment_id: z.string().min(1, "Environment is required"),
+  cadence_seconds: z.number().min(60, "Cadence must be at least 60 seconds"),
+});
+
+export type ScheduleValues = z.infer<typeof scheduleSchema>;

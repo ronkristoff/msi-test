@@ -85,3 +85,35 @@ export function matchScenariosToFlows(
 
   return matched.length > 0 ? matched : scenarios;
 }
+
+export function indicesForArea(scenarios: Scenario[], area: string): number[] {
+  return scenarios
+    .map((s, i) => (s.area === area ? i : -1))
+    .filter((i) => i >= 0);
+}
+
+export function toggleArea(
+  setter: React.Dispatch<React.SetStateAction<Set<number>>>,
+  scenarios: Scenario[],
+  area: string,
+) {
+  const indices = indicesForArea(scenarios, area);
+  setter((prev) => {
+    const allSelected = indices.length > 0 && indices.every((i) => prev.has(i));
+    const next = new Set(prev);
+    if (allSelected) {
+      indices.forEach((i) => next.delete(i));
+    } else {
+      indices.forEach((i) => next.add(i));
+    }
+    return next;
+  });
+}
+
+export function areasWithoutScenarios(
+  scenarios: Scenario[],
+  prdGaps: string[],
+): string[] {
+  const scenarioAreas = new Set(scenarios.map((s) => s.area));
+  return prdGaps.filter((g) => !scenarioAreas.has(g));
+}

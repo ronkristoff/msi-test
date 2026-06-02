@@ -105,9 +105,37 @@ export async function seedEnvironment(
   });
 }
 
+export async function seedSchedule(
+  t: TestCtx,
+  workspaceId: string,
+  suiteId: string,
+  envId: string,
+  overrides?: Partial<{
+    name: string;
+    cadence_seconds: number;
+    enabled: boolean;
+    next_run_at: number;
+    last_run_at: number;
+  }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("schedules", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      name: overrides?.name ?? "Test Schedule",
+      suite_id: suiteId as Id<"suites">,
+      environment_id: envId as Id<"environments">,
+      cadence: { seconds: overrides?.cadence_seconds ?? 3600 },
+      enabled: overrides?.enabled ?? true,
+      next_run_at: overrides?.next_run_at,
+      last_run_at: overrides?.last_run_at,
+      created_by: "user1",
+    });
+  });
+}
+
 type RunOverrides = Partial<{
   status: "running" | "passed" | "failed" | "cancelled" | "timed_out";
-  trigger_type: "manual" | "ci" | "rerun";
+  trigger_type: "manual" | "ci" | "scheduled" | "rerun";
   runner_id: string;
   environment_id: string;
   branch: string;
@@ -115,6 +143,7 @@ type RunOverrides = Partial<{
   pass_count: number;
   fail_count: number;
   skip_count: number;
+  schedule_id: string;
 }>;
 
 export async function seedRun(
@@ -132,6 +161,9 @@ export async function seedRun(
       suite_id: suiteId ? (suiteId as Id<"suites">) : undefined,
       test_id: testId ? (testId as Id<"tests">) : undefined,
       trigger_type: overrides?.trigger_type ?? "manual",
+      schedule_id: overrides?.schedule_id
+        ? (overrides.schedule_id as Id<"schedules">)
+        : undefined,
       status: overrides?.status ?? "running",
       runner_id: overrides?.runner_id,
       environment_id: overrides?.environment_id

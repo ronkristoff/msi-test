@@ -18,4 +18,11 @@ crons.interval(
   { stale_threshold_ms: LOCK_STALE_THRESHOLD_MS },
 );
 
+crons.interval(
+  "checkScheduledRuns",
+  { seconds: 60 },
+  internal.schedules.internal.checkScheduledRuns,
+  {},
+);
+
 export default crons;

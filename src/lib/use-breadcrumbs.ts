@@ -13,6 +13,7 @@ type BreadcrumbDef = {
   href?: string;
   dynamic?: boolean;
   suiteId?: boolean;
+  testListId?: boolean;
 };
 
 function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
@@ -20,6 +21,14 @@ function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
     return [
       { label: "Projects", href: "/projects" },
       { label: "New Project" },
+    ];
+  }
+
+  const testListDetailMatch = pathname.match(/^\/test-lists\/([^/]+)$/);
+  if (testListDetailMatch) {
+    return [
+      { label: "Test Lists", href: "/test-lists" },
+      { label: testListDetailMatch[1], dynamic: true, testListId: true },
     ];
   }
 
@@ -65,8 +74,9 @@ function getBreadcrumbDefs(pathname: string): BreadcrumbDef[] | null {
 
 export function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const defs = getBreadcrumbDefs(pathname);
-  const projectDef = defs?.find((d) => d.dynamic && !d.suiteId);
+  const projectDef = defs?.find((d) => d.dynamic && !d.suiteId && !d.testListId);
   const suiteDef = defs?.find((d) => d.suiteId);
+  const testListDef = defs?.find((d) => d.testListId);
 
   const project = useQuery(
     api.projects.queries.getProject,
@@ -82,6 +92,13 @@ export function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
       : "skip",
   );
 
+  const testList = useQuery(
+    api.test_lists.queries.getTestListDetail,
+    testListDef
+      ? { test_list_id: asId(testListDef.label, "test_lists") }
+      : "skip",
+  );
+
   if (!defs) return [];
 
   return defs.map((def) => {
@@ -89,6 +106,12 @@ export function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
       return { label: suite.name, href: def.href };
     }
     if (def.suiteId) {
+      return { label: "…", href: def.href };
+    }
+    if (def.testListId && testList) {
+      return { label: testList.name, href: def.href };
+    }
+    if (def.testListId) {
       return { label: "…", href: def.href };
     }
     if (def.dynamic && project) {

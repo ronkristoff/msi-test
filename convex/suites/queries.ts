@@ -241,6 +241,21 @@ export const getRegressionsForMemberSuite = query({
   },
 });
 
+export const getSuitesForWorkspace = query({
+  args: {},
+  handler: async (ctx) => {
+    const result = await getOptionalMemberWorkspace(ctx);
+    if (!result) return [];
+
+    return ctx.db
+      .query("suites")
+      .withIndex("by_workspace_id", (q) =>
+        q.eq("workspace_id", result.workspace._id),
+      )
+      .collect();
+  },
+});
+
 export const getActiveTasks = query({
   args: {},
   handler: async (ctx) => {
