@@ -10,6 +10,7 @@
 
 import type * as ai_agents from "../ai/agents.js";
 import type * as ai_authContext from "../ai/authContext.js";
+import type * as ai_browserClient from "../ai/browserClient.js";
 import type * as ai_diff from "../ai/diff.js";
 import type * as ai_errors from "../ai/errors.js";
 import type * as ai_exploreApp from "../ai/exploreApp.js";
@@ -22,6 +23,7 @@ import type * as ai_parse from "../ai/parse.js";
 import type * as ai_refineTest from "../ai/refineTest.js";
 import type * as ai_regenerateTest from "../ai/regenerateTest.js";
 import type * as ai_resolveContext from "../ai/resolveContext.js";
+import type * as ai_snapshotFormatter from "../ai/snapshotFormatter.js";
 import type * as ai_suiteStatus from "../ai/suiteStatus.js";
 import type * as ai_tools_definitions from "../ai/tools/definitions.js";
 import type * as ai_tools_logic from "../ai/tools/logic.js";
@@ -83,6 +85,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
   "ai/authContext": typeof ai_authContext;
+  "ai/browserClient": typeof ai_browserClient;
   "ai/diff": typeof ai_diff;
   "ai/errors": typeof ai_errors;
   "ai/exploreApp": typeof ai_exploreApp;
@@ -95,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   "ai/refineTest": typeof ai_refineTest;
   "ai/regenerateTest": typeof ai_regenerateTest;
   "ai/resolveContext": typeof ai_resolveContext;
+  "ai/snapshotFormatter": typeof ai_snapshotFormatter;
   "ai/suiteStatus": typeof ai_suiteStatus;
   "ai/tools/definitions": typeof ai_tools_definitions;
   "ai/tools/logic": typeof ai_tools_logic;
@@ -178,4 +182,6 @@ export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
   agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
   stagehand: import("@browserbasehq/convex-stagehand/_generated/component.js").ComponentApi<"stagehand">;
+  actionCache: import("@convex-dev/action-cache/_generated/component.js").ComponentApi<"actionCache">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

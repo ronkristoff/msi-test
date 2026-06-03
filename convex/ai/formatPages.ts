@@ -1,23 +1,13 @@
+import { formatElementLine, type FormattableElement } from "./formatElements";
+
 export interface FormattablePage {
   title: string;
   url: string;
   semantic_description?: string;
   structure_text?: string;
-  interactive_elements?: Array<{
-    selector: string;
-    description: string;
-    element_type: string;
-    role?: string;
-    aria_label?: string;
-    label_text?: string;
-    placeholder?: string;
-    name?: string;
-    id?: string;
-    type?: string;
-    href?: string;
-    data_testid?: string;
-    suggested_locator?: string;
-  }>;
+  interactive_elements?: Array<
+    FormattableElement & { selector: string; description: string }
+  >;
 }
 
 type FormatMode = "summary" | "detailed";
@@ -39,23 +29,7 @@ export function formatCapturedPagesForPrompt(
       let elementsBlock = "";
       if (mode === "detailed" && page.interactive_elements && page.interactive_elements.length > 0) {
         const elements = page.interactive_elements
-          .map((el) => {
-            const attrs = [
-              el.role ? `role="${el.role}"` : "",
-              el.type ? `type="${el.type}"` : "",
-              el.aria_label ? `aria-label="${el.aria_label}"` : "",
-              el.label_text ? `label="${el.label_text}"` : "",
-              el.placeholder ? `placeholder="${el.placeholder}"` : "",
-              el.name ? `name="${el.name}"` : "",
-              el.id ? `id="${el.id}"` : "",
-              el.data_testid ? `data-testid="${el.data_testid}"` : "",
-              el.href ? `href="${el.href}"` : "",
-            ].filter(Boolean).join(" ");
-            const locator = el.suggested_locator
-              ? `\n    → ${el.suggested_locator}`
-              : "";
-            return `  [${el.element_type}] ${attrs}${locator}`;
-          })
+          .map((el) => formatElementLine(el))
           .join("\n");
         elementsBlock = `\nInteractive Elements:\n${elements}`;
       } else if (page.interactive_elements && page.interactive_elements.length > 0) {
