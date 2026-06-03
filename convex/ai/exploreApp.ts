@@ -10,6 +10,8 @@ import { classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext, buildNavMenuContext } from "./authContext";
 import { formatCapturedPagesForPrompt, type FormattablePage } from "./formatPages";
+import { type SnapshotData } from "./snapshotFormatter";
+import { buildSnapshotContext } from "./workflowShared";
 import { getWorkspaceModel } from "./model";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
@@ -112,6 +114,66 @@ function buildFilteredPagesContext(
   const urlSet = new Set(relevantUrls);
   const filtered = capturedPages.filter((p) => urlSet.has(p.url));
   return formatCapturedPagesForPrompt(filtered.length > 0 ? filtered : capturedPages, budget, "detailed");
+}
+
+function mergeLiveAndExplorationContext(
+  liveSnapshots: SnapshotData[],
+  explorationPagesCtx: string,
+): string {
+  if (liveSnapshots.length === 0) return explorationPagesCtx;
+  const liveContext = buildSnapshotContext(liveSnapshots);
+  const guidance = "\nIMPORTANT: The LIVE PAGE CONTEXT above is the primary source for locators. Use its elements and locators over the exploration flow context when they differ.";
+  return `${liveContext}${guidance}\n\nExploration flow context (navigation and flow information):\n${explorationPagesCtx}`;
+}
+
+async function fetchLiveSnapshotsForScenario(
+  ctx: ActionCtx,
+  relevantUrls: string[] | undefined,
+  projectId: Id<"projects">,
+  workspaceId: Id<"workspaces">,
+): Promise<SnapshotData[]> {
+  if (!relevantUrls || relevantUrls.length === 0) return [];
+
+  const results = await Promise.allSettled(
+    relevantUrls.map((url) =>
+      ctx.runAction(internal.ai.snapshotAction.getLiveSnapshot, {
+        url,
+        project_id: projectId,
+        workspace_id: workspaceId,
+      }).catch(() => null as SnapshotData | null)
+    ),
+  );
+  return results
+    .map((r) => (r.status === "fulfilled" ? r.value : null))
+    .filter((s): s is SnapshotData => s !== null);
+}
+
+async function validateGeneratedTest(
+  ctx: ActionCtx,
+  opts: {
+    app_url: string;
+    project_id: Id<"projects">;
+    workspace_id: Id<"workspaces">;
+    code: string;
+    hasSnapshots: boolean;
+  },
+): Promise<{ validated: boolean }> {
+  if (!opts.hasSnapshots) return { validated: false };
+
+  try {
+    const result: { passed: boolean } | null = await ctx.runAction(
+      internal.ai.snapshotAction.validateTest,
+      {
+        url: opts.app_url,
+        project_id: opts.project_id,
+        workspace_id: opts.workspace_id,
+        playwright_code: opts.code,
+      },
+    );
+    return { validated: result?.passed === true };
+  } catch {
+    return { validated: false };
+  }
 }
 
 const ANALYSIS_PROMPT = `You are a senior QA engineer analyzing a web application to identify testable scenarios.
@@ -304,19 +366,21 @@ export const generateExplorationTests = action({
 
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();
-    const allTestBlocks: { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[] = [];
 
     const BATCH_SIZE = 5;
     const totalScenarios = args.selected_scenarios.length;
 
-    const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid") => {
+    const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid", liveSnapshots: SnapshotData[]) => {
       const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
-      const context = buildScenarioContext(exploration.url, authContext, navMenuContext, scenario, pagesCtx, flowContextSection, prdSection);
+      const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
+      const context = buildScenarioContext(exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection);
       if (kind === "playwright") {
         return `Generate a single Playwright test for the following scenario.\n\n${context}\nGenerate a single, self-contained Playwright test. Rules:\n${PLAYWRIGHT_TEST_RULES}`;
       }
       return `Generate test steps for the following scenario.\n\n${context}\nGenerate 3-8 steps that cover this scenario. Use exact element labels and text from the page context.`;
     };
+
+    const allTestBlocks: { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string; hasSnapshots: boolean }[] = [];
 
     for (let batchStart = 0; batchStart < totalScenarios; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, totalScenarios);
@@ -333,6 +397,14 @@ export const generateExplorationTests = action({
 
       const batchResults = await Promise.allSettled(
         batch.map(async (scenario) => {
+          const liveSnapshots = await fetchLiveSnapshotsForScenario(
+            ctx,
+            scenario.relevant_page_urls,
+            exploration.project_id,
+            exploration.workspace_id,
+          );
+          const hasSnapshots = liveSnapshots.length > 0;
+
           const model = (await import("./model")).getWorkspaceModel(aiConfig);
 
           const [playwrightResult, hybridResult] = await withTimeout(
@@ -343,7 +415,7 @@ export const generateExplorationTests = action({
                   title: `Test Generation — ${scenario.name}`,
                 });
                 return thread.generateText({
-                  prompt: promptTemplate(scenario, "playwright"),
+                  prompt: promptTemplate(scenario, "playwright", liveSnapshots),
                 });
               })(),
               (async () => {
@@ -353,7 +425,7 @@ export const generateExplorationTests = action({
                     title: `Hybrid Steps — ${scenario.name}`,
                   });
                   return await thread.generateText({
-                    prompt: promptTemplate(scenario, "hybrid"),
+                    prompt: promptTemplate(scenario, "hybrid", liveSnapshots),
                   });
                 } catch (err) {
                   console.error(`[generateExplorationTests] Hybrid step generation failed for "${scenario.name}":`, err);
@@ -375,6 +447,7 @@ export const generateExplorationTests = action({
             code: block,
             steps: hybridSteps,
             area: scenario.area,
+            hasSnapshots,
           }));
         }),
       );
@@ -391,7 +464,7 @@ export const generateExplorationTests = action({
       }
     }
 
-    const areaGroups = new Map<string, { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[]>();
+    const areaGroups = new Map<string, { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string; hasSnapshots: boolean }[]>();
     for (const block of allTestBlocks) {
       const existing = areaGroups.get(block.area) ?? [];
       existing.push(block);
@@ -408,12 +481,21 @@ export const generateExplorationTests = action({
       suiteIds.push(suiteId);
 
       for (const block of blocks) {
+        const { validated } = await validateGeneratedTest(ctx, {
+          app_url: exploration.url,
+          project_id: exploration.project_id,
+          workspace_id: exploration.workspace_id,
+          code: block.code,
+          hasSnapshots: block.hasSnapshots,
+        });
+
         const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
-          suite_id: suiteId as Id<"suites">,
+          suite_id: suiteId,
           name: block.name,
           playwright_code: block.code,
           steps: block.steps,
           source_type: "url_exploration",
+          validated: block.hasSnapshots ? validated : undefined,
         });
         testIds.push(testId);
       }
@@ -503,14 +585,24 @@ export const generateExplorationTestsForArea = action({
       });
 
       try {
+        const liveSnapshots = await fetchLiveSnapshotsForScenario(
+          ctx,
+          scenario.relevant_page_urls,
+          exploration.project_id,
+          exploration.workspace_id,
+        );
+        const hasSnapshots = liveSnapshots.length > 0;
+
+        const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
+        const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
+
         const agent = createTestGenerationAgent(model);
         const { thread } = await agent.createThread(ctx, {
           title: `Test — ${scenario.name}`,
         });
 
-        const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
         const prompt = buildPlaywrightTestPrompt(
-          exploration.url, authContext, navMenuContext, scenario, pagesCtx, flowContextSection, prdSection,
+          exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection,
         );
 
         const result = await withTimeout(
@@ -522,16 +614,25 @@ export const generateExplorationTestsForArea = action({
         const blocks = extractMultipleTests(result.text);
 
         for (let j = 0; j < blocks.length; j++) {
+          const { validated } = await validateGeneratedTest(ctx, {
+            app_url: exploration.url,
+            project_id: exploration.project_id,
+            workspace_id: exploration.workspace_id,
+            code: blocks[j],
+            hasSnapshots,
+          });
+
           const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
             suite_id: args.suite_id,
             name: deriveTestName(blocks[j], j),
             playwright_code: blocks[j],
             source_type: "url_exploration",
+            validated: hasSnapshots ? validated : undefined,
           });
           testIds.push(testId);
         }
 
-        console.log(`[generateExplorationTestsForArea] ${scenario.name}: ${blocks.length} test(s) generated`);
+        console.log(`[generateExplorationTestsForArea] ${scenario.name}: ${blocks.length} test(s) generated (live snapshots: ${hasSnapshots})`);
       } catch (err) {
         failed++;
         console.error(`[generateExplorationTestsForArea] Failed for "${scenario.name}":`, err);

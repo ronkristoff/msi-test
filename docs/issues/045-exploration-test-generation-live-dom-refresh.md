@@ -1,7 +1,7 @@
 # 045 — Exploration Test Generation with Live DOM Refresh
 
 **Type**: AFK
-**Status**: needs-triage
+**Status**: done
 
 ## What to build
 
@@ -11,14 +11,14 @@ Each generated test goes through the verify loop (same pattern as issue 043). Fa
 
 ## Acceptance criteria
 
-- [ ] `generateExplorationTests` refreshes live snapshot for each scenario's `relevant_page_urls` before AI generation
-- [ ] `generateExplorationTestsForArea` refreshes live snapshot for relevant pages per scenario
-- [ ] AI prompt includes both exploration flow context AND current live DOM
-- [ ] Live DOM snapshot is the primary source for locators; exploration data provides navigation/flow context
-- [ ] Verify loop runs on each generated test
-- [ ] Falls back to exploration-only data when `RUNNER_URL` is unset
-- [ ] Existing exploration generation tests updated to pass
-- [ ] New tests: generation with live refresh, generation with Runner unavailable (fallback), verify loop
+- [x] `generateExplorationTests` refreshes live snapshot for each scenario's `relevant_page_urls` before AI generation
+- [x] `generateExplorationTestsForArea` refreshes live snapshot for relevant pages per scenario
+- [x] AI prompt includes both exploration flow context AND current live DOM
+- [x] Live DOM snapshot is the primary source for locators; exploration data provides navigation/flow context
+- [x] Verify loop runs on each generated test
+- [x] Falls back to exploration-only data when `RUNNER_URL` is unset
+- [x] Existing exploration generation tests updated to pass
+- [x] New tests: generation with live refresh, generation with Runner unavailable (fallback), verify loop
 
 ## Blocked by
 
