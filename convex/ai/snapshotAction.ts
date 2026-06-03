@@ -2,7 +2,7 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { ActionCache } from "@convex-dev/action-cache";
 import { RateLimiter, MINUTE } from "@convex-dev/rate-limiter";
-import { components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import { getRunnerUrl, snapshotFetch, validateTestFetch } from "./browserClient";
 
 const CACHE_TTL_MS = 30 * MINUTE;

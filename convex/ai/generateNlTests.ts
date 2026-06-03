@@ -1,15 +1,10 @@
 "use node";
 
 import { action } from "../_generated/server";
-import type { ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "../_generated/api";
-import { createTestGenerationAgent, extractMultipleTests, deriveTestName } from "./agents";
-import { createAiError, classifyAiError } from "./errors";
-import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
-import { buildAuthPromptContext } from "./authContext";
+import { internal } from "../_generated/api";
+import { start, type WorkflowId } from "@convex-dev/workflow";
 import { ConvexError } from "convex/values";
-import type { Id } from "../_generated/dataModel";
 
 export const generateNlTests = action({
   args: {
@@ -18,22 +13,12 @@ export const generateNlTests = action({
     suite_id: v.id("suites"),
   },
   handler: async (ctx, args) => {
-    try {
-      return await generateNlTestsInner(ctx, args);
-    } finally {
-      const suite = await ctx.runQuery(api.suites.queries.getSuite, {
-        suite_id: args.suite_id,
-      });
-      if (suite?.status === "generating") {
-        await markSuiteFailed(ctx, args.suite_id, "Generation interrupted unexpectedly");
-      }
-    }
-  },
-});
-
-async function generateNlTestsInner(ctx: ActionCtx, args: { project_id: Id<"projects">; prompt: string; suite_id: Id<"suites"> }) {
     if (!args.prompt.trim()) {
-      await markSuiteFailed(ctx, args.suite_id, "Prompt cannot be empty");
+      await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+        suite_id: args.suite_id,
+        status: "failed",
+        generation_error: "Prompt cannot be empty",
+      });
       throw new ConvexError("Prompt cannot be empty");
     }
 
@@ -42,129 +27,24 @@ async function generateNlTestsInner(ctx: ActionCtx, args: { project_id: Id<"proj
     });
 
     if (!project) {
-      await markSuiteFailed(ctx, args.suite_id, "Project not found");
+      await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+        suite_id: args.suite_id,
+        status: "failed",
+        generation_error: "Project not found",
+      });
       throw new ConvexError("Project not found");
     }
 
-    console.log(`[generateNlTests] project auth: mode=${(project as Record<string, unknown>).explore_auth_mode}, username=${(project as Record<string, unknown>).explore_username ?? "(none)"}`);
+    const workflowId: WorkflowId = await start(
+      ctx,
+      internal.ai.nlWorkflow.nlTestGenerationWorkflow,
+      {
+        project_id: args.project_id,
+        prompt: args.prompt,
+        suite_id: args.suite_id,
+      },
+    );
 
-    const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
-      workspace_id: project.workspace_id,
-    });
-
-    let prdContext = "";
-    if (project.prd_text) {
-      prdContext = `\n\nProduct Requirements:\n${project.prd_text}`;
-    } else if (project.prd_file_id) {
-      const blob = await ctx.storage.get(project.prd_file_id);
-      if (blob) {
-        prdContext = `\n\nProduct Requirements:\n${await blob.text()}`;
-      }
-    }
-
-    let responseText: string;
-    try {
-      const agent = createTestGenerationAgent(
-        (await import("./model")).getWorkspaceModel(aiConfig),
-      );
-      const { thread } = await agent.createThread(ctx, {
-        title: `NL Generation — ${project.name}`,
-      });
-      const result = await thread.generateText({
-        prompt: `Generate Playwright tests from the following test description.
-
-Project: ${project.name}
-URL: ${project.app_url}
-${buildAuthPromptContext(project)}${prdContext}
-
-Test Description:
-${args.prompt}
-
-Generate complete, runnable Playwright tests. Each test must be in its own markdown code fence with the "typescript" language tag. Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach(). Each test should navigate to ${project.app_url} using page.goto() at the start.
-
-Locator strategy (priority order):
-1. Semantic locators first: getByRole, getByLabel, getByPlaceholder, getByText
-2. getByTestId for data-test/data-testid attributes
-3. NEVER use raw CSS selectors or XPath
-
-Assertion rules:
-- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
-- Never use waitForTimeout() or arbitrary sleeps
-
-CRITICAL — Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.
-
-Form submission resilience:
-- When a test submits a form (clicks Create/Save/Submit), wrap the submission in a retry loop to handle intermittent backend timeouts.
-- Pattern: click submit, check if dialog closes (success) or stays open (failure). If still open, retry up to 3 times.
-- Example:
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await submitBtn.click();
-    const closed = await expect(dialog).toBeHidden({ timeout: 10000 }).then(() => true).catch(() => false);
-    if (closed) break;
-  }
-  await expect(dialog).toBeHidden({ timeout: 5000 });`,
-      });
-      responseText = result.text;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "AI generation failed";
-      await markSuiteFailed(ctx, args.suite_id, msg);
-      classifyAiError(err);
-      return;
-    }
-
-    console.log(`[generateNlTests] AI response length: ${responseText.length}, first 500 chars: ${responseText.slice(0, 500)}`);
-
-    const testBlocks = extractMultipleTests(responseText);
-
-    if (testBlocks.length === 0) {
-      console.log("[generateNlTests] No code fences found in first response, retrying with explicit format instruction");
-      try {
-        const retryAgent = createTestGenerationAgent(
-          (await import("./model")).getWorkspaceModel(aiConfig),
-        );
-        const { thread: retryThread } = await retryAgent.createThread(ctx, {
-          title: `NL Generation Retry — ${project.name}`,
-        });
-        const retryResult = await retryThread.generateText({
-          prompt: `Your previous response did not contain valid Playwright test code in markdown code fences.
-
-Return ONLY the Playwright test code. Each test must be wrapped in a \`\`\`typescript code fence. No explanation, no commentary — just the code fences.
-
-Project: ${project.name}
-URL: ${project.app_url}
-${buildAuthPromptContext(project)}${prdContext}
-
-Test Description:
-${args.prompt}`,
-        });
-        const retryBlocks = extractMultipleTests(retryResult.text);
-        if (retryBlocks.length > 0) {
-          testBlocks.push(...retryBlocks);
-        }
-      } catch (retryErr) {
-        console.log("[generateNlTests] Retry also failed:", retryErr instanceof Error ? retryErr.message : String(retryErr));
-      }
-    }
-
-    if (testBlocks.length === 0) {
-      await markSuiteFailed(ctx, args.suite_id, "AI did not generate any valid Playwright tests.");
-      throw createAiError("malformed_response", "AI did not generate any valid Playwright tests.");
-    }
-
-    const testIds: string[] = [];
-    for (let i = 0; i < testBlocks.length; i++) {
-      const testName = deriveTestName(testBlocks[i], i);
-      const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
-        suite_id: args.suite_id as Id<"suites">,
-        name: testName,
-        playwright_code: testBlocks[i],
-        source_type: "natural_language",
-        description: args.prompt,
-      });
-      testIds.push(testId);
-    }
-
-    await markSuiteReady(ctx, args.suite_id);
-
-    return { suiteId: args.suite_id, testIds, testNameCount: testIds.length };
-}
+    return { suiteId: args.suite_id, workflowId };
+  },
+});

@@ -30,6 +30,8 @@ export const TEST_GENERATION_PROMPT = `You are MSITest's Test Generation Agent. 
 
 Given a description of user flows, page structure, or product requirements, you generate complete, runnable Playwright test code.
 
+LIVE PAGE CONTEXT: When live page context is provided in the prompt, you MUST use elements and locators from this context. The context includes an accessibility tree and interactive elements with suggested locators. Use those exact locators.
+
 Locator strategy — USE THE SUGGESTED LOCATORS from the page context when available:
 Each interactive element in the context includes a "→" line with the recommended Playwright locator. USE THAT EXACT LOCATOR. Do NOT invent alternatives.
 
@@ -234,4 +236,108 @@ export function deriveTestName(code: string, index?: number): string {
   const match = code.match(/test\s*\(\s*['"\x60]([^'"\x60]+?)['"\x60]/);
   if (match) return match[1];
   return index !== undefined ? `Generated Test ${index + 1}` : "Generated Test";
+}
+
+const TEST_GENERATION_INSTRUCTIONS = `Generate complete, runnable Playwright tests. Each test must be in its own markdown code fence with the "typescript" language tag. Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach(). Each test should navigate to the project URL using page.goto() at the start.
+
+Locator strategy (priority order):
+1. Semantic locators first: getByRole, getByLabel, getByPlaceholder, getByText
+2. getByTestId for data-test/data-testid attributes
+3. NEVER use raw CSS selectors or XPath
+
+Assertion rules:
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+
+CRITICAL — Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.
+
+Form submission resilience:
+- When a test submits a form (clicks Create/Save/Submit), wrap the submission in a retry loop to handle intermittent backend timeouts.
+- Pattern: click submit, check if dialog closes (success) or stays open (failure). If still open, retry up to 3 times.
+- Example:
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await submitBtn.click();
+    const closed = await expect(dialog).toBeHidden({ timeout: 10000 }).then(() => true).catch(() => false);
+    if (closed) break;
+  }
+  await expect(dialog).toBeHidden({ timeout: 5000 });`;
+
+export function buildNlGenerationPrompt(opts: {
+  projectName: string;
+  appUrl: string;
+  authContext: string;
+  prdContext: string;
+  snapshotContext: string;
+  retryContext: string;
+  prompt: string;
+}): string {
+  return `Generate Playwright tests from the following test description.
+
+Project: ${opts.projectName}
+URL: ${opts.appUrl}
+${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
+
+Test Description:
+${opts.prompt}
+
+${TEST_GENERATION_INSTRUCTIONS}`;
+}
+
+export function buildNlFormatRetryPrompt(opts: {
+  projectName: string;
+  appUrl: string;
+  authContext: string;
+  prdContext: string;
+  snapshotContext: string;
+  prompt: string;
+}): string {
+  return `Your previous response did not contain valid Playwright test code in markdown code fences.
+
+Return ONLY the Playwright test code. Each test must be wrapped in a \`\`\`typescript code fence. No explanation, no commentary — just the code fences.
+
+Project: ${opts.projectName}
+URL: ${opts.appUrl}
+${opts.authContext}${opts.prdContext}${opts.snapshotContext}
+
+Test Description:
+${opts.prompt}`;
+}
+
+export function buildPrdGenerationPrompt(opts: {
+  projectName: string;
+  appUrl: string;
+  authContext: string;
+  prdText: string;
+  snapshotContext: string;
+  retryContext: string;
+}): string {
+  return `Generate Playwright tests for the following application.
+
+Project: ${opts.projectName}
+URL: ${opts.appUrl}
+${opts.authContext}${opts.snapshotContext}${opts.retryContext}
+
+Product Requirements:
+${opts.prdText}
+
+${TEST_GENERATION_INSTRUCTIONS}`;
+}
+
+export function buildPrdFormatRetryPrompt(opts: {
+  projectName: string;
+  appUrl: string;
+  authContext: string;
+  prdText: string;
+  snapshotContext: string;
+}): string {
+  return `Your previous response did not contain valid Playwright test code in markdown code fences.
+
+Return ONLY the Playwright test code. Each test must be wrapped in a \`\`\`typescript code fence. No explanation, no commentary — just the code fences.
+
+Project: ${opts.projectName}
+URL: ${opts.appUrl}
+${opts.authContext}${opts.snapshotContext}
+
+Product Requirements:
+${opts.prdText}`;
 }

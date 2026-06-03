@@ -125,6 +125,7 @@ export const createTestFromGeneration = internalMutation({
       v.literal("natural_language"),
     ),
     description: v.optional(v.string()),
+    validated: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (!args.name.trim()) {
@@ -144,6 +145,7 @@ export const createTestFromGeneration = internalMutation({
       steps: args.steps,
       source_type: args.source_type,
       status: "draft",
+      validated: args.validated,
     });
   },
 });

@@ -4,10 +4,13 @@ import { executeStagehandTests } from "./stagehand-executor";
 import { executeExploration } from "./explorer";
 import { executeAutonomousExploration } from "./autonomous-explorer";
 import { executeDiscovery } from "./link-crawler";
+import { createSnapshotApiServer } from "./snapshot-api";
+import { initStagehand } from "./stagehand";
 import type { ExplorationWorkItem } from "./types";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 const RUNNER_SECRET = process.env.RUNNER_SECRET;
+const RUNNER_API_PORT = parseInt(process.env.RUNNER_API_PORT || "8931", 10);
 const RUNNER_ID = `runner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -227,6 +230,17 @@ process.on("SIGTERM", shutdown);
 log(`MSITest Runner started (id: ${RUNNER_ID})`);
 log(`Convex URL: ${CONVEX_URL}`);
 log(`Polling every ${POLL_INTERVAL_MS}ms`);
+
+const snapshotApi = createSnapshotApiServer({
+  runnerSecret: RUNNER_SECRET,
+  getAiConfig: (workspaceId) => client.getWorkspaceAiConfig(workspaceId),
+  initStagehand,
+  log,
+});
+
+snapshotApi.listen(RUNNER_API_PORT, "127.0.0.1", () => {
+  log(`Snapshot API listening on port ${RUNNER_API_PORT}`);
+});
 
 poll();
 pollTimer = setInterval(poll, POLL_INTERVAL_MS);

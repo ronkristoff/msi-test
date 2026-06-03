@@ -104,6 +104,7 @@ export default defineSchema({
       v.literal("prd"),
       v.literal("natural_language"),
     ),
+    validated: v.optional(v.boolean()),
     status: v.union(v.literal("draft"), v.literal("approved"), v.literal("healing")),
     last_healed_at: v.optional(v.number()),
     last_healed_diff: v.optional(v.string()),

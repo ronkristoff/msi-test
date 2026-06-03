@@ -1,8 +1,8 @@
 import * as fsSync from "fs";
 import * as path from "path";
-import { spawn } from "child_process";
 import { RunnerConvexClient } from "./convex-client";
 import { generatePlaywrightConfig, writeTestFile, createTempRunDir, cleanupDir } from "./config";
+import { spawnPlaywright } from "./playwright-spawn";
 import type { RunWorkItem } from "./types";
 
 export type { RunWorkItem };
@@ -345,54 +345,20 @@ async function uploadConsoleLogs(
 }
 
 function runPlaywright(cwd: string, work: RunWorkItem, log: (msg: string) => void): Promise<{ exitCode: number; output: string }> {
-  const projectRoot = path.resolve(__dirname, "../..");
-
   const authEnv: Record<string, string> = {};
   if (work.test_username) authEnv.TEST_USERNAME = work.test_username;
   if (work.test_password) authEnv.TEST_PASSWORD = work.test_password;
   if (work.login_url) authEnv.TEST_LOGIN_URL = work.login_url;
   if (work.auth_mode) authEnv.TEST_AUTH_MODE = work.auth_mode;
 
-  return new Promise((resolve) => {
-    const proc = spawn(
-      path.join(projectRoot, "node_modules", ".bin", "playwright"),
-      ["test", "--config=playwright.config.ts"],
-      {
-        cwd,
-        stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          ...authEnv,
-          NODE_PATH: path.join(projectRoot, "node_modules"),
-          MSITEST_REPORTER_DIR: path.join(cwd, "reporter"),
-        },
-      },
-    );
+  const reporterEnv: Record<string, string> = {
+    MSITEST_REPORTER_DIR: path.join(cwd, "reporter"),
+  };
 
-    const chunks: string[] = [];
-
-    proc.stdout?.on("data", (data: Buffer) => {
-      const text = data.toString();
-      chunks.push(text);
-      for (const line of text.split("\n").filter(Boolean)) {
-        log(`  [pw stdout] ${line}`);
-      }
-    });
-
-    proc.stderr?.on("data", (data: Buffer) => {
-      const text = data.toString();
-      chunks.push(text);
-      for (const line of text.split("\n").filter(Boolean)) {
-        log(`  [pw stderr] ${line}`);
-      }
-    });
-
-    proc.on("close", (code) => resolve({ exitCode: code ?? 1, output: chunks.join("") }));
-    proc.on("error", (err) => {
-      log(`Playwright process error: ${err}`);
-      resolve({ exitCode: 1, output: chunks.join("") + `\nProcess error: ${err.message}` });
-    });
-  });
+  return spawnPlaywright(cwd, log, { ...authEnv, ...reporterEnv }).then((result) => ({
+    exitCode: result.exitCode,
+    output: result.stdout + result.stderr,
+  }));
 }
 
 function detectConvexTimeout(summary: TestSummary[], reporterDir: string): boolean {
