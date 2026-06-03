@@ -47,6 +47,7 @@ export default function SuiteDetailPage() {
   const updateSuite = useMutation(api.suites.mutations.updateSuite);
   const deleteSuite = useMutation(api.suites.mutations.deleteSuite);
   const addSuiteMember = useMutation(api.suites.mutations.addSuiteMember);
+  const approveAllTests = useMutation(api.tests.mutations.approveAllTests);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
   const triggerRun = useMutation(api.runs.mutations.triggerRun);
 
@@ -80,6 +81,7 @@ export default function SuiteDetailPage() {
   const [addToRegError, setAddToRegError] = useState<string | null>(null);
 
   const approvedCount = tests?.filter((t) => t.status === "approved").length ?? 0;
+  const draftCount = tests?.filter((t) => t.status === "draft").length ?? 0;
 
   const regressionApprovedCount = regressionMembers
     ? regressionMembers.suiteRefs.reduce(
@@ -331,9 +333,27 @@ export default function SuiteDetailPage() {
           )}
 
           <div>
-            <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
-              Tests
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)]">
+                Tests
+              </h3>
+              {draftCount > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await approveAllTests({ suite_id: suiteId });
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : "Failed to approve tests";
+                      logError(msg, { severity: "error", context: { source: "SuiteDetailPage.approveAll" } });
+                    }
+                  }}
+                >
+                  Approve All ({draftCount})
+                </Button>
+              )}
+            </div>
 
             {tests.length === 0 ? (
               <EmptyState

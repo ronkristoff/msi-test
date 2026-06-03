@@ -8,12 +8,138 @@ import { createExplorationAnalysisAgent, createTestGenerationAgent, createHybrid
 import { extractJsonFromAiResponse } from "./parse";
 import { classifyAiError } from "./errors";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
-import { buildAuthPromptContext } from "./authContext";
-import { formatCapturedPagesForPrompt } from "./formatPages";
+import { buildAuthPromptContext, buildNavMenuContext } from "./authContext";
+import { formatCapturedPagesForPrompt, type FormattablePage } from "./formatPages";
+import { getWorkspaceModel } from "./model";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 
 const PRD_ANALYSIS_LIMIT = 4000;
+const SCENARIO_TIMEOUT_MS = 90_000;
+const ACTION_BUDGET_MS = 500_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout: scenario "${label}" exceeded ${Math.round(ms / 1000)}s`)), ms),
+    ),
+  ]);
+}
+
+const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
+- Navigate to the application URL at the start using page.goto()
+- For SPA apps, after login navigate to internal pages by clicking navigation links (sidebar/menu items), NOT by using page.goto() for internal routes
+- After any page.goto() or navigation click, wait for the page to settle: await page.waitForLoadState('networkidle')
+- Use the EXACT suggested locators from the Interactive Elements section — do NOT invent or guess locators
+- Each interactive element shows a "→" line with the recommended Playwright locator. USE IT.
+- If no suggested locator exists, use semantic locators: getByRole, getByLabel, getByPlaceholder, getByTestId
+- NEVER use raw CSS selectors unless no semantic locator is available
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+- For assertions, use ONLY text values that appear in the page context (headings, table data, status text). Do NOT fabricate text that isn't shown in the context.
+- Wrap the test in a single markdown code fence with language "typescript"`;
+
+function buildScenarioContext(
+  url: string,
+  authContext: string,
+  navMenuContext: string,
+  scenario: { name: string; description: string; flow_summary: string },
+  pagesContext: string,
+  flowContextSection: string,
+  prdSection: string,
+) {
+  return `Application URL: ${url}
+${authContext}${navMenuContext}
+Scenario: ${scenario.name}
+Description: ${scenario.description}
+Flow: ${scenario.flow_summary}
+
+Page structure context:
+${pagesContext}
+${flowContextSection}${prdSection}`;
+}
+
+function buildPlaywrightTestPrompt(
+  url: string,
+  authContext: string,
+  navMenuContext: string,
+  scenario: { name: string; description: string; flow_summary: string },
+  pagesContext: string,
+  flowContextSection: string,
+  prdSection: string,
+) {
+  const context = buildScenarioContext(url, authContext, navMenuContext, scenario, pagesContext, flowContextSection, prdSection);
+  return `Generate a single Playwright test for the following scenario.
+
+${context}
+Generate a single, self-contained Playwright test. Rules:
+${PLAYWRIGHT_TEST_RULES}`;
+}
+
+async function resolveExplorationContext(ctx: ActionCtx, explorationId: Id<"explorations">) {
+  const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
+    exploration_id: explorationId,
+  });
+  if (!exploration) return null;
+
+  const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
+    workspace_id: exploration.workspace_id,
+  });
+  const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
+    project_id: exploration.project_id,
+  });
+
+  const authContext = buildAuthPromptContext(project);
+  const navMenuContext = buildNavMenuContext(exploration.nav_menu);
+  const pagesContextSummary = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 3000, "summary");
+  const pagesContextDetailed = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 6000, "detailed");
+  const prdSection = project?.prd_text
+    ? `\nPRD / Product Requirements:\n${project.prd_text.slice(0, PRD_ANALYSIS_LIMIT)}\n`
+    : "";
+
+  return { exploration, aiConfig, project, authContext, navMenuContext, pagesContextSummary, pagesContextDetailed, prdSection, capturedPages: exploration.captured_pages ?? [] };
+}
+
+function buildFilteredPagesContext(
+  capturedPages: FormattablePage[],
+  relevantUrls: string[] | undefined,
+  budget: number,
+): string {
+  if (!relevantUrls || relevantUrls.length === 0) {
+    return formatCapturedPagesForPrompt(capturedPages, budget, "detailed");
+  }
+  const urlSet = new Set(relevantUrls);
+  const filtered = capturedPages.filter((p) => urlSet.has(p.url));
+  return formatCapturedPagesForPrompt(filtered.length > 0 ? filtered : capturedPages, budget, "detailed");
+}
+
+const ANALYSIS_PROMPT = `You are a senior QA engineer analyzing a web application to identify testable scenarios.
+
+Analyze each page individually based on its content, interactive elements, and complexity. Propose test scenarios driven by what each page actually contains.
+
+Analysis rules:
+- For pages with FORMS: propose scenarios for valid submission, invalid input handling, required field validation, and error message display
+- For pages with TABLES or DATA LISTS: propose scenarios for data rendering, column sorting, filtering, pagination, and empty states
+- For pages with NAVIGATION elements: propose scenarios for link correctness, active state highlighting, and page transitions
+- For pages with MODALS or DIALOGS: propose scenarios for opening, interacting with, and dismissing
+- For pages with DASHBOARDS or CHARTS: propose scenarios for data visualization rendering, date range filters, and data accuracy
+- For pages with SETTINGS or CONFIGURATION forms: propose scenarios for saving changes, resetting, and validation
+- For pages with AUTHENTICATION: propose scenarios for login, logout, session persistence, and unauthorized access redirects
+- For simple static pages: a single scenario for correct content rendering may suffice
+- For complex pages with many interactive elements: propose multiple focused scenarios, each testing a distinct interaction or feature
+- Each scenario MUST reference specific elements, text, or features found on the page — never propose generic scenarios disconnected from the actual content
+- Propose as many scenarios as the content warrants. A 15-page app with rich functionality should have 25-50+ scenarios. A 3-page app with simple content may only need 5-8. Let the content decide.
+
+Group scenarios by area (e.g. "Authentication", "Dashboard", "Settings", "Data Management", "Navigation").
+
+IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
+- "name": string — concise scenario name that includes the specific feature being tested
+- "description": string — what the scenario tests and why it matters
+- "flowSummary": string — step-by-step flow the test will execute
+- "area": string — app area category (e.g. "Authentication", "Dashboard", "Settings", "Navigation")
+- "relatedFlows": array of strings (optional) — names of discovered flows this scenario covers. Only include if the scenario clearly exercises a listed flow's steps.
+- "relevantPageUrls": array of strings — the URLs of captured pages this scenario tests. Must be exact URLs from the "Captured pages" list above. Only include pages directly exercised by the scenario.`;
 
 async function markAllSuitesFailed(
   ctx: ActionCtx,
@@ -68,7 +194,7 @@ export const analyzeExploration = internalAction({
         title: `Exploration Analysis — ${exploration.url}`,
       });
 
-      const pagesDescription = formatCapturedPagesForPrompt(exploration.captured_pages, 2000);
+      const pagesDescription = formatCapturedPagesForPrompt(exploration.captured_pages, 4000, "summary");
 
       const flowsDescription = exploration.discovered_flows
         ?.map((f: { name: string; complexity: string; steps: string[]; pages_involved: number[] }) => `Flow: ${f.name} (${f.complexity})\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.join(", ")}`)
@@ -84,21 +210,14 @@ export const analyzeExploration = internalAction({
         : "";
 
       const result = await thread.generateText({
-        prompt: `Analyze the following web application pages captured from ${exploration.url}.
-
-Identify the most testable user scenarios. For each scenario provide a name, description, step-by-step flow summary, and an area label.
+        prompt: `Application: ${exploration.url}
 
 Captured pages:
 ${pagesDescription}
 ${flowsDescription ? `\nDiscovered navigation flows:\n${flowsDescription}\n` : ""}
-${prdSection}${prdCoverageSection}${exploration.goal ? `User's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}Propose 3-8 testable scenarios focused on critical user flows, form interactions, navigation, and error states.
+${prdSection}${prdCoverageSection}${exploration.goal ? `\nUser's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}
 
-IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no explanation — just the raw JSON array. Each element must have exactly these fields:
-- "name": string — concise scenario name
-- "description": string — what the scenario tests
-- "flowSummary": string — step-by-step flow summary
-- "area": string — app area category (e.g. "Authentication", "Dashboard", "Project Management", "Settings", "Navigation")
-- "relatedFlows": array of strings (optional) — names of discovered flows this scenario covers. Only include if the scenario clearly exercises a listed flow's steps.`,
+${ANALYSIS_PROMPT}`,
       });
 
       const text = result.text.trim();
@@ -124,6 +243,7 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
         flow_summary: s.flowSummary,
         area: s.area,
         related_flows: s.relatedFlows,
+        relevant_page_urls: s.relevantPageUrls,
       }));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -152,6 +272,7 @@ export const generateExplorationTests = action({
         flow_summary: v.string(),
         area: v.string(),
         related_flows: v.optional(v.array(v.string())),
+        relevant_page_urls: v.optional(v.array(v.string())),
       }),
     ),
     suite_ids: v.array(
@@ -163,11 +284,8 @@ export const generateExplorationTests = action({
     flow_context: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
-      exploration_id: args.exploration_id,
-    });
-
-    if (!exploration) {
+    const resolved = await resolveExplorationContext(ctx, args.exploration_id);
+    if (!resolved) {
       await markAllSuitesFailed(ctx, args.suite_ids, "Exploration not found");
       throw new ConvexError("Exploration not found");
     }
@@ -177,106 +295,99 @@ export const generateExplorationTests = action({
       throw new ConvexError("No scenarios selected");
     }
 
-    const aiConfig = await ctx.runQuery(internal.ai.model.getWorkspaceAiConfigQuery, {
-      workspace_id: exploration.workspace_id,
-    });
-
-    const project = await ctx.runQuery(internal.projects.queries.getProjectForAi, {
-      project_id: exploration.project_id,
-    });
-    const authContext = buildAuthPromptContext(project);
-    console.log(`[generateExplorationTests] project auth: mode=${(project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(project as Record<string, unknown> | null)?.explore_username ?? "(none)"}, authContext length=${authContext.length}`);
-
-    const pagesContext = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 3000);
+    const { exploration, aiConfig, authContext, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    console.log(`[generateExplorationTests] project auth: mode=${(resolved.project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(resolved.project as Record<string, unknown> | null)?.explore_username ?? "(none)"}, authContext length=${authContext.length}`);
 
     const flowContextSection = args.flow_context
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
-      : "";
-
-    const prdSection = project?.prd_text
-      ? `\nPRD / Product Requirements:\n${project.prd_text.slice(0, PRD_ANALYSIS_LIMIT)}\n`
       : "";
 
     const areaSuiteMap = new Map(args.suite_ids.map((s) => [s.area, s.suite_id]));
     const failedAreas = new Set<string>();
     const allTestBlocks: { name: string; code: string; steps?: { instruction: string; assertion_code?: string; expected_outcome?: string }[]; area: string }[] = [];
 
-    for (const scenario of args.selected_scenarios) {
-      try {
-        const model = (await import("./model")).getWorkspaceModel(aiConfig);
+    const BATCH_SIZE = 5;
+    const totalScenarios = args.selected_scenarios.length;
 
-        const [playwrightResult, hybridResult] = await Promise.all([
-          (async () => {
-            const agent = createTestGenerationAgent(model);
-            const { thread } = await agent.createThread(ctx, {
-              title: `Test Generation — ${scenario.name}`,
-            });
-            return thread.generateText({
-              prompt: `Generate a single Playwright test for the following scenario.
+    const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid") => {
+      const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
+      const context = buildScenarioContext(exploration.url, authContext, navMenuContext, scenario, pagesCtx, flowContextSection, prdSection);
+      if (kind === "playwright") {
+        return `Generate a single Playwright test for the following scenario.\n\n${context}\nGenerate a single, self-contained Playwright test. Rules:\n${PLAYWRIGHT_TEST_RULES}`;
+      }
+      return `Generate test steps for the following scenario.\n\n${context}\nGenerate 3-8 steps that cover this scenario. Use exact element labels and text from the page context.`;
+    };
 
-Application URL: ${exploration.url}
-${authContext}
-Scenario: ${scenario.name}
-Description: ${scenario.description}
-Flow: ${scenario.flow_summary}
+    for (let batchStart = 0; batchStart < totalScenarios; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, totalScenarios);
+      const batch = args.selected_scenarios.slice(batchStart, batchEnd);
 
-Page structure context:
-${pagesContext}
-${flowContextSection}${prdSection}
-Generate a single, self-contained Playwright test. Rules:
-- Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
-- Navigate to ${exploration.url} at the start using page.goto()
-- Use semantic locators first (getByRole, getByLabel, getByPlaceholder, getByText), then getByTestId for data-test attributes shown in the page context
-- NEVER use raw CSS selectors (page.locator('.class')) or guess selectors not shown in the context
-- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
-- Never use waitForTimeout() or arbitrary sleeps
-- Only interact with elements and assert on values explicitly shown in the page context — do NOT invent or guess selectors
-- Wrap the test in a single markdown code fence with language "typescript"`,
-            });
-          })(),
-          (async () => {
-            try {
-              const hybridAgent = createHybridTestGenerationAgent(model);
-              const { thread } = await hybridAgent.createThread(ctx, {
-                title: `Hybrid Steps — ${scenario.name}`,
-              });
-              return await thread.generateText({
-                prompt: `Generate test steps for the following scenario.
+      const progressMsg = `Generating tests ${batchStart + 1}-${batchEnd} of ${totalScenarios}...`;
+      for (const { suite_id } of args.suite_ids) {
+        await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+          suite_id,
+          status: "generating",
+          progress_message: progressMsg,
+        });
+      }
 
-Application URL: ${exploration.url}
-${authContext}
-Scenario: ${scenario.name}
-Description: ${scenario.description}
-Flow: ${scenario.flow_summary}
+      const batchResults = await Promise.allSettled(
+        batch.map(async (scenario) => {
+          const model = (await import("./model")).getWorkspaceModel(aiConfig);
 
-Page structure context:
-${pagesContext}
-${flowContextSection}${prdSection}
-Generate 3-8 steps that cover this scenario. Use exact element labels and text from the page context.`,
-              });
-            } catch (err) {
-              console.error(`[generateExplorationTests] Hybrid step generation failed for "${scenario.name}":`, err);
-              return null;
-            }
-          })(),
-        ]);
+          const [playwrightResult, hybridResult] = await withTimeout(
+            Promise.all([
+              (async () => {
+                const agent = createTestGenerationAgent(model);
+                const { thread } = await agent.createThread(ctx, {
+                  title: `Test Generation — ${scenario.name}`,
+                });
+                return thread.generateText({
+                  prompt: promptTemplate(scenario, "playwright"),
+                });
+              })(),
+              (async () => {
+                try {
+                  const hybridAgent = createHybridTestGenerationAgent(model);
+                  const { thread } = await hybridAgent.createThread(ctx, {
+                    title: `Hybrid Steps — ${scenario.name}`,
+                  });
+                  return await thread.generateText({
+                    prompt: promptTemplate(scenario, "hybrid"),
+                  });
+                } catch (err) {
+                  console.error(`[generateExplorationTests] Hybrid step generation failed for "${scenario.name}":`, err);
+                  return null;
+                }
+              })(),
+            ]),
+            SCENARIO_TIMEOUT_MS,
+            scenario.name,
+          );
 
-        const blocks = extractMultipleTests(playwrightResult.text);
-        const hybridSteps = hybridResult
-          ? extractJsonFromAiResponse(hybridResult.text, hybridTestStepSchema.array()) ?? undefined
-          : undefined;
+          const blocks = extractMultipleTests(playwrightResult.text);
+          const hybridSteps = hybridResult
+            ? extractJsonFromAiResponse(hybridResult.text, hybridTestStepSchema.array()) ?? undefined
+            : undefined;
 
-        for (let i = 0; i < blocks.length; i++) {
-          allTestBlocks.push({
-            name: deriveTestName(blocks[i], i),
-            code: blocks[i],
+          return blocks.map((block, i) => ({
+            name: deriveTestName(block, i),
+            code: block,
             steps: hybridSteps,
             area: scenario.area,
-          });
+          }));
+        }),
+      );
+
+      for (let i = 0; i < batchResults.length; i++) {
+        const result = batchResults[i];
+        if (result.status === "fulfilled") {
+          allTestBlocks.push(...result.value);
+        } else {
+          const scenario = batch[i];
+          failedAreas.add(scenario.area);
+          console.error(`[generateExplorationTests] Failed to generate test for scenario "${scenario.name}":`, result.reason);
         }
-      } catch (err: unknown) {
-        failedAreas.add(scenario.area);
-        console.error(`[generateExplorationTests] Failed to generate test for scenario "${scenario.name}":`, err);
       }
     }
 
@@ -329,5 +440,110 @@ Generate 3-8 steps that cover this scenario. Use exact element labels and text f
     });
 
     return { suiteIds, testIds, testNameCount: testIds.length };
+  },
+});
+
+export const generateExplorationTestsForArea = action({
+  args: {
+    exploration_id: v.id("explorations"),
+    scenarios: v.array(
+      v.object({
+        name: v.string(),
+        description: v.string(),
+        flow_summary: v.string(),
+        area: v.string(),
+        related_flows: v.optional(v.array(v.string())),
+        relevant_page_urls: v.optional(v.array(v.string())),
+      }),
+    ),
+    suite_id: v.id("suites"),
+    area: v.string(),
+    flow_context: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const resolved = await resolveExplorationContext(ctx, args.exploration_id);
+    if (!resolved) {
+      await markSuiteFailed(ctx, args.suite_id, "Exploration not found");
+      return { testIds: [] as string[], failed: 0 };
+    }
+
+    if (args.scenarios.length === 0) {
+      await markSuiteFailed(ctx, args.suite_id, "No scenarios provided");
+      return { testIds: [] as string[], failed: 0 };
+    }
+
+    const { exploration, aiConfig, authContext, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    const flowContextSection = args.flow_context
+      ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
+      : "";
+
+    const model = getWorkspaceModel(aiConfig);
+    const testIds: string[] = [];
+    let failed = 0;
+    const startTime = Date.now();
+
+    for (let i = 0; i < args.scenarios.length; i++) {
+      const scenario = args.scenarios[i];
+
+      if (Date.now() - startTime > ACTION_BUDGET_MS) {
+        const remaining = args.scenarios.length - i;
+        console.log(`[generateExplorationTestsForArea] Time budget reached — generated ${testIds.length} tests, skipping ${remaining} remaining scenarios`);
+        await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+          suite_id: args.suite_id,
+          status: "generating",
+          progress_message: `Generated ${testIds.length} tests — ${remaining} scenarios skipped due to time budget`,
+        });
+        break;
+      }
+
+      await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+        suite_id: args.suite_id,
+        status: "generating",
+        progress_message: `Generating test ${i + 1}/${args.scenarios.length}: ${scenario.name}`,
+      });
+
+      try {
+        const agent = createTestGenerationAgent(model);
+        const { thread } = await agent.createThread(ctx, {
+          title: `Test — ${scenario.name}`,
+        });
+
+        const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
+        const prompt = buildPlaywrightTestPrompt(
+          exploration.url, authContext, navMenuContext, scenario, pagesCtx, flowContextSection, prdSection,
+        );
+
+        const result = await withTimeout(
+          thread.generateText({ prompt }),
+          SCENARIO_TIMEOUT_MS,
+          scenario.name,
+        );
+
+        const blocks = extractMultipleTests(result.text);
+
+        for (let j = 0; j < blocks.length; j++) {
+          const testId: string = await ctx.runMutation(internal.tests.mutations.createTestFromGeneration, {
+            suite_id: args.suite_id,
+            name: deriveTestName(blocks[j], j),
+            playwright_code: blocks[j],
+            source_type: "url_exploration",
+          });
+          testIds.push(testId);
+        }
+
+        console.log(`[generateExplorationTestsForArea] ${scenario.name}: ${blocks.length} test(s) generated`);
+      } catch (err) {
+        failed++;
+        console.error(`[generateExplorationTestsForArea] Failed for "${scenario.name}":`, err);
+      }
+    }
+
+    if (testIds.length > 0) {
+      await markSuiteReady(ctx, args.suite_id);
+    } else {
+      await markSuiteFailed(ctx, args.suite_id, failed > 0 ? `AI failed to generate tests for all ${args.scenarios.length} scenarios` : "No test blocks generated");
+    }
+
+    return { testIds, failed };
   },
 });

@@ -60,8 +60,8 @@ export async function executeExploration(
     const linkObjectsBySource = new Map<string, Array<{ text: string; href: string }>>();
 
     if (work.auth_mode === "form" && work.username && work.password) {
-      const loginPage = await handleFormLogin(stagehand, work, client, log);
-      capturedPages.push(loginPage);
+      const { loginPage, postLoginPage } = await handleFormLogin(stagehand, work, client, log);
+      capturedPages.push(loginPage, postLoginPage);
       await client.updateExplorationProgress(
         work.exploration_id,
         `Captured login page: ${loginPage.title}`,

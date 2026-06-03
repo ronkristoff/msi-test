@@ -25,4 +25,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "markStaleGenerations",
+  { minutes: 2 },
+  internal.suites.mutations.markStaleGenerations,
+  {},
+);
+
 export default crons;

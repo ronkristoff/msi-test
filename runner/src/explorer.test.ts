@@ -155,10 +155,18 @@ describe("executeExploration", () => {
     });
     (initStagehand as Mock).mockResolvedValue(stagehand);
     (handleFormLogin as Mock).mockResolvedValue({
-      url: "https://example.com/login",
-      title: "Login",
-      structure_text: "",
-      semantic_description: "Login",
+      loginPage: {
+        url: "https://example.com/login",
+        title: "Login",
+        structure_text: "",
+        semantic_description: "Login",
+      },
+      postLoginPage: {
+        url: "https://example.com/dashboard",
+        title: "Dashboard",
+        structure_text: "",
+        semantic_description: "Dashboard",
+      },
     });
 
     await executeExploration(client, work, log);

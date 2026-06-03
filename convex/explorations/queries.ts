@@ -41,7 +41,7 @@ export const getExplorationsByProject = query({
   },
 });
 
-const ACTIVE_STATUSES = ["pending", "capturing", "captured", "analyzing", "analyzed"] as const;
+const ACTIVE_STATUSES = ["pending", "discovering", "discovered", "capturing", "captured", "analyzing", "analyzed"] as const;
 
 export const getLatestActiveExploration = query({
   args: { project_id: v.id("projects") },
@@ -92,6 +92,7 @@ export const getPendingExplorations = query({
           max_steps: exploration.max_steps,
           goal: exploration.goal,
           prd_text: project?.prd_text,
+          selected_pages: exploration.selected_pages,
         };
       }),
     );

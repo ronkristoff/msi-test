@@ -4,6 +4,11 @@ export interface PrdCoverageItem {
   evidence?: string;
 }
 
+export interface DiscoveredPage {
+  url: string;
+  title: string;
+}
+
 export interface Scenario {
   name: string;
   description: string;

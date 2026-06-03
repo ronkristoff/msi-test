@@ -143,8 +143,11 @@ export const analyzeFailures = internalAction({
           .map((s: { step_number: number; command: string; locator: string | null; status: string; error_message: string | null }) => `Step ${s.step_number}: ${s.command} ${s.locator ?? ""} [${s.status}]${s.error_message ? ` — ${s.error_message}` : ""}`)
           .join("\n");
 
-        const prompt = `Analyze this failed Playwright test. Respond with a JSON object containing: rootCause (string), suggestedFix (string), confidenceScore (0-1 number).
+        const prompt = `Analyze this failed Playwright test. Respond with ONLY a JSON object (no markdown, no code fences, no explanation) containing: rootCause (string), suggestedFix (string), confidenceScore (0-1 number).
 
+Do NOT use any tools. Respond directly with the JSON object.
+
+Project ID: ${run.project_id}
 Test: ${result.test_name}
 
 Test code:

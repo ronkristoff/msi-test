@@ -9,6 +9,7 @@ type SuiteBannerData = {
   _id: string;
   status?: string;
   generation_error?: string;
+  progress_message?: string;
   locked_by?: string;
   locked_reason?: string;
   source_type: string;
@@ -31,6 +32,11 @@ export function SuiteStatusBanners({ suite, activeRun }: SuiteStatusBannersProps
   const handleRetry = async () => {
     try {
       const result = await retrySuiteGeneration({ suite_id: suite._id as Id<"suites"> });
+
+      if (result.source_type === "url_exploration") {
+        window.location.href = `/projects/${suite.project_id}/explore`;
+        return;
+      }
 
       const action = result.source_type === "prd"
         ? generatePrdTests
@@ -67,7 +73,7 @@ export function SuiteStatusBanners({ suite, activeRun }: SuiteStatusBannersProps
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <span className="text-sm text-[var(--fg)]">
-            Generating tests... {suite.testCount > 0 && `(${suite.testCount} created so far)`}
+            {suite.progress_message || "Generating tests..."} {suite.testCount > 0 && `(${suite.testCount} created so far)`}
           </span>
         </div>
       </div>

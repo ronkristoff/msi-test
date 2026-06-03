@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator, prdCoverageItemValidator, testStepValidator } from "./lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, prdCoverageItemValidator, testStepValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -78,6 +78,7 @@ export default defineSchema({
       v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
     ),
     generation_error: v.optional(v.string()),
+    progress_message: v.optional(v.string()),
     triggered_by: v.optional(v.string()),
     locked_by: v.optional(v.string()),
     locked_at: v.optional(v.number()),
@@ -250,6 +251,8 @@ export default defineSchema({
     additional_urls: v.optional(v.array(v.string())),
     status: v.union(
       v.literal("pending"),
+      v.literal("discovering"),
+      v.literal("discovered"),
       v.literal("capturing"),
       v.literal("captured"),
       v.literal("analyzing"),
@@ -266,6 +269,8 @@ export default defineSchema({
     ),
     max_steps: v.optional(v.number()),
     captured_pages: v.optional(v.array(capturedPageValidator)),
+    discovered_pages: v.optional(v.array(discoveredPageValidator)),
+    selected_pages: v.optional(v.array(v.string())),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
     prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
     proposed_scenarios: v.optional(
@@ -276,10 +281,21 @@ export default defineSchema({
           flow_summary: v.string(),
           area: v.string(),
           related_flows: v.optional(v.array(v.string())),
+          relevant_page_urls: v.optional(v.array(v.string())),
         }),
       ),
     ),
     error_message: v.optional(v.string()),
+    auth_cookies: v.optional(v.array(v.object({
+      name: v.string(),
+      value: v.string(),
+      domain: v.string(),
+      path: v.string(),
+    }))),
+    nav_menu: v.optional(v.array(v.object({
+      text: v.string(),
+      href: v.string(),
+    }))),
   })
     .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"])

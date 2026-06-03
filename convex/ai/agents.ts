@@ -11,6 +11,7 @@ export const explorationScenarioSchema = z.object({
   flowSummary: z.string(),
   area: z.string(),
   relatedFlows: z.array(z.string()).optional(),
+  relevantPageUrls: z.array(z.string()).optional(),
 });
 
 export const failureAnalysisSchema = z.object({
@@ -29,17 +30,24 @@ export const TEST_GENERATION_PROMPT = `You are MSITest's Test Generation Agent. 
 
 Given a description of user flows, page structure, or product requirements, you generate complete, runnable Playwright test code.
 
-Locator strategy (use in this priority order):
+Locator strategy — USE THE SUGGESTED LOCATORS from the page context when available:
+Each interactive element in the context includes a "→" line with the recommended Playwright locator. USE THAT EXACT LOCATOR. Do NOT invent alternatives.
+
+When no suggested locator exists, use this priority order:
 1. getByRole — e.g. page.getByRole('button', { name: 'Login' })
 2. getByLabel / getByPlaceholder — e.g. page.getByLabel('Username'), page.getByPlaceholder('Password')
-3. getByText / getByTitle — e.g. page.getByText('Welcome')
-4. getByTestId — when data-test attributes are provided in the page context, e.g. page.getByTestId('username')
-5. NEVER use raw CSS selectors (page.locator('.class')), XPath, or guess selectors not provided in context
+3. getByTestId — when data-test attributes are provided in the page context
+4. NEVER use raw CSS selectors (page.locator('.class')), XPath, or guess selectors not provided in context
 
 Assertion rules:
+- Use ONLY text values that appear in the page context (headings, table data, status text, button labels). Do NOT fabricate text that isn't shown.
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL(), toBeEnabled()
 - Never use generic expect() for DOM state — always use expect(locator).matcher()
 - Never use waitForTimeout() or arbitrary sleeps — Playwright auto-waits for actionability
+
+Navigation rules:
+- For SPA apps, after login navigate to internal pages by clicking navigation links (sidebar/menu items), NOT by using page.goto() for internal routes
+- After any page.goto() or navigation click, wait for the page to settle: await page.waitForLoadState('networkidle')
 
 Structure rules:
 - Always use @playwright/test imports
@@ -49,7 +57,7 @@ Structure rules:
 - Prefer simple, linear test flows: navigate → interact → assert
 - Use descriptive test names that reflect the user flow being tested
 - Wrap test code in a markdown code fence with language "typescript"
-- Only interact with elements and assert on values explicitly shown in the page context — do NOT invent, guess, or fabricate selectors, attributes, or text`;
+- Only interact with elements and assert on values explicitly shown in the page context — do NOT invent, guess, or fabricate selectors, text, or values`;
 
 export const EXPLORATION_ANALYSIS_PROMPT = `You are MSITest's Exploration Analysis Agent. You analyze web application pages and identify testable user scenarios.
 
@@ -146,7 +154,6 @@ export function createFailureAnalysisAgent(model: AgentModel) {
     name: "Failure Analysis",
     languageModel: model,
     instructions: FAILURE_ANALYSIS_PROMPT,
-    tools: createToolDefinitions(),
   });
 }
 
@@ -165,6 +172,7 @@ Rules:
 8. Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText()
 9. Never use waitForTimeout() or arbitrary sleeps
 10. Wrap the modified test in a markdown code fence with language "typescript"
+11. When page context is provided, use the actual elements, text, and structure from that context. NEVER fabricate selectors, text content, or assertions that aren't present in the page context.
 
 After the code fence, provide a brief summary of changes in this format:
 ---CHANGES---
@@ -184,17 +192,41 @@ const CODE_FENCE_RE = /```(?:typescript|ts|tsx|javascript|js|jsx)?\s*\r?\n([\s\S
 
 export function extractPlaywrightCode(response: string): string | null {
   const match = response.match(CODE_FENCE_RE);
-  if (!match) return null;
-  return match[1].trim();
+  if (match) return match[1].trim();
+  const looseMatch = response.match(/```\s*\r?\n([\s\S]*?)```/);
+  if (looseMatch) return looseMatch[1].trim();
+  return null;
 }
 
+const PLAYWRIGHT_CODE_HINTS = /(?:import\s.*@playwright\/test|test\s*\(|expect\s*\(|page\.(goto|click|fill|locator|getBy))/;
+
 export function extractMultipleTests(response: string): string[] {
-  const regex = new RegExp(CODE_FENCE_RE.source, "g");
-  const results: string[] = [];
-  let match;
-  while ((match = regex.exec(response)) !== null) {
-    results.push(match[1].trim());
+  const patterns = [
+    CODE_FENCE_RE,
+    /```(?:typescript|ts|tsx|javascript|js|jsx)?\s*([\s\S]*?)```/,
+    /```\s*\r?\n([\s\S]*?)```/,
+  ];
+
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern.source, "g");
+    const results: string[] = [];
+    let match;
+    while ((match = regex.exec(response)) !== null) {
+      const code = match[1].trim();
+      if (code.length > 0 && PLAYWRIGHT_CODE_HINTS.test(code)) results.push(code);
+    }
+    if (results.length > 0) return results;
   }
+
+  const blocks = response.split(/(?=import\s*\{[^}]*\}\s*from\s*['"]@playwright\/test['"])/);
+  const results: string[] = [];
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (trimmed && /test\s*\(/.test(trimmed)) {
+      results.push(trimmed);
+    }
+  }
+
   return results;
 }
 

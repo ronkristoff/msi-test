@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 
 const mockCreateExploration = vi.fn();
 const mockCancelExploration = vi.fn();
+const mockStartDeepExploration = vi.fn();
+const mockUpdateDiscoveredPages = vi.fn();
 const mockGenerateTests = vi.fn();
 let mockQueryResults: Record<string, unknown> = {};
 
@@ -22,6 +24,8 @@ vi.mock("convex/react", () => ({
     const key = String(_ref);
     if (key.includes("createExploration")) return mockCreateExploration;
     if (key.includes("cancelExploration")) return mockCancelExploration;
+    if (key.includes("startDeepExploration")) return mockStartDeepExploration;
+    if (key.includes("updateDiscoveredPages")) return mockUpdateDiscoveredPages;
     if (key.includes("createSuitesForExploration")) return vi.fn().mockResolvedValue([{ area: "Auth", suite_id: "s1" }]);
     return vi.fn();
   }),
@@ -41,7 +45,12 @@ vi.mock("@/lib/convex", () => ({
         getExploration: "explorations.queries.getExploration",
         getLatestActiveExploration: "explorations.queries.getLatestActiveExploration",
       },
-      mutations: { createExploration: "explorations.mutations.createExploration", cancelExploration: "explorations.mutations.cancelExploration" },
+      mutations: {
+        createExploration: "explorations.mutations.createExploration",
+        cancelExploration: "explorations.mutations.cancelExploration",
+        startDeepExploration: "explorations.mutations.startDeepExploration",
+        updateDiscoveredPages: "explorations.mutations.updateDiscoveredPages",
+      },
     },
     suites: {
       mutations: {
@@ -60,6 +69,35 @@ vi.mock("@/lib/convex", () => ({
 
 vi.mock("@/lib/error-logger", () => ({
   useErrorLogger: () => ({ logError: vi.fn() }),
+}));
+
+vi.mock("./PageChecklist", () => ({
+  PageChecklist: ({ pages, selectedIndices, onToggle, onSelectAll, onDeselectAll }: {
+    pages: { url: string; title: string }[];
+    selectedIndices: Set<number>;
+    onToggle: (i: number) => void;
+    onSelectAll: () => void;
+    onDeselectAll: () => void;
+  }) => (
+    <div data-testid="page-checklist">
+      <span data-testid="page-count">{pages.length}</span>
+      <span data-testid="selected-count">{selectedIndices.size}</span>
+      {pages.map((p, i) => (
+        <div key={i} data-testid={`page-${i}`}>
+          <input
+            type="checkbox"
+            checked={selectedIndices.has(i)}
+            onChange={() => onToggle(i)}
+            aria-label={`Select ${p.title}`}
+          />
+          <span>{p.title}</span>
+          <span>{p.url}</span>
+        </div>
+      ))}
+      <button onClick={onSelectAll} data-testid="select-all">Select All</button>
+      <button onClick={onDeselectAll} data-testid="deselect-all">Deselect All</button>
+    </div>
+  ),
 }));
 
 const projectData = {
@@ -98,10 +136,23 @@ const analyzedNoFlows = {
   ],
 };
 
+const discoveredExploration = {
+  _id: "expl-disc",
+  status: "discovered",
+  url: "https://example.com",
+  discovered_pages: [
+    { url: "https://example.com", title: "Home" },
+    { url: "https://example.com/about", title: "About" },
+    { url: "https://example.com/contact", title: "Contact" },
+  ],
+};
+
 describe("ExplorePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCancelExploration.mockResolvedValue(undefined);
+    mockStartDeepExploration.mockResolvedValue(undefined);
+    mockUpdateDiscoveredPages.mockResolvedValue(undefined);
     mockQueryResults = { project: undefined, exploration: undefined, user: { _id: "user1", name: "Test" }, latestActive: null };
   });
 
@@ -119,69 +170,88 @@ describe("ExplorePage", () => {
     expect(screen.getByText("Project not found")).toBeInTheDocument();
   });
 
-  it("renders URL display and Start Exploration button", async () => {
+  it("renders URL display and Discover Pages button", async () => {
     mockQueryResults.project = projectData;
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
     expect(screen.getByText("Explore & Generate Tests")).toBeInTheDocument();
     expect(screen.getByText("https://example.com")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start exploration/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /discover pages/i })).toBeInTheDocument();
   });
 
-  it("calls createExploration with exploration_mode scripted by default", async () => {
+  it("does not render Smart/Agent mode toggle", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+    expect(screen.queryByRole("button", { name: /smart explorer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /agent explorer/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render max steps input", async () => {
+    mockQueryResults.project = projectData;
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+    expect(screen.queryByText(/maximum agent steps/i)).not.toBeInTheDocument();
+  });
+
+  it("calls createExploration without exploration_mode", async () => {
     mockQueryResults.project = projectData;
     mockCreateExploration.mockResolvedValue("exploration-1");
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    await userEvent.click(screen.getByRole("button", { name: /start exploration/i }));
-    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1", exploration_mode: "scripted" });
+    await userEvent.click(screen.getByRole("button", { name: /discover pages/i }));
+    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1" });
   });
 
-  it("renders Smart Explorer and Agent Explorer mode buttons", async () => {
+  it("calls createExploration with goal and additional_urls", async () => {
     mockQueryResults.project = projectData;
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-    expect(screen.getByRole("button", { name: /smart explorer/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /agent explorer/i })).toBeInTheDocument();
-  });
-
-  it("shows max steps input only in autonomous mode", async () => {
-    mockQueryResults.project = projectData;
+    mockCreateExploration.mockResolvedValue("exploration-1");
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    expect(screen.queryByText(/maximum agent steps/i)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/focus on checkout/i), "Focus on auth flows");
+    await userEvent.type(screen.getByPlaceholderText(/one url per line/i), "https://example.com/login");
+    await userEvent.click(screen.getByRole("button", { name: /discover pages/i }));
 
-    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
-    expect(screen.getByText(/maximum agent steps/i)).toBeInTheDocument();
+    expect(mockCreateExploration).toHaveBeenCalledWith({
+      project_id: "proj1",
+      goal: "Focus on auth flows",
+      additional_urls: ["https://example.com/login"],
+    });
   });
 
-  it("calls createExploration with autonomous mode and max_steps", async () => {
+  it("shows spinner during discovering status", async () => {
     mockQueryResults.project = projectData;
-    mockCreateExploration.mockResolvedValue("exploration-2");
+    mockQueryResults.exploration = {
+      _id: "expl-disc",
+      status: "discovering",
+      progress_message: "Scanning links...",
+    };
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
-    await userEvent.click(screen.getByRole("button", { name: /start exploration/i }));
-    expect(mockCreateExploration).toHaveBeenCalledWith({ project_id: "proj1", exploration_mode: "autonomous", max_steps: 25 });
+    expect(screen.getByText("Scanning links...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
   });
 
-  it("shows cancel button during exploration", async () => {
+  it("shows spinner during capturing status with deep exploring message", async () => {
     mockQueryResults.project = projectData;
     mockQueryResults.exploration = {
       _id: "expl-active",
       status: "capturing",
-      progress_message: "Crawling...",
-      pages_captured: 2,
+      progress_message: "Deep exploring...",
+      pages_captured: 3,
     };
     mockQueryResults.latestActive = { _id: "expl-active" };
 
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    expect(screen.getByRole("button", { name: /cancel exploration/i })).toBeInTheDocument();
+    expect(screen.getByText("Deep exploring...")).toBeInTheDocument();
+    expect(screen.getByText("3 pages captured")).toBeInTheDocument();
   });
 
   it("calls cancelExploration on cancel click", async () => {
@@ -198,35 +268,8 @@ describe("ExplorePage", () => {
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    await userEvent.click(screen.getByRole("button", { name: /cancel exploration/i }));
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(mockCancelExploration).toHaveBeenCalledWith({ exploration_id: "expl-active" });
-  });
-
-  it("shows BFS description for Smart Explorer mode", async () => {
-    mockQueryResults.project = projectData;
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-    expect(screen.getByText(/BFS crawl that visits pages/)).toBeInTheDocument();
-  });
-
-  it("shows AI agent description for Agent Explorer mode", async () => {
-    mockQueryResults.project = projectData;
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-
-    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
-    expect(screen.getByText(/AI agent autonomously explores/)).toBeInTheDocument();
-  });
-
-  it("changes goal label based on mode", async () => {
-    mockQueryResults.project = projectData;
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-
-    expect(screen.getByText(/goal \/ focus/i)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /agent explorer/i }));
-    expect(screen.getByText(/goal \/ instruction/i)).toBeInTheDocument();
   });
 
   it("shows Cancel link back to project", async () => {
@@ -235,6 +278,80 @@ describe("ExplorePage", () => {
     render(<ExplorePage />);
     const cancelLink = screen.getByRole("link", { name: /cancel/i });
     expect(cancelLink).toHaveAttribute("href", "/projects/proj1");
+  });
+
+  it("shows PageChecklist when exploration is discovered", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = discoveredExploration;
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.getByTestId("page-checklist")).toBeInTheDocument();
+    expect(screen.getByTestId("page-count")).toHaveTextContent("3");
+  });
+
+  it("Explore Selected button is disabled when no pages selected", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = discoveredExploration;
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.getByRole("button", { name: /explore selected/i })).toBeDisabled();
+  });
+
+  it("Explore Selected button enables when pages are selected and calls startDeepExploration", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = discoveredExploration;
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByLabelText("Select Home"));
+
+    expect(screen.getByRole("button", { name: /explore selected \(1\)/i })).not.toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: /explore selected/i }));
+    expect(mockStartDeepExploration).toHaveBeenCalledWith({
+      exploration_id: "expl-disc",
+      selected_pages: ["https://example.com"],
+    });
+  });
+
+  it("Add button calls updateDiscoveredPages", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = discoveredExploration;
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.type(screen.getByPlaceholderText(/extra-page/i), "https://example.com/pricing");
+    await userEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+    expect(mockUpdateDiscoveredPages).toHaveBeenCalledWith({
+      exploration_id: "expl-disc",
+      additional_urls: ["https://example.com/pricing"],
+    });
+  });
+
+  it("Select All / Deselect All in PageChecklist works", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = discoveredExploration;
+    mockQueryResults.latestActive = { _id: "expl-disc" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByTestId("select-all"));
+    expect(screen.getByRole("button", { name: /explore selected \(3\)/i })).not.toBeDisabled();
+
+    await userEvent.click(screen.getByTestId("deselect-all"));
+    expect(screen.getByRole("button", { name: /explore selected \(0\)/i })).toBeDisabled();
   });
 
   it("shows flow cards with complexity badges and step counts", async () => {

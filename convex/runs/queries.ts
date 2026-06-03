@@ -131,6 +131,18 @@ export const getPendingWork = query({
         const project = await ctx.db.get(run.project_id);
         const workspace = await ctx.db.get(run.workspace_id);
 
+        let auth_cookies: Array<{ name: string; value: string; domain: string; path: string }> | undefined;
+        if (project?.explore_auth_mode === "form") {
+          const exploration = await ctx.db
+            .query("explorations")
+            .withIndex("by_project_id", (q) => q.eq("project_id", project._id))
+            .order("desc")
+            .first();
+          if (exploration?.auth_cookies && exploration.auth_cookies.length > 0) {
+            auth_cookies = exploration.auth_cookies;
+          }
+        }
+
         return {
           run_id: run._id,
           workspace_id: run.workspace_id,
@@ -144,6 +156,7 @@ export const getPendingWork = query({
           login_url: project?.explore_login_url ?? undefined,
           test_username: project?.explore_username ?? undefined,
           test_password: project?.explore_password ?? undefined,
+          auth_cookies,
           test_data: project?.test_data ?? undefined,
           heal_confidence_threshold: workspace?.heal_confidence_threshold ?? undefined,
         };
@@ -475,6 +488,7 @@ export const getRunForAnalysis = internalQuery({
 
     return {
       workspace_id: run.workspace_id,
+      project_id: run.project_id,
       results: results.map((r) => ({
         test_id: r.test_id,
         test_name: r.test_name,

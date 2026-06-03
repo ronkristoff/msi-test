@@ -112,7 +112,39 @@ Form submission resilience:
       return;
     }
 
+    console.log(`[generateNlTests] AI response length: ${responseText.length}, first 500 chars: ${responseText.slice(0, 500)}`);
+
     const testBlocks = extractMultipleTests(responseText);
+
+    if (testBlocks.length === 0) {
+      console.log("[generateNlTests] No code fences found in first response, retrying with explicit format instruction");
+      try {
+        const retryAgent = createTestGenerationAgent(
+          (await import("./model")).getWorkspaceModel(aiConfig),
+        );
+        const { thread: retryThread } = await retryAgent.createThread(ctx, {
+          title: `NL Generation Retry — ${project.name}`,
+        });
+        const retryResult = await retryThread.generateText({
+          prompt: `Your previous response did not contain valid Playwright test code in markdown code fences.
+
+Return ONLY the Playwright test code. Each test must be wrapped in a \`\`\`typescript code fence. No explanation, no commentary — just the code fences.
+
+Project: ${project.name}
+URL: ${project.app_url}
+${buildAuthPromptContext(project)}${prdContext}
+
+Test Description:
+${args.prompt}`,
+        });
+        const retryBlocks = extractMultipleTests(retryResult.text);
+        if (retryBlocks.length > 0) {
+          testBlocks.push(...retryBlocks);
+        }
+      } catch (retryErr) {
+        console.log("[generateNlTests] Retry also failed:", retryErr instanceof Error ? retryErr.message : String(retryErr));
+      }
+    }
 
     if (testBlocks.length === 0) {
       await markSuiteFailed(ctx, args.suite_id, "AI did not generate any valid Playwright tests.");

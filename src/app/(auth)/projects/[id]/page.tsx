@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
 import { Alert } from "@/components/ui/Alert";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatDate } from "@/lib/format";
 import { useErrorLogger } from "@/lib/error-logger";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
@@ -28,6 +29,7 @@ export default function ProjectDetailPage() {
   const [triggeringRunAll, setTriggeringRunAll] = useState(false);
   const [runAllError, setRunAllError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteSuiteId, setDeleteSuiteId] = useState<string | null>(null);
   const projectId = asId(params.id, "projects");
   const project = useQuery(api.projects.queries.getProject, {
     project_id: projectId,
@@ -44,6 +46,7 @@ export default function ProjectDetailPage() {
 
   const createSuite = useMutation(api.suites.mutations.createSuite);
   const createRegressionSuite = useMutation(api.suites.mutations.createRegressionSuite);
+  const deleteSuite = useMutation(api.suites.mutations.deleteSuite);
   const runAllTests = useMutation(api.runs.mutations.runAllTests);
 
   const handleCreateSuite = async () => {
@@ -250,12 +253,14 @@ export default function ProjectDetailPage() {
                       </div>
                       <div className="divide-y divide-[var(--border-soft)]">
                         {functionalSuites.map((suite) => (
-                          <Link
+                          <div
                             key={suite._id}
-                            href={`/projects/${params.id}/suites/${suite._id}`}
                             className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
+                            <Link
+                              href={`/projects/${params.id}/suites/${suite._id}`}
+                              className="flex items-center gap-3 min-w-0 flex-1"
+                            >
                               <div className="min-w-0">
                                 <div className="text-sm font-medium text-[var(--fg)] group-hover:text-[var(--accent)] truncate">
                                   {suite.name}
@@ -264,19 +269,42 @@ export default function ProjectDetailPage() {
                                   {formatDate(suite._creationTime)}
                                 </div>
                               </div>
-                            </div>
+                            </Link>
                             <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-xs text-[var(--muted)]">
-                                {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
-                              </span>
+                              {suite.status === "generating" ? (
+                                <span className="text-xs text-[var(--accent)] inline-flex items-center gap-1.5">
+                                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                  {suite.progress_message ?? "Generating..."}
+                                </span>
+                              ) : suite.status === "failed" ? (
+                                <span className="text-xs text-[var(--danger)]">Generation failed</span>
+                              ) : (
+                                <span className="text-xs text-[var(--muted)]">
+                                  {suite.testCount} {suite.testCount === 1 ? "test" : "tests"}
+                                </span>
+                              )}
                               <StatusPill variant="neutral" showDot={false}>
                                 {SOURCE_TYPE_LABELS[suite.source_type] ?? suite.source_type}
                               </StatusPill>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--muted)] group-hover:text-[var(--fg)]">
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
+                              <button
+                                onClick={(e) => { e.preventDefault(); setDeleteSuiteId(suite._id); }}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded-[var(--radius-sm)] hover:bg-[var(--danger)]/10 text-[var(--muted)] hover:text-[var(--danger)] transition-opacity duration-[var(--motion-fast)]"
+                                title="Delete suite"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                </svg>
+                              </button>
+                              <Link href={`/projects/${params.id}/suites/${suite._id}`}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--muted)] group-hover:text-[var(--fg)]">
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                              </Link>
                             </div>
-                          </Link>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -414,6 +442,25 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {deleteSuiteId && (
+        <ConfirmDialog
+          title="Delete suite?"
+          message="This will permanently delete the suite and all tests inside it."
+          onConfirm={async () => {
+            try {
+              await deleteSuite({ suite_id: deleteSuiteId as Id<"suites"> });
+            } catch (err) {
+              logError(err instanceof Error ? err.message : "Failed to delete suite", {
+                severity: "error",
+                context: { source: "ProjectDetailPage.deleteSuite" },
+              });
+            }
+            setDeleteSuiteId(null);
+          }}
+          onCancel={() => setDeleteSuiteId(null)}
+        />
       )}
     </div>
          );

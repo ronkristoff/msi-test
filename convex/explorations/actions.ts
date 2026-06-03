@@ -4,19 +4,24 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { validateRunnerSecret } from "../lib/runner";
-import { capturedPageValidator, discoveredFlowValidator, prdCoverageItemValidator } from "../lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, prdCoverageItemValidator, authCookieValidator } from "../lib/validation";
 
 export const runnerClaimExploration = action({
   args: {
     runner_secret: v.string(),
     exploration_id: v.id("explorations"),
     runner_id: v.string(),
+    target_status: v.optional(v.union(
+      v.literal("discovering"),
+      v.literal("capturing"),
+    )),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
     await ctx.runMutation(internal.explorations.internal.claimExploration, {
       exploration_id: args.exploration_id,
       runner_id: args.runner_id,
+      target_status: args.target_status,
     });
   },
 });
@@ -45,6 +50,10 @@ export const runnerCompleteExploration = action({
     captured_pages: v.array(capturedPageValidator),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
     prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
+    nav_menu: v.optional(v.array(v.object({
+      text: v.string(),
+      href: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
@@ -53,6 +62,7 @@ export const runnerCompleteExploration = action({
       captured_pages: args.captured_pages,
       discovered_flows: args.discovered_flows,
       prd_coverage: args.prd_coverage,
+      nav_menu: args.nav_menu,
     });
     await ctx.runAction(internal.ai.exploreApp.analyzeExploration, {
       exploration_id: args.exploration_id,
@@ -85,6 +95,25 @@ export const runnerFailExploration = action({
       exploration_id: args.exploration_id,
       status: "failed",
       error_message: args.error_message,
+    });
+  },
+});
+
+export const runnerCompleteDiscovery = action({
+  args: {
+    runner_secret: v.string(),
+    exploration_id: v.id("explorations"),
+    discovered_pages: v.array(discoveredPageValidator),
+    discovered_flows: v.optional(v.array(discoveredFlowValidator)),
+    auth_cookies: v.optional(v.array(authCookieValidator)),
+  },
+  handler: async (ctx, args) => {
+    validateRunnerSecret(args.runner_secret);
+    await ctx.runMutation(internal.explorations.internal.completeDiscovery, {
+      exploration_id: args.exploration_id,
+      discovered_pages: args.discovered_pages,
+      discovered_flows: args.discovered_flows,
+      auth_cookies: args.auth_cookies,
     });
   },
 });

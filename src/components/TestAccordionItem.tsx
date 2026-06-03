@@ -24,15 +24,14 @@ function CodePreview({ code }: { code: string }) {
   useEffect(() => {
     if (codeRef.current) {
       codeRef.current.removeAttribute("data-highlighted");
+      codeRef.current.textContent = code;
       hljs.highlightElement(codeRef.current);
     }
   }, [code]);
 
   return (
     <pre className="bg-[#0d1117] rounded-[var(--radius-sm)] p-4 overflow-x-auto text-sm text-[#e6edf3]">
-      <code ref={codeRef} className="language-javascript">
-        {code}
-      </code>
+      <code ref={codeRef} className="language-javascript" />
     </pre>
   );
 }

@@ -9,7 +9,7 @@ import { createRefineAgent, extractPlaywrightCode, hybridTestStepSchema } from "
 import { classifyAiError } from "./errors";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
-import { resolveTestContext } from "./resolveContext";
+import { resolveTestContext, resolvePageContext } from "./resolveContext";
 import { extractJsonFromAiResponse } from "./parse";
 import { z } from "zod/v3";
 
@@ -64,10 +64,13 @@ export const refineTest = action({
       prdContext = `\n\nProduct Requirements:\n${project.prd_text}`;
     }
 
+    const pagesContext = await resolvePageContext(ctx, suite.project_id, test.playwright_code ?? undefined);
+
     const sharedPrompt = `Project: ${project.name}
 URL: ${project.app_url}
 Suite: ${suite.name}
 ${buildAuthPromptContext(project)}${prdContext}
+${pagesContext ? `\nPage context (use actual locators and text values from here — never fabricate selectors):\n${pagesContext}` : ""}
 
 Test name: ${test.name}
 

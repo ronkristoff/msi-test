@@ -37,7 +37,10 @@ You MUST include these login steps at the beginning of EVERY test, right after p
   await page.locator('input[type="email"], input[type="text"][name*="email" i], input[name*="user" i], input[autocomplete="email"]').first().fill("${project.explore_username}");
   await page.locator('input[type="password"]').first().fill("${project.explore_password ?? ""}");
   await page.getByRole("button", { name: /sign.?in|log.?in|submit/i }).click();
-  await page.waitForURL("**/dashboard**", { timeout: 10000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 10000 });
+  await expect(page).not.toHaveURL(/\\/(login|sign-in|signin)/);
+
+After login, navigate to internal pages by clicking navigation links (sidebar, menu items) — do NOT use page.goto() for internal SPA routes. Use page.goto() only for the initial page load.
 
 Use the EXACT credentials shown above. Do NOT use placeholder values like admin@example.com or process.env.ADMIN_EMAIL. The credentials above are the real ones.`;
   }
@@ -50,4 +53,10 @@ Tests do not need to perform login — the runner injects authentication cookies
   }
 
   return "";
+}
+
+export function buildNavMenuContext(navMenu: { text: string; href: string }[] | undefined): string {
+  if (!navMenu || navMenu.length === 0) return "";
+  const items = navMenu.map((item) => `  - "${item.text}" → ${item.href}`).join("\n");
+  return `\nApplication navigation menu (use these link names when navigating):\n${items}\n`;
 }

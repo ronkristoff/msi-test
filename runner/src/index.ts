@@ -3,6 +3,7 @@ import { executeRun, type RunWorkItem } from "./executor";
 import { executeStagehandTests } from "./stagehand-executor";
 import { executeExploration } from "./explorer";
 import { executeAutonomousExploration } from "./autonomous-explorer";
+import { executeDiscovery } from "./link-crawler";
 import type { ExplorationWorkItem } from "./types";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
@@ -148,14 +149,18 @@ async function handleExploration(exploration: {
   max_steps?: number;
   goal?: string;
   prd_text?: string;
+  selected_pages?: string[];
 }) {
+  const isPhase2 = !!(exploration.selected_pages && exploration.selected_pages.length > 0);
+  const targetStatus = isPhase2 ? "capturing" : "discovering";
+
   if (!(await claimWithRetry(
-    () => client.claimExploration(exploration._id, RUNNER_ID),
+    () => client.claimExploration(exploration._id, RUNNER_ID, targetStatus),
     exploration._id,
   ))) return;
 
   activeWork = { kind: "exploration", id: exploration._id };
-  log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode}, mode: ${exploration.exploration_mode ?? "scripted"})`);
+  log(`Claimed exploration ${exploration._id} (${exploration.url}, auth: ${exploration.auth_mode}, phase: ${isPhase2 ? "capture" : "discover"})`);
 
   const work: ExplorationWorkItem = {
     exploration_id: exploration._id,
@@ -169,16 +174,18 @@ async function handleExploration(exploration: {
     cookie_value: exploration.cookie_value,
     additional_urls: exploration.additional_urls,
     interactive: exploration.interactive ?? false,
-    exploration_mode: (exploration.exploration_mode as "scripted" | "autonomous") ?? "scripted",
+    exploration_mode: (exploration.exploration_mode as "scripted" | "autonomous") ?? "autonomous",
     max_steps: exploration.max_steps,
     goal: exploration.goal,
     prd_text: exploration.prd_text,
+    selected_pages: exploration.selected_pages,
+    phase: isPhase2 ? "capture" : "discover",
   };
 
-  if (work.exploration_mode === "autonomous") {
+  if (isPhase2) {
     await executeAutonomousExploration(client, work, log);
   } else {
-    await executeExploration(client, work, log);
+    await executeDiscovery(client, work, log);
   }
 
   cleanupSession();

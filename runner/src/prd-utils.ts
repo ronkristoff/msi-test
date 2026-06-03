@@ -1,7 +1,7 @@
 import { normalizeUrl } from "./explorer-utils";
 import type { CapturedPage, PrdCoverageItem } from "./types";
 
-export const PRD_TEXT_LIMIT = 3000;
+export const PRD_TEXT_LIMIT = 1500;
 export const PRD_ANALYSIS_LIMIT = 4000;
 export const PRD_KEYWORD_MAX = 20;
 

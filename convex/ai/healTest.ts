@@ -8,10 +8,9 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createHealAgent, extractPlaywrightCode, deriveTestName } from "./agents";
 import { classifyAiError } from "./errors";
-import { formatCapturedPagesForPrompt } from "./formatPages";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
-import { resolveTestContext } from "./resolveContext";
+import { resolveTestContext, resolvePageContext } from "./resolveContext";
 
 export const healTest = action({
   args: {
@@ -53,16 +52,7 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
       errorMessage = [failure.error_message, failure.step_errors].filter(Boolean).join("\n");
     }
 
-    let pagesContext = "";
-    const explorations = await ctx.runQuery(api.explorations.queries.getExplorationsByProject, {
-      project_id: suite.project_id,
-    });
-    if (explorations.length > 0) {
-      const latest = explorations[0];
-      if (latest.captured_pages && latest.captured_pages.length > 0) {
-        pagesContext = formatCapturedPagesForPrompt(latest.captured_pages.slice(0, 5), 2000);
-      }
-    }
+    const pagesContext = await resolvePageContext(ctx, suite.project_id, test.playwright_code ?? undefined);
 
     let responseText = "";
     try {

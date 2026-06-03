@@ -17,6 +17,7 @@ import {
   type Scenario,
   type CapturedPageWithUrl,
   type DiscoveredFlow,
+  type DiscoveredPage,
   type PrdCoverageItem,
   type SelectionMode,
   makeToggleHandler,
@@ -25,6 +26,7 @@ import {
   toggleArea,
   areasWithoutScenarios,
 } from "./types";
+import { PageChecklist } from "./PageChecklist";
 
 export default function ExplorePage() {
   const params = useParams<{ id: string }>();
@@ -39,6 +41,7 @@ export default function ExplorePage() {
   const [explorationId, setExplorationId] = useState<string | null>(null);
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
   const [selectedFlows, setSelectedFlows] = useState<Set<number>>(new Set());
+  const [selectedDiscoveredPages, setSelectedDiscoveredPages] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("flows");
   const [generating, setGenerating] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
@@ -46,15 +49,17 @@ export default function ExplorePage() {
 
   const [goal, setGoal] = useState("");
   const [additionalUrlInput, setAdditionalUrlInput] = useState("");
-  const [explorationMode, setExplorationMode] = useState<"scripted" | "autonomous">("scripted");
-  const [maxSteps, setMaxSteps] = useState(25);
+  const [manualUrlInput, setManualUrlInput] = useState("");
 
   const url = project?.app_url ?? "";
 
   const createExploration = useMutation(api.explorations.mutations.createExploration);
   const cancelExploration = useMutation(api.explorations.mutations.cancelExploration);
+  const startDeepExploration = useMutation(api.explorations.mutations.startDeepExploration);
+  const updateDiscoveredPages = useMutation(api.explorations.mutations.updateDiscoveredPages);
   const createSuitesForExploration = useMutation(api.suites.mutations.createSuitesForExploration);
-  const generateTests = useAction(api.ai.exploreApp.generateExplorationTests);
+  const generateTestsForArea = useAction(api.ai.exploreApp.generateExplorationTestsForArea);
+  const markExplorationCompleted = useMutation(api.explorations.mutations.markExplorationCompleted);
   const user = useQuery(api.workspaces.queries.getCurrentUser);
 
   const latestActive = useQuery(
@@ -97,6 +102,11 @@ export default function ExplorePage() {
     [exploration],
   );
 
+  const discoveredPagesList = useMemo<DiscoveredPage[]>(
+    () => (exploration as { discovered_pages?: DiscoveredPage[] } | null)?.discovered_pages ?? [],
+    [exploration],
+  );
+
   const emptyAreas = useMemo(
     () => areasWithoutScenarios(scenarios, prdGaps.map((g) => g.feature)),
     [scenarios, prdGaps],
@@ -113,10 +123,11 @@ export default function ExplorePage() {
     [scenarios],
   );
 
-  const handleStartExploration = useCallback(async () => {
+  const handleDiscoverPages = useCallback(async () => {
     setError(null);
     setSelectedScenarios(new Set());
     setSelectedFlows(new Set());
+    setSelectedDiscoveredPages(new Set());
     setExplorationId(null);
     setUserDismissed(false);
     try {
@@ -128,16 +139,54 @@ export default function ExplorePage() {
         project_id: projectId,
         goal: goal.trim() || undefined,
         additional_urls: additionalUrls.length > 0 ? additionalUrls : undefined,
-        exploration_mode: explorationMode,
-        ...(explorationMode === "autonomous" ? { max_steps: maxSteps } : {}),
       });
       setExplorationId(id);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to start exploration";
+      const msg = err instanceof Error ? err.message : "Failed to start discovery";
       setError(msg);
       logError(msg, { severity: "error", context: { source: "ExplorePage" } });
     }
-  }, [createExploration, projectId, goal, additionalUrlInput, explorationMode, maxSteps, logError]);
+  }, [createExploration, projectId, goal, additionalUrlInput, logError]);
+
+  const handleExploreSelected = useCallback(async () => {
+    if (!effectiveExplorationId) return;
+    setError(null);
+    try {
+      const selectedUrls = discoveredPagesList
+        .filter((_: DiscoveredPage, i: number) => selectedDiscoveredPages.has(i))
+        .map((p: DiscoveredPage) => p.url);
+
+      if (selectedUrls.length === 0) return;
+
+      await startDeepExploration({
+        exploration_id: asId(effectiveExplorationId, "explorations"),
+        selected_pages: selectedUrls,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to start deep exploration";
+      setError(msg);
+      logError(msg, { severity: "error", context: { source: "ExplorePage" } });
+    }
+  }, [effectiveExplorationId, discoveredPagesList, selectedDiscoveredPages, startDeepExploration, logError]);
+
+  const handleAddManualUrls = useCallback(async () => {
+    if (!effectiveExplorationId || !manualUrlInput.trim()) return;
+    try {
+      const urls = manualUrlInput
+        .split("\n")
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0);
+      await updateDiscoveredPages({
+        exploration_id: asId(effectiveExplorationId, "explorations"),
+        additional_urls: urls,
+      });
+      setManualUrlInput("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to add URLs";
+      setError(msg);
+      logError(msg, { severity: "error", context: { source: "ExplorePage" } });
+    }
+  }, [effectiveExplorationId, manualUrlInput, updateDiscoveredPages, logError]);
 
   const matchedScenarios = useMemo(() => {
     if (selectionMode !== "flows" || selectedFlows.size === 0) return [];
@@ -198,19 +247,26 @@ export default function ExplorePage() {
         triggered_by: user._id,
       });
 
-      router.push(`/projects/${params.id}/suites/${suiteResults[0].suite_id}`);
+      router.push(`/projects/${params.id}`);
 
-      generateTests({
-        exploration_id: asId(effectiveExplorationId!, "explorations"),
-        selected_scenarios: selected,
-        suite_ids: suiteResults,
-        flow_context: flowContext,
-      }).catch((err) => {
-        logError(err instanceof Error ? err.message : "Test generation failed", {
-          severity: "error",
-          context: { source: "ExplorePage.handleGenerateTests" },
+      const explorationId = asId(effectiveExplorationId!, "explorations");
+      for (const { area, suite_id } of suiteResults) {
+        const areaScenarios = selected.filter((s: Scenario) => s.area === area);
+        generateTestsForArea({
+          exploration_id: explorationId,
+          scenarios: areaScenarios,
+          suite_id,
+          area,
+          flow_context: flowContext,
+        }).catch((err) => {
+          logError(err instanceof Error ? err.message : `Test generation failed for ${area}`, {
+            severity: "error",
+            context: { source: "ExplorePage.handleGenerateTests", area },
+          });
         });
-      });
+      }
+
+      await markExplorationCompleted({ exploration_id: explorationId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create suites";
       setError(msg);
@@ -218,7 +274,7 @@ export default function ExplorePage() {
     } finally {
       setGenerating(false);
     }
-  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTests, effectiveExplorationId, router, params.id, logError, user, projectId]);
+  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTestsForArea, markExplorationCompleted, effectiveExplorationId, router, params.id, logError, user, projectId]);
 
   if (project === undefined) {
     return <PageSkeleton />;
@@ -244,7 +300,7 @@ export default function ExplorePage() {
   }
 
   const isInProgress =
-    exploration?.status === "pending" ||
+    exploration?.status === "discovering" ||
     exploration?.status === "capturing" ||
     exploration?.status === "captured" ||
     exploration?.status === "analyzing";
@@ -281,75 +337,12 @@ export default function ExplorePage() {
 
             <div className="mb-4">
               <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                Explorer Mode
-              </div>
-              <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setExplorationMode("scripted")}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    explorationMode === "scripted"
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
-                  }`}
-                >
-                  Smart Explorer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExplorationMode("autonomous")}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    explorationMode === "autonomous"
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
-                  }`}
-                >
-                  Agent Explorer
-                </button>
-              </div>
-              {explorationMode === "scripted" && (
-                <p className="text-xs text-[var(--muted)] mt-1">
-                  BFS crawl that visits pages, extracts structure, and discovers navigation flows.
-                </p>
-              )}
-              {explorationMode === "autonomous" && (
-                <p className="text-xs text-[var(--muted)] mt-1">
-                  AI agent autonomously explores the app, discovering hidden flows, error states, and dynamic interactions.
-                </p>
-              )}
-            </div>
-
-            {explorationMode === "autonomous" && (
-              <div className="mb-4">
-                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                  Max Steps
-                </div>
-                <input
-                  type="number"
-                  min={5}
-                  max={100}
-                  value={maxSteps}
-                  onChange={(e) => setMaxSteps(Number(e.target.value))}
-                  className="w-24 font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                />
-                <p className="text-xs text-[var(--muted)] mt-1">
-                  Maximum agent steps (5–100). More steps = deeper exploration but longer runtime.
-                </p>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-                {explorationMode === "autonomous" ? "Goal / Instruction" : "Goal / Focus"} (optional)
+                Goal / Focus (optional)
               </div>
               <textarea
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
-                placeholder={
-                  explorationMode === "autonomous"
-                    ? "e.g., Explore the checkout process end-to-end, including cart, payment, and order confirmation"
-                    : "e.g., Focus on checkout and payment flows"
-                }
+                placeholder={"e.g., Focus on checkout and payment flows"}
                 className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
               />
             </div>
@@ -367,8 +360,8 @@ export default function ExplorePage() {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleStartExploration} disabled={!url}>
-                Start Exploration
+              <Button onClick={handleDiscoverPages} disabled={!url}>
+                Discover Pages
               </Button>
               <Link href={`/projects/${params.id}`}>
                 <Button variant="secondary">Cancel</Button>
@@ -384,9 +377,9 @@ export default function ExplorePage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              {exploration?.status === "pending" && "Queuing exploration..."}
-              {exploration?.status === "capturing" && (exploration.progress_message || "Crawling pages...")}
-              {exploration?.status === "captured" && "Crawl complete. Preparing analysis..."}
+              {exploration?.status === "discovering" && (exploration.progress_message || "Discovering pages...")}
+              {exploration?.status === "capturing" && (exploration.progress_message || "Deep exploring pages...")}
+              {exploration?.status === "captured" && "Capture complete. Preparing analysis..."}
               {exploration?.status === "analyzing" && "Analyzing pages and identifying scenarios..."}
             </div>
             {exploration?.pages_captured != null && exploration.pages_captured > 0 && (
@@ -396,7 +389,51 @@ export default function ExplorePage() {
             )}
             <div className="mt-3">
               <Button variant="secondary" onClick={handleCancel}>
-                Cancel Exploration
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {exploration?.status === "discovered" && (
+          <div className="mb-5">
+            <PageChecklist
+              pages={discoveredPagesList}
+              selectedIndices={selectedDiscoveredPages}
+              onToggle={makeToggleHandler(setSelectedDiscoveredPages)}
+              onSelectAll={() => setSelectedDiscoveredPages(new Set(Array.from({ length: discoveredPagesList.length }, (_, i) => i)))}
+              onDeselectAll={() => setSelectedDiscoveredPages(new Set())}
+            />
+
+            <div className="mt-4 mb-4">
+              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                Add More URLs (optional)
+              </div>
+              <div className="flex gap-2">
+                <textarea
+                  value={manualUrlInput}
+                  onChange={(e) => setManualUrlInput(e.target.value)}
+                  placeholder={"https://example.com/extra-page"}
+                  className="flex-1 min-h-[36px] max-h-[60px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-2 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
+                <Button variant="secondary" onClick={handleAddManualUrls} disabled={!manualUrlInput.trim()}>
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleExploreSelected}
+                disabled={selectedDiscoveredPages.size === 0}
+              >
+                Explore Selected ({selectedDiscoveredPages.size})
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => { setExplorationId(null); setError(null); setUserDismissed(true); setSelectedDiscoveredPages(new Set()); }}
+              >
+                Cancel
               </Button>
             </div>
           </div>
@@ -618,6 +655,7 @@ export default function ExplorePage() {
                   setExplorationId(null);
                   setSelectedScenarios(new Set());
                   setSelectedFlows(new Set());
+                  setSelectedDiscoveredPages(new Set());
                   setGoal("");
                   setAdditionalUrlInput("");
                   setUserDismissed(true);

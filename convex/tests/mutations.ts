@@ -82,6 +82,25 @@ export const setTestDraft = internalMutation({
   },
 });
 
+export const approveAllTests = mutation({
+  args: { suite_id: v.id("suites") },
+  handler: async (ctx, args) => {
+    const { user } = await getOwnedEntity(ctx, args.suite_id, "suites");
+    const userId = String(user._id);
+
+    const tests = await ctx.db
+      .query("tests")
+      .withIndex("by_suite_id", (q) => q.eq("suite_id", args.suite_id))
+      .collect();
+
+    for (const test of tests) {
+      if (test.status === "draft") {
+        await ctx.db.patch(test._id, { status: "approved" });
+      }
+    }
+  },
+});
+
 export const deleteTest = mutation({
   args: { test_id: v.id("tests") },
   handler: async (ctx, args) => {

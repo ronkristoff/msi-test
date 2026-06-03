@@ -262,6 +262,7 @@ export const updateSuiteStatus = internalMutation({
     suite_id: v.id("suites"),
     status: v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
     generation_error: v.optional(v.string()),
+    progress_message: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const suite = await ctx.db.get(args.suite_id);
@@ -273,10 +274,15 @@ export const updateSuiteStatus = internalMutation({
       status: args.status,
     };
 
+    if (args.progress_message !== undefined) {
+      updates.progress_message = args.progress_message;
+    }
+
     if (args.status === "ready" || args.status === "failed") {
       updates.locked_by = undefined;
       updates.locked_at = undefined;
       updates.locked_reason = undefined;
+      updates.progress_message = undefined;
     }
 
     if (args.status === "failed" && args.generation_error) {
@@ -298,8 +304,8 @@ export const retrySuiteGeneration = mutation({
   handler: async (ctx, args) => {
     const { entity: suite } = await getOwnedEntity(ctx, args.suite_id, "suites");
 
-    if (suite.source_type !== "prd" && suite.source_type !== "natural_language") {
-      throw new ConvexError("Can only retry PRD or NL generation");
+    if (suite.source_type !== "prd" && suite.source_type !== "natural_language" && suite.source_type !== "url_exploration") {
+      throw new ConvexError("Can only retry PRD, NL, or exploration generation");
     }
 
     const identity = await ctx.auth.getUserIdentity();
@@ -312,6 +318,7 @@ export const retrySuiteGeneration = mutation({
       locked_at: Date.now(),
       locked_reason: "generating",
       triggered_by: userId,
+      progress_message: undefined,
     });
 
     return { project_id: suite.project_id, source_type: suite.source_type };
@@ -362,5 +369,36 @@ export const createSuitesForExploration = mutation({
     }
 
     return results;
+  },
+});
+
+const STALE_GENERATION_THRESHOLD_MS = 10 * 60 * 1000;
+
+export const markStaleGenerations = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const allSuites = await ctx.db.query("suites").collect();
+
+    let marked = 0;
+    for (const suite of allSuites) {
+      if (suite.status !== "generating") continue;
+      const lockedAt = suite.locked_at ?? 0;
+      if (lockedAt > 0 && now - lockedAt > STALE_GENERATION_THRESHOLD_MS) {
+        await ctx.db.patch(suite._id, {
+          status: "failed",
+          generation_error: "Generation timed out — suite was stuck in generating state for over 10 minutes. Please retry.",
+          locked_by: undefined,
+          locked_at: undefined,
+          locked_reason: undefined,
+          progress_message: undefined,
+        });
+        marked++;
+      }
+    }
+
+    if (marked > 0) {
+      console.log(`[markStaleGenerations] Marked ${marked} stale suite(s) as failed`);
+    }
   },
 });

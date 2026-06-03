@@ -2,6 +2,23 @@ export interface InteractiveElement {
   selector: string;
   description: string;
   element_type: string;
+  role?: string;
+  aria_label?: string;
+  label_text?: string;
+  placeholder?: string;
+  name?: string;
+  id?: string;
+  type?: string;
+  href?: string;
+  data_testid?: string;
+  suggested_locator: string;
+}
+
+export interface AuthCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
 }
 
 export interface DiscoveredFlow {
@@ -12,6 +29,11 @@ export interface DiscoveredFlow {
   complexity: "low" | "medium" | "high";
 }
 
+export interface DiscoveredPage {
+  url: string;
+  title: string;
+}
+
 export interface CapturedPage {
   url: string;
   title: string;
@@ -19,6 +41,12 @@ export interface CapturedPage {
   screenshot_storage_id?: string;
   semantic_description?: string;
   interactive_elements?: InteractiveElement[];
+  nav_menu?: NavMenuItem[];
+}
+
+export interface NavMenuItem {
+  text: string;
+  href: string;
 }
 
 export interface PrdCoverageItem {
@@ -43,6 +71,8 @@ export interface ExplorationWorkItem {
   max_steps?: number;
   goal?: string;
   prd_text?: string;
+  selected_pages?: string[];
+  phase?: "discover" | "capture";
 }
 
 export interface TestStep {
@@ -74,6 +104,7 @@ export interface RunWorkItem {
   login_url?: string;
   test_username?: string;
   test_password?: string;
+  auth_cookies?: AuthCookie[];
   test_data?: Record<string, string>;
   heal_confidence_threshold?: number;
 }

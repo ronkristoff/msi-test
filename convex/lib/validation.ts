@@ -48,6 +48,16 @@ export const interactiveElementValidator = v.object({
   selector: v.string(),
   description: v.string(),
   element_type: v.string(),
+  role: v.optional(v.string()),
+  aria_label: v.optional(v.string()),
+  label_text: v.optional(v.string()),
+  placeholder: v.optional(v.string()),
+  name: v.optional(v.string()),
+  id: v.optional(v.string()),
+  type: v.optional(v.string()),
+  href: v.optional(v.string()),
+  data_testid: v.optional(v.string()),
+  suggested_locator: v.optional(v.string()),
 });
 
 export const capturedPageValidator = v.object({
@@ -57,6 +67,18 @@ export const capturedPageValidator = v.object({
   structure_text: v.string(),
   semantic_description: v.optional(v.string()),
   interactive_elements: v.optional(v.array(interactiveElementValidator)),
+});
+
+export const authCookieValidator = v.object({
+  name: v.string(),
+  value: v.string(),
+  domain: v.string(),
+  path: v.string(),
+});
+
+export const discoveredPageValidator = v.object({
+  url: v.string(),
+  title: v.string(),
 });
 
 export const testStepValidator = v.object({

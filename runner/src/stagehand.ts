@@ -29,6 +29,10 @@ class ZAiClient extends LLMClient {
     this.model = model;
   }
 
+  getLanguageModel() {
+    return this.model;
+  }
+
   async createChatCompletion<T>(
     opts: CreateChatCompletionOptions,
   ): Promise<T extends { response_model: unknown } ? LLMParsedResponse<T> : LLMResponse> {

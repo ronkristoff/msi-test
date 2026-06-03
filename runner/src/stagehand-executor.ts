@@ -168,6 +168,28 @@ async function performLogin(
   log: (msg: string) => void,
 ): Promise<void> {
   if (work.auth_mode === "form" && work.test_username && work.test_password) {
+    if (work.auth_cookies && work.auth_cookies.length > 0) {
+      log(`Run ${work.run_id}: trying saved auth cookies first (${work.auth_cookies.length} cookies)`);
+      const baseUrl = work.base_url || work.login_url!;
+      const domain = new URL(baseUrl).hostname;
+      await stagehand.context.addCookies(
+        work.auth_cookies.map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain || domain,
+          path: c.path || "/",
+          url: baseUrl,
+        })),
+      );
+      await page.goto(work.base_url!, { timeoutMs: NAVIGATION_TIMEOUT_MS });
+      const hasPasswordField = await page.locator('input[type="password"]').count() > 0;
+      if (!hasPasswordField) {
+        log(`Run ${work.run_id}: cookies valid — on ${page.url()}, skipping form login`);
+        return;
+      }
+      log(`Run ${work.run_id}: cookies expired/revoked — password field detected, falling back to form login`);
+    }
+
     log(`Run ${work.run_id}: performing form login`);
     const loginUrl = work.login_url || work.base_url;
     await page.goto(loginUrl!, { timeoutMs: NAVIGATION_TIMEOUT_MS });

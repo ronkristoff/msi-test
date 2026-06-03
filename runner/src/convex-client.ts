@@ -6,12 +6,13 @@ import mime from "mime";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { AiConfig } from "../../convex/ai/model";
-import type { CapturedPage, DiscoveredFlow, PrdCoverageItem } from "./types";
+import type { AuthCookie, CapturedPage, DiscoveredPage, DiscoveredFlow, NavMenuItem, PrdCoverageItem } from "./types";
 
 export interface CompleteExplorationOpts {
   capturedPages: CapturedPage[];
   discoveredFlows?: DiscoveredFlow[];
   prdCoverage?: PrdCoverageItem[];
+  navMenu?: NavMenuItem[];
 }
 
 export class RunnerConvexClient {
@@ -154,11 +155,27 @@ export class RunnerConvexClient {
     return this.client.query(api.explorations.queries.getPendingExplorations, {});
   }
 
-  async claimExploration(explorationId: string, runnerId: string): Promise<void> {
+  async claimExploration(explorationId: string, runnerId: string, targetStatus?: string): Promise<void> {
     await this.client.action(api.explorations.actions.runnerClaimExploration, {
       runner_secret: this.secret,
       exploration_id: explorationId as Id<"explorations">,
       runner_id: runnerId,
+      target_status: targetStatus as "discovering" | "capturing" | undefined,
+    });
+  }
+
+  async completeDiscovery(
+    explorationId: string,
+    discoveredPages: DiscoveredPage[],
+    discoveredFlows?: DiscoveredFlow[],
+    authCookies?: AuthCookie[],
+  ): Promise<void> {
+    await this.client.action(api.explorations.actions.runnerCompleteDiscovery, {
+      runner_secret: this.secret,
+      exploration_id: explorationId as Id<"explorations">,
+      discovered_pages: discoveredPages,
+      discovered_flows: discoveredFlows,
+      auth_cookies: authCookies,
     });
   }
 
@@ -188,6 +205,7 @@ export class RunnerConvexClient {
       })),
       discovered_flows: opts.discoveredFlows,
       prd_coverage: opts.prdCoverage,
+      nav_menu: opts.navMenu,
     });
   }
 

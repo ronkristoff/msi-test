@@ -63,7 +63,7 @@ describe("explorations queries", () => {
 });
 
 describe("explorations internal mutations", () => {
-  it("claimExploration sets runner_id and status to capturing", async () => {
+  it("claimExploration sets runner_id and status to discovering", async () => {
     const t = convexTest(schema, modules);
     const workspaceId = await seedWorkspace(t);
     const projectId = await seedProject(t, workspaceId);
@@ -72,12 +72,33 @@ describe("explorations internal mutations", () => {
     await t.mutation(internal.explorations.internal.claimExploration, {
       exploration_id: explorationId,
       runner_id: "runner-1",
+      target_status: "discovering",
+    });
+
+    const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
+    expect(exploration!.status).toBe("discovering");
+    expect(exploration!.runner_id).toBe("runner-1");
+    expect(exploration!.progress_message).toBe("Discovering pages...");
+  });
+
+  it("claimExploration sets status to capturing for Phase 2", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const explorationId = await seedExploration(t, workspaceId, projectId, {
+      status: "discovered",
+    });
+
+    await t.mutation(internal.explorations.internal.claimExploration, {
+      exploration_id: explorationId,
+      runner_id: "runner-1",
+      target_status: "capturing",
     });
 
     const exploration = await t.run(async (ctx) => ctx.db.get(explorationId));
     expect(exploration!.status).toBe("capturing");
     expect(exploration!.runner_id).toBe("runner-1");
-    expect(exploration!.progress_message).toBe("Starting exploration...");
+    expect(exploration!.progress_message).toBe("Starting deep exploration...");
   });
 
   it("claimExploration rejects already claimed exploration", async () => {
@@ -108,8 +129,9 @@ describe("explorations internal mutations", () => {
       t.mutation(internal.explorations.internal.claimExploration, {
         exploration_id: explorationId,
         runner_id: "runner-1",
+        target_status: "discovering",
       }),
-    ).rejects.toThrow("not in pending status");
+    ).rejects.toThrow("not in pending status for discovery");
   });
 
   it("updateExplorationProgress updates message and count", async () => {
