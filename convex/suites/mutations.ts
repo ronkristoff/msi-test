@@ -321,7 +321,7 @@ export const retrySuiteGeneration = mutation({
       progress_message: undefined,
     });
 
-    return { project_id: suite.project_id, source_type: suite.source_type };
+    return { project_id: suite.project_id, source_type: suite.source_type, exploration_id: suite.exploration_id, area: suite.area };
   },
 });
 
@@ -338,6 +338,7 @@ export const createSuitesForExploration = mutation({
       ),
     ),
     triggered_by: v.optional(v.string()),
+    exploration_id: v.optional(v.id("explorations")),
   },
   handler: async (ctx, args) => {
     const { user, workspace } = await getMemberWorkspace(ctx);
@@ -364,6 +365,8 @@ export const createSuitesForExploration = mutation({
         locked_by: userId,
         locked_at: Date.now(),
         locked_reason: "generating",
+        exploration_id: args.exploration_id,
+        area,
       });
       results.push({ area, suite_id: suiteId });
     }

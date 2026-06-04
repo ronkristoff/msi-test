@@ -23,9 +23,7 @@ export default function EnvironmentsPage() {
   const projectId = asId(params.id, "projects");
   const { logError } = useErrorLogger();
 
-  const environments = useQuery(api.environments.queries.getEnvironments, {
-    project_id: projectId,
-  });
+  const environments = useQuery(api.environments.queries.getEnvironments, { project_id: projectId });
   const createEnv = useMutation(api.environments.mutations.createEnvironment);
   const updateEnv = useMutation(api.environments.mutations.updateEnvironment);
   const deleteEnv = useMutation(api.environments.mutations.deleteEnvironment);
@@ -95,9 +93,9 @@ export default function EnvironmentsPage() {
   }
 
   return (
-    <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border-soft)]">
+    <div className="max-w-[960px]">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-[var(--elev-raised)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-soft)]">
           <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)]">
             Environments
           </h3>
@@ -117,88 +115,91 @@ export default function EnvironmentsPage() {
           )}
         </div>
 
-        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+        <div className="p-5">
+          {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
-        {editing.mode !== "idle" && (
-          <form onSubmit={handleSubmit} className="mb-4 pb-4 border-b border-[var(--border-soft)]">
-            <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-              <Input
-                label="Name"
-                required
-                placeholder="e.g. Staging"
-                error={form.formState.errors.name?.message}
-                {...form.register("name")}
-              />
-              <Input
-                label="Base URL"
-                required
-                placeholder="e.g. staging.myapp.com"
-                hint="https:// will be added automatically if missing"
-                error={form.formState.errors.base_url?.message}
-                {...form.register("base_url")}
-              />
-            </div>
-            <div className="flex gap-2 mt-2">
-              <Button type="submit" size="sm">
-                {editing.mode === "create" ? "Create" : "Save"}
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={cancel}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {environments.length === 0 && editing.mode === "idle" ? (
-          <EmptyState
-            icon={
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-              </svg>
-            }
-            title="No environments"
-            description="Add deployment targets like staging or production to run tests against."
-          />
-        ) : (
-          <div className="divide-y divide-[var(--border-soft)]">
-            {environments.map((env) => (
-              <div
-                key={env._id}
-                className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-[var(--fg)]">{env.name}</div>
-                  <a
-                    href={env.base_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-[var(--accent)] hover:underline"
-                  >
-                    {env.base_url}
-                  </a>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => startEdit(env)}
-                    disabled={editing.mode !== "idle"}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleDelete(env._id)}
-                    disabled={deleting === env._id}
-                  >
-                    {deleting === env._id ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
+          {editing.mode !== "idle" && (
+            <form onSubmit={handleSubmit} className="mb-5 pb-5 border-b border-[var(--border-soft)]">
+              <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+                <Input
+                  label="Name"
+                  required
+                  placeholder="e.g. Staging"
+                  error={form.formState.errors.name?.message}
+                  {...form.register("name")}
+                />
+                <Input
+                  label="Base URL"
+                  required
+                  placeholder="e.g. staging.myapp.com"
+                  hint="https:// will be added automatically if missing"
+                  error={form.formState.errors.base_url?.message}
+                  {...form.register("base_url")}
+                />
               </div>
-            ))}
-          </div>
-        )}
+              <div className="flex gap-2 mt-2">
+                <Button type="submit" size="sm">
+                  {editing.mode === "create" ? "Create" : "Save"}
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={cancel}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {environments.length === 0 && editing.mode === "idle" ? (
+            <EmptyState
+              icon={
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                </svg>
+              }
+              title="No environments"
+              description="Add deployment targets like staging or production to run tests against."
+            />
+          ) : (
+            <div className="divide-y divide-[var(--border-soft)]">
+              {environments.map((env) => (
+                <div
+                  key={env._id}
+                  className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[var(--fg)]">{env.name}</div>
+                    <a
+                      href={env.base_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[var(--accent)] hover:underline"
+                    >
+                      {env.base_url}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(env)}
+                      disabled={editing.mode !== "idle"}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(env._id)}
+                      disabled={deleting === env._id}
+                      className="text-[var(--danger)] hover:bg-[var(--danger)]/10"
+                    >
+                      {deleting === env._id ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
 import { Alert } from "@/components/ui/Alert";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Select } from "@/components/ui/FormField";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { useErrorLogger } from "@/lib/error-logger";
 import { hasAiConfig } from "@/lib/ai-presets";
@@ -178,7 +179,7 @@ export default function SuiteDetailPage() {
       }
     >
       {(suite) => (
-    <div className="max-w-[840px]">
+    <div className="max-w-[960px]">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)] mb-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
@@ -254,36 +255,38 @@ export default function SuiteDetailPage() {
 
       {!activeRun && effectiveApprovedCount > 0 && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Run Tests ({effectiveApprovedCount} approved)
+          <div className="flex gap-3 items-start">
+            <div className="flex-1">
+              <Select
+                label={`Run Tests (${effectiveApprovedCount} approved)`}
+                value={selectedEnvId ?? ""}
+                onChange={(e) => setSelectedEnvId(e.target.value || null)}
+              >
+                <option value="">Select environment...</option>
+                {environments?.map((env) => (
+                  <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
+                ))}
+              </Select>
+            </div>
+            <div className="pt-[26px]">
+              <Button
+                onClick={handleTriggerRun}
+                disabled={triggeringRun || !selectedEnvId}
+                size="sm"
+              >
+                {triggeringRun ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Starting...
+                  </>
+                ) : "Run Tests"}
+              </Button>
+            </div>
           </div>
-          {triggerError && <Alert variant="error" className="mb-3">{triggerError}</Alert>}
-          <div className="flex gap-3 items-center">
-            <select
-              value={selectedEnvId ?? ""}
-              onChange={(e) => setSelectedEnvId(e.target.value || null)}
-              className="font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-            >
-              <option value="">Select environment...</option>
-              {environments?.map((env) => (
-                <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
-              ))}
-            </select>
-            <Button
-              onClick={handleTriggerRun}
-              disabled={triggeringRun || !selectedEnvId}
-            >
-              {triggeringRun ? (
-                <>
-                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Starting...
-                </>
-              ) : "Run Tests"}
-            </Button>
-          </div>
+          {triggerError && <Alert variant="error" className="mt-3">{triggerError}</Alert>}
         </div>
       )}
 
@@ -310,7 +313,7 @@ export default function SuiteDetailPage() {
                   value={nlPrompt}
                   onChange={(e) => setNlPrompt(e.target.value)}
                   placeholder={"e.g., Test that login works with valid credentials"}
-                  className="flex-1 min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  className="flex-1 min-h-[60px] max-h-[120px] px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
                   disabled={generating}
                 />
                 <Button

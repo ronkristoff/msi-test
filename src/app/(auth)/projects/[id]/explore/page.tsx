@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useErrorLogger } from "@/lib/error-logger";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import { PhaseIndicator } from "@/components/PhaseIndicator";
 import Link from "next/link";
 import { FlowCard } from "./FlowCard";
 import { ScenarioList } from "./ScenarioList";
@@ -33,9 +34,7 @@ export default function ExplorePage() {
   const router = useRouter();
   const { logError } = useErrorLogger();
   const projectId = asId(params.id, "projects");
-  const project = useQuery(api.projects.queries.getProject, {
-    project_id: projectId,
-  });
+  const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
 
   const [error, setError] = useState<string | null>(null);
   const [explorationId, setExplorationId] = useState<string | null>(null);
@@ -245,6 +244,7 @@ export default function ExplorePage() {
         areas,
         source_type: "url_exploration",
         triggered_by: user._id,
+        exploration_id: explorationId,
       });
 
       router.push(`/projects/${params.id}`);
@@ -276,6 +276,70 @@ export default function ExplorePage() {
     }
   }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTestsForArea, markExplorationCompleted, effectiveExplorationId, router, params.id, logError, user, projectId]);
 
+  const isInProgress =
+    exploration?.status === "discovering" ||
+    exploration?.status === "capturing" ||
+    exploration?.status === "captured" ||
+    exploration?.status === "analyzing";
+
+  const showScenarios = exploration?.status === "analyzed" && scenarios.length > 0;
+
+  const phases = useMemo(() => {
+    if (!effectiveExplorationId) {
+      return [
+        { label: "Configure", status: "current" as const },
+        { label: "Discover", status: "upcoming" as const },
+        { label: "Analyze", status: "upcoming" as const },
+        { label: "Select", status: "upcoming" as const },
+        { label: "Generate", status: "upcoming" as const },
+      ];
+    }
+    if (exploration?.status === "discovered") {
+      return [
+        { label: "Configure", status: "completed" as const },
+        { label: "Discover", status: "completed" as const },
+        { label: "Deep Explore", status: "current" as const },
+        { label: "Select", status: "upcoming" as const },
+        { label: "Generate", status: "upcoming" as const },
+      ];
+    }
+    if (isInProgress) {
+      const currentIdx = exploration?.status === "discovering" ? 1 : exploration?.status === "capturing" ? 2 : 2;
+      return [
+        { label: "Configure", status: "completed" as const },
+        { label: "Discover", status: (currentIdx >= 1 ? "completed" : "current") as "completed" | "current" },
+        { label: "Deep Explore", status: (currentIdx >= 2 ? "completed" : "current") as "completed" | "current" },
+        { label: "Select", status: "upcoming" as const },
+        { label: "Generate", status: "upcoming" as const },
+      ];
+    }
+    if (showScenarios) {
+      return [
+        { label: "Configure", status: "completed" as const },
+        { label: "Discover", status: "completed" as const },
+        { label: "Deep Explore", status: "completed" as const },
+        { label: "Select", status: "current" as const },
+        { label: "Generate", status: "upcoming" as const },
+      ];
+    }
+    if (exploration?.status === "completed") {
+      return [
+        { label: "Configure", status: "completed" as const },
+        { label: "Discover", status: "completed" as const },
+        { label: "Deep Explore", status: "completed" as const },
+        { label: "Select", status: "completed" as const },
+        { label: "Generate", status: "completed" as const },
+      ];
+    }
+    return [
+      { label: "Configure", status: "current" as const },
+      { label: "Discover", status: "upcoming" as const },
+      { label: "Analyze", status: "upcoming" as const },
+      { label: "Select", status: "upcoming" as const },
+      { label: "Generate", status: "upcoming" as const },
+    ];
+  }, [effectiveExplorationId, exploration?.status, isInProgress, showScenarios]);
+
   if (project === undefined) {
     return <PageSkeleton />;
   }
@@ -299,63 +363,53 @@ export default function ExplorePage() {
     );
   }
 
-  const isInProgress =
-    exploration?.status === "discovering" ||
-    exploration?.status === "capturing" ||
-    exploration?.status === "captured" ||
-    exploration?.status === "analyzing";
-
-  const showScenarios = exploration?.status === "analyzed" && scenarios.length > 0;
-
   return (
-    <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
-        <div className="mb-5 pb-4 border-b border-[var(--border-soft)]">
-          <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)]">
+    <div className="max-w-[1080px]">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 shadow-[var(--elev-raised)]">
+        <div className="mb-5">
+          <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)] mb-1">
             Explore & Generate Tests
           </h2>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Crawl the site, identify testable scenarios, and generate Playwright tests from your selections.
+          <p className="text-sm text-[var(--muted)]">
+            Crawl the site, identify testable scenarios, and generate Playwright tests.
           </p>
         </div>
 
+        <PhaseIndicator phases={phases} />
+
         {error && <Alert variant="error" className="mb-5">{error}</Alert>}
 
-        <div className="mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Project
-          </div>
-          <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
-        </div>
-
+        {/* Phase: Configure */}
         {!effectiveExplorationId && (
-          <div className="mb-5">
-            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-              URL to Explore
+          <div className="space-y-5">
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-4 rounded-[var(--radius-sm)] bg-[var(--border-soft)]">
+              <span className="text-[11px] font-[var(--font-mono)] uppercase tracking-[0.05em] text-[var(--muted)] self-center">Project</span>
+              <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
+              <span className="text-[11px] font-[var(--font-mono)] uppercase tracking-[0.05em] text-[var(--muted)] self-center">URL</span>
+              <div className="text-sm text-[var(--fg)]">{url || project.app_url}</div>
             </div>
-            <div className="text-sm text-[var(--fg)] mb-4">{url || project.app_url}</div>
 
-            <div className="mb-4">
-              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+            <div>
+              <label className="block font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                 Goal / Focus (optional)
-              </div>
+              </label>
               <textarea
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 placeholder={"e.g., Focus on checkout and payment flows"}
-                className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="w-full min-h-[60px] max-h-[120px] px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
               />
             </div>
 
-            <div className="mb-4">
-              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+            <div>
+              <label className="block font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                 Additional URLs (optional)
-              </div>
+              </label>
               <textarea
                 value={additionalUrlInput}
                 onChange={(e) => setAdditionalUrlInput(e.target.value)}
                 placeholder={"One URL per line — pages the crawler might miss\nhttps://example.com/cart\nhttps://example.com/checkout"}
-                className="w-full min-h-[60px] max-h-[120px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="w-full min-h-[60px] max-h-[120px] px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
               />
             </div>
 
@@ -370,9 +424,10 @@ export default function ExplorePage() {
           </div>
         )}
 
+        {/* Phase: In progress */}
         {isInProgress && (
-          <div className="mb-5">
-            <div className="flex items-center gap-2 text-sm text-[var(--muted)] mb-3">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -387,16 +442,15 @@ export default function ExplorePage() {
                 {exploration.pages_captured} page{exploration.pages_captured !== 1 ? "s" : ""} captured
               </div>
             )}
-            <div className="mt-3">
-              <Button variant="secondary" onClick={handleCancel}>
-                Cancel
-              </Button>
-            </div>
+            <Button variant="secondary" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
           </div>
         )}
 
+        {/* Phase: Select discovered pages */}
         {exploration?.status === "discovered" && (
-          <div className="mb-5">
+          <div className="space-y-5">
             <PageChecklist
               pages={discoveredPagesList}
               selectedIndices={selectedDiscoveredPages}
@@ -405,16 +459,16 @@ export default function ExplorePage() {
               onDeselectAll={() => setSelectedDiscoveredPages(new Set())}
             />
 
-            <div className="mt-4 mb-4">
-              <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+            <div>
+              <label className="block font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                 Add More URLs (optional)
-              </div>
+              </label>
               <div className="flex gap-2">
                 <textarea
                   value={manualUrlInput}
                   onChange={(e) => setManualUrlInput(e.target.value)}
                   placeholder={"https://example.com/extra-page"}
-                  className="flex-1 min-h-[36px] max-h-[60px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-2 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  className="flex-1 min-h-[36px] max-h-[60px] px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
                 />
                 <Button variant="secondary" onClick={handleAddManualUrls} disabled={!manualUrlInput.trim()}>
                   Add
@@ -423,10 +477,7 @@ export default function ExplorePage() {
             </div>
 
             <div className="flex gap-3">
-              <Button
-                onClick={handleExploreSelected}
-                disabled={selectedDiscoveredPages.size === 0}
-              >
+              <Button onClick={handleExploreSelected} disabled={selectedDiscoveredPages.size === 0}>
                 Explore Selected ({selectedDiscoveredPages.size})
               </Button>
               <Button
@@ -439,12 +490,13 @@ export default function ExplorePage() {
           </div>
         )}
 
+        {/* Phase: Failed */}
         {exploration?.status === "failed" && (
-          <div className="mb-5">
-              <Alert variant="error">
-                Exploration failed: {exploration.error_message || "Unknown error. Try again or check your AI configuration."}
-              </Alert>
-            <div className="flex gap-3 mt-4">
+          <div className="space-y-4">
+            <Alert variant="error">
+              Exploration failed: {exploration.error_message || "Unknown error. Try again or check your AI configuration."}
+            </Alert>
+            <div className="flex gap-3">
               <Button onClick={() => { setExplorationId(null); setError(null); setUserDismissed(true); }}>
                 Try Again
               </Button>
@@ -455,14 +507,15 @@ export default function ExplorePage() {
           </div>
         )}
 
+        {/* Phase: Select scenarios */}
         {showScenarios && (
-          <div className="mb-5">
+          <div className="space-y-5">
             {capturedPages.length > 0 && (
-              <div className="mb-4">
-                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+              <div>
+                <div className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                   Captured Pages ({capturedPages.length})
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
                   {capturedPages.map((page, i) =>
                     page.screenshot_url ? (
                       <a
@@ -470,7 +523,7 @@ export default function ExplorePage() {
                         href={page.screenshot_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden hover:border-[var(--border-strong)] transition-colors"
+                        className="block rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden hover:border-[var(--accent)] transition-colors"
                       >
                         <img
                           src={page.screenshot_url}
@@ -490,7 +543,7 @@ export default function ExplorePage() {
                     ) : (
                       <div
                         key={i}
-                        className="flex items-center justify-center h-20 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]"
+                        className="flex items-center justify-center h-20 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--border-soft)]"
                       >
                         <span className="text-[10px] text-[var(--muted)] truncate px-2">{page.title}</span>
                       </div>
@@ -501,11 +554,11 @@ export default function ExplorePage() {
             )}
 
             {hasFlows && (
-              <div className="mb-4">
+              <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]">
+                  <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
                     Discovered Flows ({discoveredFlows.length})
-                  </div>
+                  </span>
                   {selectionMode === "flows" && (
                     <button
                       type="button"
@@ -533,15 +586,15 @@ export default function ExplorePage() {
             )}
 
             {prdCoverage.length > 0 && (
-              <div className="mb-4">
-                <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+              <div>
+                <div className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                   PRD Coverage ({prdCoverage.filter((c) => c.found).length}/{prdCoverage.length} features found)
                 </div>
                 <div className="space-y-1">
                   {prdCoverage.map((item, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 text-xs px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-elevated)]"
+                      className="flex items-center gap-2 text-xs px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--border-soft)]"
                     >
                       <span className={`inline-block w-2 h-2 rounded-full ${item.found ? "bg-green-500" : "bg-red-400"}`} />
                       <span className={item.found ? "text-[var(--fg)]" : "text-[var(--fg)] font-medium"}>
@@ -564,7 +617,7 @@ export default function ExplorePage() {
               </div>
             )}
 
-            <div className="mb-3">
+            <div>
               <div className="flex items-center gap-2 mb-3">
                 {hasFlows && (
                   <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
@@ -574,7 +627,7 @@ export default function ExplorePage() {
                       className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
                         selectionMode === "flows"
                           ? "bg-[var(--accent)] text-white"
-                          : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                          : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--fg)]"
                       }`}
                     >
                       Select Flows
@@ -585,7 +638,7 @@ export default function ExplorePage() {
                       className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
                         selectionMode === "scenarios"
                           ? "bg-[var(--accent)] text-white"
-                          : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                          : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--fg)]"
                       }`}
                     >
                       Select Scenarios
@@ -593,9 +646,9 @@ export default function ExplorePage() {
                   </div>
                 )}
                 {!hasFlows && (
-                  <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)]">
+                  <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
                     Proposed Scenarios ({scenarios.length})
-                  </div>
+                  </span>
                 )}
                 {showScenarioSelection && (
                   <button
@@ -630,7 +683,7 @@ export default function ExplorePage() {
             )}
 
             {selectionMode === "flows" && selectedFlows.size > 0 && (
-              <div className="mb-4 p-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-elevated)]">
+              <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--border-soft)]">
                 <div className="text-xs text-[var(--muted)]">
                   {selectedFlows.size} flow{selectedFlows.size !== 1 ? "s" : ""} selected
                   {matchedScenarios.length > 0
@@ -640,7 +693,7 @@ export default function ExplorePage() {
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-4 border-t border-[var(--border-soft)]">
               <Button
                 onClick={handleGenerateTests}
                 disabled={totalSelected === 0 || generating}
@@ -667,10 +720,11 @@ export default function ExplorePage() {
           </div>
         )}
 
+        {/* Phase: Completed */}
         {exploration?.status === "completed" && !showScenarios && (
-          <div className="mb-5">
+          <div className="space-y-4">
             <Alert variant="success">Tests generated successfully!</Alert>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3">
               <Link href={`/projects/${params.id}`}>
                 <Button>Back to Project</Button>
               </Link>

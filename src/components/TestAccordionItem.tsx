@@ -66,6 +66,10 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
   const [healing, setHealing] = useState(false);
   const [healSuccess, setHealSuccess] = useState(false);
   const [healHint, setHealHint] = useState("");
+  const [healExpanded, setHealExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpenSignal, setChatOpenSignal] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const latestFailure = useQuery(
     api.runs.queries.getLatestFailureForTest,
@@ -73,6 +77,17 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
   );
 
   const aiConfigReady = hasAiConfig(workspace);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const handleExpand = async (opening: boolean) => {
     setExpanded(opening);
@@ -133,6 +148,7 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
       });
       setHealSuccess(true);
       setHealHint("");
+      setHealExpanded(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Healing failed";
       logError(msg, { severity: "error", context: { source: "TestAccordionItem.handleHeal" } });
@@ -291,35 +307,19 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-soft)]">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-              >
-                {regenerating ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Regenerating...
-                  </>
-                ) : "Regenerate"}
-              </Button>
-              {aiConfigReady && latestFailure && (
-                <div className="flex items-start gap-2">
+            <div className="pt-3 border-t border-[var(--border-soft)] space-y-2">
+              {aiConfigReady && latestFailure && healExpanded && (
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={healHint}
                     onChange={(e) => setHealHint(e.target.value)}
-                    placeholder="Describe what's wrong..."
+                    placeholder="Describe what's wrong (optional)"
                     disabled={healing}
                     className="flex-1 min-w-[180px] max-w-[320px] text-sm bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-2.5 py-1.5 placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
                   />
                   <Button
-                    variant="ghost"
+                    variant="primary"
                     size="sm"
                     onClick={handleHeal}
                     disabled={healing}
@@ -332,74 +332,163 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
                         </svg>
                         Healing...
                       </>
-                    ) : "AI Heal"}
+                    ) : "Heal"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setHealExpanded(false); setHealHint(""); }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
                   </Button>
                 </div>
               )}
               {healSuccess && (
                 <span className="text-xs text-[var(--success-text)]">Healed and saved as draft. Review before approving.</span>
               )}
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSave}
-                disabled={!isDirty || updateTestCode === undefined}
-              >
-                {isDirty ? "Save Changes" : "Saved"}
-              </Button>
-              {isDirty && (
-                <Button variant="ghost" size="sm" onClick={handleDiscard}>
-                  Discard
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={!isDirty || updateTestCode === undefined}
+                >
+                  {isDirty ? "Save Changes" : "Saved"}
                 </Button>
-              )}
-              <div className="flex-1" />
-              {test.status === "approved" && environments && environments.length > 0 && (
+                {isDirty && (
+                  <Button variant="ghost" size="sm" onClick={handleDiscard}>
+                    Discard
+                  </Button>
+                )}
+                {test.status === "approved" && environments && environments.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      onRunTest(test._id, environments[0]._id);
+                    }}
+                  >
+                    Run Test
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    onRunTest(test._id, environments[0]._id);
-                  }}
+                  onClick={toggleStatus}
+                  disabled={updateTestStatus === undefined}
                 >
-                  Run Test
+                  {test.status === "draft" ? "Approve" : "Revert to Draft"}
                 </Button>
-              )}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={toggleStatus}
-                disabled={updateTestStatus === undefined}
-              >
-                {test.status === "draft" ? "Approve" : "Revert to Draft"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAddToList(true)}
-              >
-                Add to List
-              </Button>
-              {aiConfigReady && (
-                <TestChat
-                  test={test}
-                  latestFailure={latestFailure}
-                  onApply={() => {
-                    setLocalCode(null);
-                  }}
-                />
-              )}
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={deleteTest === undefined}
-              >
-                Delete Test
-              </Button>
+                <div className="flex-1" />
+                {aiConfigReady && latestFailure && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHealExpanded((prev) => !prev)}
+                    disabled={healing}
+                  >
+                    {healing ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Healing...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                          <path d="M12 8v4l3 3" />
+                        </svg>
+                        AI Heal
+                      </>
+                    )}
+                  </Button>
+                )}
+                <div ref={menuRef} className="relative">
+                  <button
+                    onClick={() => setMenuOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-[var(--radius-sm)] text-[var(--muted)] hover:bg-[var(--border-soft)] hover:text-[var(--fg)] transition-colors"
+                    aria-label="More actions"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="6" r="1.5" />
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="12" cy="18" r="1.5" />
+                    </svg>
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute right-0 bottom-full mb-1 w-48 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-[var(--elev-raised)] py-1 z-50">
+                      <button
+                        onClick={() => { setMenuOpen(false); handleRegenerate(); }}
+                        disabled={regenerating}
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                          <polyline points="23 4 23 10 17 10" />
+                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                        </svg>
+                        {regenerating ? "Regenerating..." : "Regenerate"}
+                      </button>
+                      {aiConfigReady && (
+                        <button
+                          onClick={() => { setMenuOpen(false); setChatOpenSignal(true); }}
+                          className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors flex items-center gap-2"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          Refine
+                        </button>
+                      )}
+                      <div className="my-1 border-t border-[var(--border-soft)]" />
+                      <button
+                        onClick={() => { setMenuOpen(false); setShowAddToList(true); }}
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors flex items-center gap-2"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                          <line x1="8" y1="6" x2="21" y2="6" />
+                          <line x1="8" y1="12" x2="21" y2="12" />
+                          <line x1="8" y1="18" x2="21" y2="18" />
+                          <line x1="3" y1="6" x2="3.01" y2="6" />
+                          <line x1="3" y1="12" x2="3.01" y2="12" />
+                          <line x1="3" y1="18" x2="3.01" y2="18" />
+                        </svg>
+                        Add to List
+                      </button>
+                      <button
+                        onClick={() => { setMenuOpen(false); setShowDeleteConfirm(true); }}
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--danger)] hover:bg-[rgba(220,38,38,0.06)] transition-colors flex items-center gap-2"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        Delete Test
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {aiConfigReady && expanded && (
+        <TestChat
+          test={test}
+          latestFailure={latestFailure}
+          onApply={() => {
+            setLocalCode(null);
+          }}
+          externalOpen={chatOpenSignal}
+          onExternalOpenConsumed={() => setChatOpenSignal(false)}
+        />
+      )}
 
       {showDeleteConfirm && (
         <ConfirmDialog

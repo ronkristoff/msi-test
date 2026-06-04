@@ -41,9 +41,7 @@ function asProjectWithAuth(p: unknown): ProjectWithAuth {
 export default function ProjectSettingsPage() {
   const params = useParams<{ id: string }>();
   const projectId = asId(params.id, "projects");
-  const project = useQuery(api.projects.queries.getProject, {
-    project_id: projectId,
-  });
+  const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
   const updateProject = useMutation(api.projects.mutations.updateProject);
   const { upload } = useFileUpload();
 
@@ -170,133 +168,139 @@ export default function ProjectSettingsPage() {
   const storedCookieName = p.explore_cookie_name;
 
   return (
-    <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)] mb-5">
-        <h2 className="font-[var(--font-display)] text-xl font-bold mb-5 pb-4 border-b border-[var(--border-soft)]">
-          Project Settings
-        </h2>
+    <div className="max-w-[960px]">
+      <div className="grid grid-cols-[1fr_380px] gap-5 max-[800px]:grid-cols-1">
+        {/* Left column: Project config */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
+          <h2 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-5 pb-4 border-b border-[var(--border-soft)]">
+            Project Settings
+          </h2>
 
-        {error && <Alert variant="error" className="mb-5">{error}</Alert>}
-        {success && <Alert variant="success" className="mb-5">Project updated</Alert>}
+          {error && <Alert variant="error" className="mb-5">{error}</Alert>}
+          {success && <Alert variant="success" className="mb-5">Project updated</Alert>}
 
-        <Input
-          label="Project Name"
-          required
-          error={form.formState.errors.name?.message}
-          {...form.register("name")}
-        />
-        <Input
-          label="App URL"
-          required
-          placeholder="example.com"
-          hint="https:// will be added automatically if missing"
-          error={form.formState.errors.app_url?.message}
-          {...form.register("app_url")}
-        />
+          <Input
+            label="Project Name"
+            required
+            error={form.formState.errors.name?.message}
+            {...form.register("name")}
+          />
+          <Input
+            label="App URL"
+            required
+            placeholder="example.com"
+            hint="https:// will be added automatically if missing"
+            error={form.formState.errors.app_url?.message}
+            {...form.register("app_url")}
+          />
 
-        <PRDInput
-          mode={prdMode}
-          onModeChange={setPrdMode}
-          text={prdText}
-          onTextChange={setPrdText}
-          file={prdFile}
-          onFileChange={setPrdFile}
-          hasExistingFile={!!asProjectWithAuth(project).prd_file_id}
-        />
+          <PRDInput
+            mode={prdMode}
+            onModeChange={setPrdMode}
+            text={prdText}
+            onTextChange={setPrdText}
+            file={prdFile}
+            onFileChange={setPrdFile}
+            hasExistingFile={!!asProjectWithAuth(project).prd_file_id}
+          />
 
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+
+        {/* Right column: Exploration auth */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
+          <h2 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-1 pb-4 border-b border-[var(--border-soft)]">
+            Exploration Auth
+          </h2>
+          <p className="text-sm text-[var(--muted)] mb-5">
+            Configure how the explorer authenticates to reach pages behind login.
+          </p>
+
+          {authError && <Alert variant="error" className="mb-5">{authError}</Alert>}
+          {authSuccess && <Alert variant="success" className="mb-5">Auth config saved</Alert>}
+
+          <Select
+            label="Authentication Mode"
+            value={authMode}
+            onChange={(e) => setAuthMode(e.target.value as "none" | "form" | "cookie")}
+          >
+            <option value="none">None — public pages only</option>
+            <option value="form">Form Fill — auto-fill login form</option>
+            <option value="cookie">Cookie Injection — inject session cookie</option>
+          </Select>
+
+          {authMode === "form" && (
+            <>
+              <Input
+                id="explore_login_url"
+                label="Login Page URL"
+                placeholder="/login"
+                hint="Defaults to the app URL if not set"
+                defaultValue={storedLoginUrl ?? ""}
+              />
+              <Input
+                id="explore_username"
+                label="Username / Email"
+                required
+                defaultValue={storedUsername ?? ""}
+              />
+              <Input
+                id="explore_password"
+                label="Password"
+                type="password"
+                togglePassword
+                required
+                placeholder={maskedPassword ? "Leave blank to keep current" : undefined}
+                defaultValue=""
+              />
+              {maskedPassword && (
+                <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
+                  Current: <span className="font-[var(--font-mono)]">{maskedPassword}</span>
+                </p>
+              )}
+            </>
+          )}
+
+          {authMode === "cookie" && (
+            <>
+              <Input
+                id="explore_cookie_name"
+                label="Cookie Name"
+                required
+                placeholder="session_id"
+                defaultValue={storedCookieName ?? ""}
+              />
+              <Input
+                id="explore_cookie_value"
+                label="Cookie Value"
+                type="password"
+                togglePassword
+                required
+                placeholder={maskedCookieValue ? "Leave blank to keep current" : undefined}
+                defaultValue=""
+              />
+              {maskedCookieValue && (
+                <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
+                  Current: <span className="font-[var(--font-mono)]">{maskedCookieValue}</span>
+                </p>
+              )}
+            </>
+          )}
+
+          <Button onClick={handleSaveAuth} disabled={authSaving}>
+            {authSaving ? "Saving..." : "Save Auth Config"}
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)] mb-5">
-        <h2 className="font-[var(--font-display)] text-xl font-bold mb-1 pb-4 border-b border-[var(--border-soft)]">
-          Exploration Authentication
-        </h2>
-        <p className="text-sm text-[var(--muted)] mb-5">
-          Configure how the explorer authenticates to reach inner pages behind login.
-        </p>
-
-        {authError && <Alert variant="error" className="mb-5">{authError}</Alert>}
-        {authSuccess && <Alert variant="success" className="mb-5">Auth config saved</Alert>}
-
-        <Select
-          label="Authentication Mode"
-          value={authMode}
-          onChange={(e) => setAuthMode(e.target.value as "none" | "form" | "cookie")}
-        >
-          <option value="none">None — public pages only</option>
-          <option value="form">Form Fill — auto-fill login form</option>
-          <option value="cookie">Cookie Injection — inject session cookie</option>
-        </Select>
-
-        {authMode === "form" && (
-          <>
-            <Input
-              id="explore_login_url"
-              label="Login Page URL"
-              placeholder="/login"
-              hint="Defaults to the app URL if not set"
-              defaultValue={storedLoginUrl ?? ""}
-            />
-            <Input
-              id="explore_username"
-              label="Username / Email"
-              required
-              defaultValue={storedUsername ?? ""}
-            />
-            <Input
-              id="explore_password"
-              label="Password"
-              type="password"
-              togglePassword
-              required
-              placeholder={maskedPassword ? "Leave blank to keep current" : undefined}
-              defaultValue=""
-            />
-            {maskedPassword && (
-              <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
-                Current: <span className="font-[var(--font-mono)]">{maskedPassword}</span>
-              </p>
-            )}
-          </>
-        )}
-
-        {authMode === "cookie" && (
-          <>
-            <Input
-              id="explore_cookie_name"
-              label="Cookie Name"
-              required
-              placeholder="session_id"
-              defaultValue={storedCookieName ?? ""}
-            />
-            <Input
-              id="explore_cookie_value"
-              label="Cookie Value"
-              type="password"
-              togglePassword
-              required
-              placeholder={maskedCookieValue ? "Leave blank to keep current" : undefined}
-              defaultValue=""
-            />
-            {maskedCookieValue && (
-              <p className="text-xs text-[var(--muted)] -mt-3 mb-5">
-                Current: <span className="font-[var(--font-mono)]">{maskedCookieValue}</span>
-              </p>
-            )}
-          </>
-        )}
-
-        <Button onClick={handleSaveAuth} disabled={authSaving}>
-          {authSaving ? "Saving..." : "Save Auth Config"}
-        </Button>
+      <div className="mt-5">
+        <TestDataSection
+          projectId={asProjectWithAuth(project)._id as Id<"projects">}
+          initialEntries={asProjectWithAuth(project).test_data}
+        />
       </div>
-
-      <TestDataSection
-        projectId={asProjectWithAuth(project)._id as Id<"projects">}
-        initialEntries={asProjectWithAuth(project).test_data}
-      />
     </div>
   );
 }

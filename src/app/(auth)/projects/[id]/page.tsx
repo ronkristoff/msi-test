@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,10 +12,71 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { QueryResult } from "@/components/ui/QueryResult";
 import { Alert } from "@/components/ui/Alert";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Select } from "@/components/ui/FormField";
 import { formatDate } from "@/lib/format";
 import { useErrorLogger } from "@/lib/error-logger";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+
+function ActionMenu({
+  onAction,
+}: {
+  onAction: (action: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <Button variant="secondary" size="sm" onClick={() => setOpen(!open)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+        </svg>
+        Actions
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-40 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-[var(--elev-raised)] py-1 min-w-[200px]">
+          <button
+            onClick={() => { onAction("createSuite"); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
+          >
+            Create Suite
+          </button>
+          <button
+            onClick={() => { onAction("createRegression"); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
+          >
+            Create Regression Suite
+          </button>
+          <div className="border-t border-[var(--border-soft)] my-1" />
+          <Link
+            href=""
+            onClick={(e) => { e.preventDefault(); onAction("generateNl"); setOpen(false); }}
+            className="block px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
+          >
+            Generate from Description
+          </Link>
+          <Link
+            href=""
+            onClick={(e) => { e.preventDefault(); onAction("generatePrd"); setOpen(false); }}
+            className="block px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)]"
+          >
+            Generate from PRD
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -30,19 +91,12 @@ export default function ProjectDetailPage() {
   const [runAllError, setRunAllError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteSuiteId, setDeleteSuiteId] = useState<string | null>(null);
+
   const projectId = asId(params.id, "projects");
-  const project = useQuery(api.projects.queries.getProject, {
-    project_id: projectId,
-  });
-  const suites = useQuery(api.suites.queries.getSuites, {
-    project_id: projectId,
-  });
-  const environments = useQuery(api.environments.queries.getEnvironments, {
-    project_id: projectId,
-  });
-  const functionalSuites = useQuery(api.suites.queries.getFunctionalSuites, {
-    project_id: projectId,
-  });
+  const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
+  const suites = useQuery(api.suites.queries.getSuites, { project_id: projectId });
+  const environments = useQuery(api.environments.queries.getEnvironments, { project_id: projectId });
+  const functionalSuites = useQuery(api.suites.queries.getFunctionalSuites, { project_id: projectId });
 
   const createSuite = useMutation(api.suites.mutations.createSuite);
   const createRegressionSuite = useMutation(api.suites.mutations.createRegressionSuite);
@@ -56,9 +110,9 @@ export default function ProjectDetailPage() {
       router.push(`/projects/${params.id}/suites/${suiteId}`);
     } catch (err) {
       logError(err instanceof Error ? err.message : "Failed to create suite", {
-          severity: "error",
-          context: { source: "ProjectDetailPage.handleCreateSuite" },
-        });
+        severity: "error",
+        context: { source: "ProjectDetailPage.handleCreateSuite" },
+      });
     } finally {
       setCreating(false);
     }
@@ -109,6 +163,23 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleAction = (action: string) => {
+    switch (action) {
+      case "createSuite":
+        handleCreateSuite();
+        break;
+      case "createRegression":
+        setShowCreateRegression(true);
+        break;
+      case "generateNl":
+        router.push(`/projects/${params.id}/generate-nl`);
+        break;
+      case "generatePrd":
+        router.push(`/projects/${params.id}/generate`);
+        break;
+    }
+  };
+
   if (project === undefined || suites === undefined || environments === undefined) {
     return <PageSkeleton />;
   }
@@ -135,127 +206,95 @@ export default function ProjectDetailPage() {
     >
       {(project) => {
         const hasPrd = !!(project.prd_text || project.prd_file_id);
+        const functionalSuitesList = suites.filter((s) => s.suite_type !== "regression");
+        const regressionSuitesList = suites.filter((s) => s.suite_type === "regression");
+
         return (
-    <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)] mb-5">
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-[var(--border-soft)]">
-          <div>
-            <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)]">
-              {project.name}
-            </h2>
-            <a
-              href={project.app_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-[var(--accent)] hover:underline"
-            >
-              {project.app_url}
-            </a>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href={`/projects/${project._id}/explore`}>
-              <Button variant="secondary" size="sm">Explore</Button>
-            </Link>
-            <Link href={`/projects/${project._id}/environments`}>
-              <Button variant="secondary" size="sm">Environments</Button>
-            </Link>
-            <Link href={`/projects/${project._id}/settings`}>
-              <Button variant="secondary" size="sm">Edit</Button>
-            </Link>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-          <div>
-            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1">
-              Created
+          <div className="max-w-[1080px]">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="min-w-0">
+                  <h2 className="font-[var(--font-display)] text-2xl font-bold text-[var(--fg)] truncate">
+                    {project.name}
+                  </h2>
+                  <a
+                    href={project.app_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-[var(--accent)] hover:underline"
+                  >
+                    {project.app_url}
+                  </a>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link href={`/projects/${project._id}/explore`}>
+                    <Button size="sm">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      Explore
+                    </Button>
+                  </Link>
+                  <Link href={`/projects/${project._id}/environments`}>
+                    <Button variant="secondary" size="sm">Environments</Button>
+                  </Link>
+                  <Link href={`/projects/${project._id}/settings`}>
+                    <Button variant="secondary" size="sm">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                      </svg>
+                      Settings
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs text-[var(--muted)]">
+                <span>Created {formatDate(project._creationTime)}</span>
+                {hasPrd && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--accent)]/10 text-[var(--accent)] font-medium">
+                    {project.prd_file_id ? "PRD file" : "PRD text"}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="text-sm text-[var(--fg)]">{formatDate(project._creationTime)}</div>
-          </div>
-          <div>
-            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1">
-              PRD
-            </div>
-            <div className="text-sm text-[var(--fg)]">
-              {hasPrd ? (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--border-soft)] text-[var(--fg)]">
-                  {project.prd_file_id ? "File uploaded" : "Text provided"}
-                </span>
+
+            {/* Suites section */}
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-[var(--elev-raised)]">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-soft)]">
+                <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)]">
+                  Suites
+                </h3>
+                <ActionMenu onAction={handleAction} />
+              </div>
+
+              {suites.length === 0 ? (
+                <div className="px-5 py-8">
+                  <EmptyState
+                    icon={
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    }
+                    title="No suites yet"
+                    description="Create a suite to start organizing your tests, or generate them from exploration, PRD, or a description."
+                  />
+                </div>
               ) : (
-                <span className="text-[var(--muted)]">None</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border-soft)]">
-          <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)]">
-            Suites
-          </h3>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowCreateRegression(true)}
-            >
-              Create Regression
-            </Button>
-            <Link href={`/projects/${params.id}/generate-nl`}>
-              <Button variant="secondary" size="sm">
-                Generate from NL
-              </Button>
-            </Link>
-            {hasPrd && (
-              <Link href={`/projects/${params.id}/generate`}>
-                <Button variant="secondary" size="sm">
-                  Generate from PRD
-                </Button>
-              </Link>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCreateSuite}
-              disabled={creating}
-              icon={
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              }
-            >
-              Create Suite
-            </Button>
-          </div>
-        </div>
-
-        {suites.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            }
-            title="No suites yet"
-            description="Create a suite to start organizing your tests."
-          />
-        ) : (
-          <>
-            {(() => {
-              const functionalSuites = suites.filter((s) => s.suite_type !== "regression");
-              const regressionSuites = suites.filter((s) => s.suite_type === "regression");
-              return (
-                <>
-                  {functionalSuites.length > 0 && (
-                    <div className="mb-4">
-                      <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2 px-1">
-                        Functional Suites
+                <div>
+                  {functionalSuitesList.length > 0 && (
+                    <div>
+                      <div className="px-5 pt-4 pb-2">
+                        <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
+                          Functional ({functionalSuitesList.length})
+                        </span>
                       </div>
-                      <div className="divide-y divide-[var(--border-soft)]">
-                        {functionalSuites.map((suite) => (
+                      <div className="px-3 pb-2">
+                        {functionalSuitesList.map((suite) => (
                           <div
                             key={suite._id}
-                            className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
+                            className="flex items-center justify-between py-2.5 px-2 -mx-0.5 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
                           >
                             <Link
                               href={`/projects/${params.id}/suites/${suite._id}`}
@@ -310,17 +349,20 @@ export default function ProjectDetailPage() {
                     </div>
                   )}
 
-                  {regressionSuites.length > 0 && (
-                    <div className="mb-4">
-                      <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2 px-1">
-                        Regression Suites
+                  {regressionSuitesList.length > 0 && (
+                    <div>
+                      {functionalSuitesList.length > 0 && <div className="border-t border-[var(--border-soft)] mx-5" />}
+                      <div className="px-5 pt-4 pb-2">
+                        <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
+                          Regression ({regressionSuitesList.length})
+                        </span>
                       </div>
-                      <div className="divide-y divide-[var(--border-soft)]">
-                        {regressionSuites.map((suite) => (
+                      <div className="px-3 pb-2">
+                        {regressionSuitesList.map((suite) => (
                           <Link
                             key={suite._id}
                             href={`/projects/${params.id}/suites/${suite._id}`}
-                            className="flex items-center justify-between py-3 px-1 -mx-1 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
+                            className="flex items-center justify-between py-2.5 px-2 -mx-0.5 rounded-[var(--radius-sm)] hover:bg-[var(--border-soft)] transition-colors duration-[var(--motion-fast)] group"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="min-w-0">
@@ -355,116 +397,122 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Run All Tests */}
+              {environments.length > 0 && (
+                <>
+                  <div className="border-t border-[var(--border-soft)] mx-5" />
+                  <div className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <Select
+                          label="Run All Tests"
+                          hint="Select an environment and run every approved test across all suites."
+                          value={runAllEnvId ?? ""}
+                          onChange={(e) => setRunAllEnvId(e.target.value || null)}
+                        >
+                          <option value="">Select environment...</option>
+                          {environments.map((env) => (
+                            <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="pt-6">
+                        <Button
+                          onClick={handleRunAll}
+                          disabled={triggeringRunAll || !runAllEnvId}
+                          size="sm"
+                        >
+                          {triggeringRunAll ? (
+                            <>
+                              <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Starting...
+                            </>
+                          ) : "Run All"}
+                        </Button>
+                      </div>
+                    </div>
+                    {runAllError && <Alert variant="error" className="mt-3">{runAllError}</Alert>}
+                  </div>
                 </>
-              );
-            })()}
-          </>
-        )}
-
-        {environments.length > 0 && (
-          <div className="pt-4 mt-4 border-t border-[var(--border-soft)]">
-            <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-              Run All Tests
+              )}
             </div>
-            {runAllError && <Alert variant="error" className="mb-3">{runAllError}</Alert>}
-            <div className="flex gap-3 items-center">
-              <select
-                value={runAllEnvId ?? ""}
-                onChange={(e) => setRunAllEnvId(e.target.value || null)}
-                className="font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-              >
-                <option value="">Select environment...</option>
-                {environments.map((env) => (
-                  <option key={env._id} value={env._id}>{env.name} ({env.base_url})</option>
-                ))}
-              </select>
-              <Button
-                onClick={handleRunAll}
-                disabled={triggeringRunAll || !runAllEnvId}
-                size="sm"
-              >
-                {triggeringRunAll ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Starting...
-                  </>
-                ) : "Run All"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {showCreateRegression && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCreateRegression(false)}>
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 max-w-[440px] w-full shadow-[var(--elev-raised)]" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
-              Create Regression Suite
-            </h3>
-            {createError && <Alert variant="error" className="mb-3">{createError}</Alert>}
-            <div className="mb-4">
-              <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-1 block">
-                Name
-              </label>
-              <input
-                type="text"
-                value={regressionName}
-                onChange={(e) => setRegressionName(e.target.value)}
-                placeholder="e.g., Full Smoke Test"
-                className="w-full font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                autoFocus
+            {/* Create Regression Modal */}
+            {showCreateRegression && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCreateRegression(false)}>
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 max-w-[440px] w-full shadow-[var(--elev-raised)]" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="font-[var(--font-display)] text-lg font-bold text-[var(--fg)] mb-4">
+                    Create Regression Suite
+                  </h3>
+                  {createError && <Alert variant="error" className="mb-3">{createError}</Alert>}
+                  <div className="mb-4">
+                    <label className="block font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={regressionName}
+                      onChange={(e) => setRegressionName(e.target.value)}
+                      placeholder="e.g., Full Smoke Test"
+                      className="w-full px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)]"
+                      autoFocus
+                    />
+                  </div>
+                  <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={regressionAutoAll}
+                      onChange={(e) => setRegressionAutoAll(e.target.checked)}
+                      className="mt-0.5 accent-[var(--accent)]"
+                    />
+                    <div>
+                      <span className="text-sm text-[var(--fg)]">
+                        Auto-include all current and future functional suites
+                      </span>
+                      <span className="text-xs text-[var(--muted)] block mt-0.5">
+                        New functional suites will be automatically added to this regression suite.
+                      </span>
+                    </div>
+                  </label>
+                  <div className="flex gap-3 justify-end">
+                    <Button variant="secondary" size="sm" onClick={() => { setShowCreateRegression(false); setCreateError(null); }}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleCreateRegression} disabled={!regressionName.trim() || creating}>
+                      {creating ? "Creating..." : "Create"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {deleteSuiteId && (
+              <ConfirmDialog
+                title="Delete suite?"
+                message="This will permanently delete the suite and all tests inside it."
+                onConfirm={async () => {
+                  try {
+                    await deleteSuite({ suite_id: deleteSuiteId as Id<"suites"> });
+                  } catch (err) {
+                    logError(err instanceof Error ? err.message : "Failed to delete suite", {
+                      severity: "error",
+                      context: { source: "ProjectDetailPage.deleteSuite" },
+                    });
+                  }
+                  setDeleteSuiteId(null);
+                }}
+                onCancel={() => setDeleteSuiteId(null)}
               />
-            </div>
-            <label className="flex items-center gap-2 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={regressionAutoAll}
-                onChange={(e) => setRegressionAutoAll(e.target.checked)}
-                className="accent-[var(--accent)]"
-              />
-              <span className="text-sm text-[var(--fg)]">
-                Auto-include all current and future functional suites
-              </span>
-              <span className="text-xs text-[var(--muted)] block mt-0.5">
-                New functional suites will be automatically added to this regression suite.
-              </span>
-            </label>
-            <div className="flex gap-3 justify-end">
-              <Button variant="secondary" size="sm" onClick={() => { setShowCreateRegression(false); setCreateError(null); }}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleCreateRegression} disabled={!regressionName.trim() || creating}>
-                {creating ? "Creating..." : "Create"}
-              </Button>
-            </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {deleteSuiteId && (
-        <ConfirmDialog
-          title="Delete suite?"
-          message="This will permanently delete the suite and all tests inside it."
-          onConfirm={async () => {
-            try {
-              await deleteSuite({ suite_id: deleteSuiteId as Id<"suites"> });
-            } catch (err) {
-              logError(err instanceof Error ? err.message : "Failed to delete suite", {
-                severity: "error",
-                context: { source: "ProjectDetailPage.deleteSuite" },
-              });
-            }
-            setDeleteSuiteId(null);
-          }}
-          onCancel={() => setDeleteSuiteId(null)}
-        />
-      )}
-    </div>
-         );
-       }}
-     </QueryResult>
-   );
- }
+        );
+      }}
+    </QueryResult>
+  );
+}

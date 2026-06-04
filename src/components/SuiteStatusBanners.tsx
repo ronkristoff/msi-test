@@ -28,13 +28,21 @@ export function SuiteStatusBanners({ suite, activeRun }: SuiteStatusBannersProps
   const retrySuiteGeneration = useMutation(api.suites.mutations.retrySuiteGeneration);
   const generatePrdTests = useAction(api.ai.generatePrdTests.generatePrdTests);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
+  const retryExploration = useAction(api.ai.exploreApp.retryExplorationGeneration);
 
   const handleRetry = async () => {
     try {
       const result = await retrySuiteGeneration({ suite_id: suite._id as Id<"suites"> });
 
       if (result.source_type === "url_exploration") {
-        window.location.href = `/projects/${suite.project_id}/explore`;
+        if (result.exploration_id) {
+          retryExploration({ suite_id: suite._id as Id<"suites"> }).catch((err) => {
+            logError(err instanceof Error ? err.message : "Retry exploration generation failed", {
+              severity: "error",
+              context: { source: "SuiteStatusBanners.retry" },
+            });
+          });
+        }
         return;
       }
 

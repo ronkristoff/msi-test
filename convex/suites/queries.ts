@@ -271,11 +271,12 @@ export const getActiveTasks = query({
       )
       .collect();
 
-    const allRuns = await ctx.db
+    const workspaceRuns = await ctx.db
       .query("runs")
-      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", workspace._id))
+      .withIndex("by_workspace_id_and_status", (q) =>
+        q.eq("workspace_id", workspace._id).eq("status", "running"),
+      )
       .collect();
-    const workspaceRuns = allRuns.filter((r) => r.status === "running");
 
     const EXPLORING_STATUSES = ["pending", "capturing", "analyzing"] as const;
     const activeExplorations: { _id: string; url: string; project_id: string; status: string }[] = [];

@@ -13,9 +13,7 @@ export default function GeneratePrdTestsPage() {
   const router = useRouter();
   const { logError } = useErrorLogger();
   const projectId = asId(params.id, "projects");
-  const project = useQuery(api.projects.queries.getProject, {
-    project_id: projectId,
-  });
+  const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
   const user = useQuery(api.workspaces.queries.getCurrentUser);
   const createSuite = useMutation(api.suites.mutations.createSuite);
   const generatePrdTests = useAction(api.ai.generatePrdTests.generatePrdTests);
@@ -72,62 +70,46 @@ export default function GeneratePrdTestsPage() {
 
   return (
     <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
-        <div className="mb-5 pb-4 border-b border-[var(--border-soft)]">
-          <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)]">
-            Generate Tests from PRD
-          </h2>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            AI will generate Playwright tests from your product requirements document.
-          </p>
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 shadow-[var(--elev-raised)]">
+        <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)] mb-1">
+          Generate Tests from PRD
+        </h2>
+        <p className="text-sm text-[var(--muted)] mb-6">
+          AI will generate Playwright tests from your product requirements document.
+        </p>
+
+        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 mb-6 p-4 rounded-[var(--radius-sm)] bg-[var(--border-soft)]">
+          <span className="text-[11px] font-[var(--font-mono)] uppercase tracking-[0.05em] text-[var(--muted)] self-center">Project</span>
+          <div>
+            <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
+            <a href={project.app_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--accent)] hover:underline">
+              {project.app_url}
+            </a>
+          </div>
+
+          <span className="text-[11px] font-[var(--font-mono)] uppercase tracking-[0.05em] text-[var(--muted)] self-center">PRD</span>
+          <div>
+            {!hasPrd ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-[var(--muted)]">No PRD found</span>
+                <Link href={`/projects/${params.id}/settings`}>
+                  <Button variant="secondary" size="sm">Add PRD</Button>
+                </Link>
+              </div>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-pill)] bg-[var(--accent)]/10 text-[11px] font-medium text-[var(--accent)]">
+                {project.prd_text ? `Text PRD (${project.prd_text.length} chars)` : "File uploaded"}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Project
+        {hasPrd && project.prd_text && (
+          <div className="mb-6 p-3 rounded-[var(--radius-sm)] border border-[var(--border)] text-xs text-[var(--muted)] max-h-[200px] overflow-y-auto whitespace-pre-wrap font-[var(--font-mono)]">
+            {project.prd_text.slice(0, 500)}
+            {project.prd_text.length > 500 && "..."}
           </div>
-          <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
-          <a
-            href={project.app_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-[var(--accent)] hover:underline"
-          >
-            {project.app_url}
-          </a>
-        </div>
-
-        <div className="mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            PRD Source
-          </div>
-          {!hasPrd ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-[var(--muted)]">No PRD found</span>
-              <Link href={`/projects/${params.id}/settings`}>
-                <Button variant="secondary" size="sm">Add PRD</Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="text-sm text-[var(--fg)]">
-              {project.prd_text ? (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--border-soft)] text-[var(--fg)]">
-                  Text PRD ({project.prd_text.length} chars)
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--border-soft)] text-[var(--fg)]">
-                  File uploaded
-                </span>
-              )}
-            </div>
-          )}
-          {hasPrd && project.prd_text && (
-            <div className="mt-3 p-3 rounded-[var(--radius-sm)] bg-[var(--border-soft)] text-xs text-[var(--muted)] max-h-[200px] overflow-y-auto whitespace-pre-wrap font-[var(--font-mono)]">
-              {project.prd_text.slice(0, 500)}
-              {project.prd_text.length > 500 && "..."}
-            </div>
-          )}
-        </div>
+        )}
 
         <div className="flex gap-3">
           <Button onClick={handleGenerate} disabled={!hasPrd}>

@@ -47,17 +47,35 @@ type TestChatProps = {
   test: Doc<"tests">;
   latestFailure?: LatestFailure | null;
   onApply: (code?: string | null, steps?: ModifiedSteps) => void;
+  externalOpen?: boolean;
+  onExternalOpenConsumed?: () => void;
 };
 
 function getStorageKey(testId: string) {
   return `testchat_open_${testId}`;
 }
 
-export function TestChat({ test, latestFailure, onApply }: TestChatProps) {
-  const [isOpen, setIsOpen] = useState(() => {
+export function TestChat({ test, latestFailure, onApply, externalOpen, onExternalOpenConsumed }: TestChatProps) {
+  const [internalOpen, setInternalOpen] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(getStorageKey(test._id)) === "true";
   });
+
+  const isOpen = externalOpen ?? internalOpen;
+
+  const setIsOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setInternalOpen((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      localStorage.setItem(getStorageKey(test._id), String(resolved));
+      return resolved;
+    });
+  }, [test._id]);
+
+  useEffect(() => {
+    if (externalOpen) {
+      onExternalOpenConsumed?.();
+    }
+  }, [externalOpen, onExternalOpenConsumed]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);

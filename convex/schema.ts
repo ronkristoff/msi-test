@@ -83,6 +83,8 @@ export default defineSchema({
     locked_by: v.optional(v.string()),
     locked_at: v.optional(v.number()),
     locked_reason: v.optional(v.union(v.literal("running"), v.literal("generating"))),
+    exploration_id: v.optional(v.id("explorations")),
+    area: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
@@ -152,6 +154,7 @@ export default defineSchema({
     error_message: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
+    .index("by_workspace_id_and_status", ["workspace_id", "status"])
     .index("by_project_id", ["project_id"])
     .index("by_project_id_and_status", ["project_id", "status"])
     .index("by_suite_id", ["suite_id"])

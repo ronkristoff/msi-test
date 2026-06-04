@@ -20,14 +20,14 @@ export default function NewProjectPage() {
   const createProject = useMutation(api.projects.mutations.createProject);
   const { upload } = useFileUpload();
 
-  const [step, setStep] = useState<1 | 2>(1);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [prdMode, setPrdMode] = useState<PRDMode>("none");
   const [prdFile, setPrdFile] = useState<File | null>(null);
   const [prdText, setPrdText] = useState("");
+  const [showPrd, setShowPrd] = useState(false);
 
-  const step1Form = useForm<ProjectStep1Values>({
+  const form = useForm<ProjectStep1Values>({
     resolver: zodResolver(projectStep1Schema),
     defaultValues: { name: "", app_url: "" },
   });
@@ -39,17 +39,12 @@ export default function NewProjectPage() {
     return <div className="text-[var(--muted)] text-sm">No workspace found</div>;
   }
 
-  const handleStep1 = step1Form.handleSubmit(() => {
-    setError(null);
-    setStep(2);
-  });
-
-  const handleCreate = async () => {
+  const handleCreate = form.handleSubmit(async () => {
     setError(null);
     setCreating(true);
     try {
-      const name = step1Form.getValues("name");
-      const appUrl = normalizeAppUrl(step1Form.getValues("app_url"));
+      const name = form.getValues("name");
+      const appUrl = normalizeAppUrl(form.getValues("app_url"));
 
       let prdTextValue: string | undefined;
       let prdFileId: string | undefined;
@@ -74,54 +69,66 @@ export default function NewProjectPage() {
     } finally {
       setCreating(false);
     }
-  };
+  });
 
   return (
-    <div className="max-w-[560px] mx-auto">
+    <div className="max-w-[680px] mx-auto">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 shadow-[var(--elev-raised)]">
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border-soft)]">
-          <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-full text-xs font-bold grid place-items-center ${
-              step >= 1 ? "bg-[var(--accent)] text-[var(--accent-on)]" : "bg-[var(--border-soft)] text-[var(--muted)]"
-            }`}>1</span>
-            <span className="text-sm font-semibold text-[var(--fg)]">Project Details</span>
-          </div>
-          <div className="w-8 h-px bg-[var(--border)]" />
-          <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-full text-xs font-bold grid place-items-center ${
-              step >= 2 ? "bg-[var(--accent)] text-[var(--accent-on)]" : "bg-[var(--border-soft)] text-[var(--muted)]"
-            }`}>2</span>
-            <span className="text-sm font-semibold text-[var(--fg)]">PRD (Optional)</span>
-          </div>
-        </div>
+        <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)] mb-1">
+          New Project
+        </h2>
+        <p className="text-sm text-[var(--muted)] mb-6">
+          Define the application you want to test.
+        </p>
 
         {error && <Alert variant="error" className="mb-5">{error}</Alert>}
 
-        {step === 1 && (
-          <>
-            <Input
-              label="Project Name"
-              required
-              placeholder="My App"
-              error={step1Form.formState.errors.name?.message}
-              {...step1Form.register("name")}
-            />
-            <Input
-              label="App URL"
-              required
-              placeholder="example.com"
-              hint="https:// will be added automatically if missing"
-              error={step1Form.formState.errors.app_url?.message}
-              {...step1Form.register("app_url")}
-            />
-            <div className="flex justify-end">
-              <Button onClick={handleStep1}>Continue</Button>
-            </div>
-          </>
-        )}
+        <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+          <Input
+            label="Project Name"
+            required
+            placeholder="My App"
+            error={form.formState.errors.name?.message}
+            {...form.register("name")}
+          />
+          <Input
+            label="App URL"
+            required
+            placeholder="example.com"
+            hint="https:// will be added automatically if missing"
+            error={form.formState.errors.app_url?.message}
+            {...form.register("app_url")}
+          />
+        </div>
 
-        {step === 2 && (
-          <>
+        <div className="border-t border-[var(--border-soft)] mt-2 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowPrd(!showPrd)}
+            className="flex items-center gap-2 text-sm font-medium text-[var(--muted)] hover:text-[var(--fg)] transition-colors duration-[var(--motion-fast)] mb-4"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform duration-[var(--motion-fast)] ${showPrd ? "rotate-90" : ""}`}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            Add a PRD (optional)
+            {prdMode !== "none" && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-[var(--radius-pill)] bg-[var(--accent)]/10 text-[10px] font-medium text-[var(--accent)]">
+                Added
+              </span>
+            )}
+          </button>
+
+          {showPrd && (
             <PRDInput
               mode={prdMode}
               onModeChange={setPrdMode}
@@ -131,15 +138,17 @@ export default function NewProjectPage() {
               onFileChange={setPrdFile}
               allowNone
             />
+          )}
+        </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-[var(--border-soft)]">
-              <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleCreate} disabled={creating}>
-                {creating ? "Creating..." : "Create Project"}
-              </Button>
-            </div>
-          </>
-        )}
+        <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-soft)]">
+          <Button variant="secondary" onClick={() => router.push("/projects")}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? "Creating..." : "Create Project"}
+          </Button>
+        </div>
       </div>
     </div>
   );

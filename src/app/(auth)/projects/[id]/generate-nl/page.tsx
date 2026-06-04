@@ -16,9 +16,7 @@ export default function GenerateNlTestsPage() {
   const router = useRouter();
   const { logError } = useErrorLogger();
   const projectId = asId(params.id, "projects");
-  const project = useQuery(api.projects.queries.getProject, {
-    project_id: projectId,
-  });
+  const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
   const workspace = useQuery(api.workspaces.queries.getWorkspaceForUser);
   const user = useQuery(api.workspaces.queries.getCurrentUser);
   const createSuite = useMutation(api.suites.mutations.createSuite);
@@ -81,29 +79,22 @@ export default function GenerateNlTestsPage() {
 
   return (
     <div className="max-w-[720px]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-5 shadow-[var(--elev-raised)]">
-        <div className="mb-5 pb-4 border-b border-[var(--border-soft)]">
-          <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)]">
-            Generate Tests from Description
-          </h2>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Describe test scenarios in plain English and AI will generate Playwright tests.
-          </p>
-        </div>
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-6 shadow-[var(--elev-raised)]">
+        <h2 className="font-[var(--font-display)] text-xl font-bold text-[var(--fg)] mb-1">
+          Generate Tests from Description
+        </h2>
+        <p className="text-sm text-[var(--muted)] mb-6">
+          Describe test scenarios in plain English and AI will generate Playwright tests.
+        </p>
 
-        <div className="mb-5">
-          <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
-            Project
+        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 mb-6 p-4 rounded-[var(--radius-sm)] bg-[var(--border-soft)]">
+          <span className="text-[11px] font-[var(--font-mono)] uppercase tracking-[0.05em] text-[var(--muted)] self-center">Project</span>
+          <div>
+            <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
+            <a href={project.app_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--accent)] hover:underline">
+              {project.app_url}
+            </a>
           </div>
-          <div className="text-sm font-medium text-[var(--fg)]">{project.name}</div>
-          <a
-            href={project.app_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-[var(--accent)] hover:underline"
-          >
-            {project.app_url}
-          </a>
         </div>
 
         {!aiConfigReady ? (
@@ -118,15 +109,15 @@ export default function GenerateNlTestsPage() {
           </div>
         ) : (
           <>
-            <div className="mb-5">
-              <label className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2 block">
+            <div className="mb-6">
+              <label className="block font-[var(--font-mono)] text-[11px] uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
                 Test Description
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={"e.g., Test that login works with valid credentials\nTest that the shopping cart updates when adding items"}
-                className="w-full min-h-[160px] font-[var(--font-mono)] text-sm bg-[var(--bg)] text-[var(--fg)] border border-[var(--border)] rounded-[var(--radius-sm)] p-3 resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                className="w-full min-h-[160px] px-3 py-[9px] border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
               />
             </div>
 
