@@ -273,3 +273,4 @@ Default triage label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`
 ### Domain docs
 
 Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
+

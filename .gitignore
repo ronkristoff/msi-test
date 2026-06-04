@@ -37,6 +37,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent configs (local only)
+.claude/
+.opencode/
+.mcp.json
+opencode.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
