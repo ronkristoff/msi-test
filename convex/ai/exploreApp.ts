@@ -33,7 +33,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach()
 - Navigate to the application URL at the start using page.goto()
 - For SPA apps, after login navigate to internal pages by clicking navigation links (sidebar/menu items), NOT by using page.goto() for internal routes
-- After any page.goto() or navigation click, wait for the page to settle: await page.waitForLoadState('networkidle')
+- After page.goto() or navigation, do NOT use waitForLoadState('networkidle') or waitForLoadState('domcontentloaded') — these fire while loading skeletons are still visible and cause tests to pass on skeleton content
+- Instead, wait for a specific meaningful element that proves the page finished loading: await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible({ timeout: 15000 })
+- The element you wait for must be real content (heading, data, button) — never a skeleton or loading indicator
 - Use the EXACT suggested locators from the Interactive Elements section — do NOT invent or guess locators
 - Each interactive element shows a "→" line with the recommended Playwright locator. USE IT.
 - If no suggested locator exists, use semantic locators: getByRole, getByLabel, getByPlaceholder, getByTestId
@@ -45,6 +47,8 @@ const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.de
 - Do NOT assert toBeVisible() on elements the page context shows as hidden/aria-hidden unless your test triggers them to appear.
 - Do NOT assert on framework-internal elements (e.g. __next-route-announcer__, empty role="status" divs) — they are not user-facing.
 - Do NOT test keyboard shortcuts or ARIA live region content unless the page context explicitly shows them as interactive features with populated content.
+- Do NOT guard assertions with if (await locator.count() > 0) — this makes assertions optional and lets tests pass on skeleton content
+- Every test MUST have at least one unconditional assertion that would FAIL if only a loading skeleton were shown
 - Wrap the test in a single markdown code fence with language "typescript"`;
 
 function buildScenarioContext(
@@ -656,5 +660,48 @@ export const generateExplorationTestsForArea = action({
     }
 
     return { testIds, failed };
+  },
+});
+
+export const retryExplorationGeneration = action({
+  args: {
+    suite_id: v.id("suites"),
+  },
+  handler: async (ctx, args) => {
+    const suite = await ctx.runQuery(api.suites.queries.getSuite, {
+      suite_id: args.suite_id,
+    });
+    if (!suite) {
+      throw new ConvexError("Suite not found");
+    }
+
+    if (!suite.exploration_id) {
+      throw new ConvexError("Suite has no associated exploration");
+    }
+
+    if (!suite.area) {
+      throw new ConvexError("Suite has no area");
+    }
+
+    const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
+      exploration_id: suite.exploration_id as Id<"explorations">,
+    });
+    if (!exploration) {
+      throw new ConvexError("Exploration not found");
+    }
+
+    const allScenarios = exploration.proposed_scenarios ?? [];
+    const areaScenarios = allScenarios.filter((s: { area: string }) => s.area === suite.area);
+
+    if (areaScenarios.length === 0) {
+      throw new ConvexError(`No scenarios found for area "${suite.area}"`);
+    }
+
+    await ctx.runAction(api.ai.exploreApp.generateExplorationTestsForArea, {
+      exploration_id: suite.exploration_id as Id<"explorations">,
+      scenarios: areaScenarios,
+      suite_id: args.suite_id,
+      area: suite.area,
+    });
   },
 });

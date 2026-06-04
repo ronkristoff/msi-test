@@ -141,6 +141,7 @@ For ALL errors:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Prefer toContainText() over toHaveText() for partial matches — it's more resilient
 - Never use waitForTimeout(), arbitrary sleeps, or waitForLoadState('networkidle')
+- Do NOT use waitForLoadState('domcontentloaded') — it fires while loading skeletons are still visible
 - Wrap the test in a single markdown code fence with language "typescript"
 
 ${locatorInstruction}Only use locators for elements that you can verify exist from the test code, the page context (if provided), or the error message. Do NOT invent or guess locators. If a step cannot be verified, remove that assertion rather than guessing.
@@ -150,7 +151,7 @@ For text/value mismatch errors:
 
 For TimeoutError (element not found within timeout):
 - Simplify the test to only assert what the existing code structure suggests should be present
-- After login or any navigation, add await page.waitForLoadState('domcontentloaded') before interacting with new content
+- After login or any navigation, wait for real content instead of using waitForLoadState: await expect(page.getByRole('heading', { name: /pattern/ })).toBeVisible({ timeout: 15000 })
 - After page.goto(), add await expect(locator).toBeVisible({ timeout: 15000 }) before clicking anything
 
 For assertion failures (visible/enabled/text mismatch):

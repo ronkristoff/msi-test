@@ -46,6 +46,13 @@ Assertion rules:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL(), toBeEnabled()
 - Never use generic expect() for DOM state — always use expect(locator).matcher()
 - Never use waitForTimeout() or arbitrary sleeps — Playwright auto-waits for actionability
+- Do NOT use waitForLoadState() — it fires while loading skeletons are still visible. Wait for real content instead.
+
+Assertion anti-patterns — NEVER do these:
+- Do NOT guard assertions with if (await locator.count() > 0) — this makes assertions optional so the test passes even when the page shows only skeletons
+- Do NOT use conditional patterns like "if visible, assert visible" — every assertion must be unconditional
+- Do NOT assert on skeleton/loading elements — only assert on real content that appears after data loads
+- Every test MUST have at least one unconditional assertion that would FAIL if only a skeleton were shown
 
 URL assertion rules:
 - Use flexible URL matching: toHaveURL(/settings/) NOT toHaveURL(/\/settings\//) — prefer substring patterns over path-segment patterns
@@ -58,9 +65,11 @@ Element visibility rules:
 - Do NOT generate tests that verify ARIA live regions contain specific text unless the page context shows them populated with that text
 - Do NOT test keyboard shortcuts unless the page context explicitly documents them as interactive features
 
-Navigation rules:
+Navigation and loading rules:
 - For SPA apps, after login navigate to internal pages by clicking navigation links (sidebar/menu items), NOT by using page.goto() for internal routes
-- After any page.goto() or navigation click, wait for the page to settle: await page.waitForLoadState('networkidle')
+- After page.goto() or navigation, do NOT use waitForLoadState('networkidle') or waitForLoadState('domcontentloaded') — these fire while loading skeletons are still visible and cause tests to pass on skeleton content
+- Instead, wait for a specific meaningful element that proves the page has finished loading: await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible({ timeout: 15000 })
+- The element you wait for should be real content (heading, data, button) — never a skeleton or loading indicator
 
 Structure rules:
 - Always use @playwright/test imports
@@ -259,8 +268,16 @@ Locator strategy (priority order):
 Assertion rules:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
+- Do NOT use waitForLoadState('networkidle') or waitForLoadState('domcontentloaded') — these fire while loading skeletons are still visible
+- After page.goto() or navigation, wait for a specific real element: await expect(page.getByRole('heading', { name: /pattern/ })).toBeVisible({ timeout: 15000 })
 - URL assertions — use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\/settings\//). Prefer asserting on page content over URLs after navigation clicks.
 - Element visibility — do NOT assert toBeVisible() on elements the page context shows as hidden unless your test interaction triggers them. Do NOT assert on framework internals (__next-route-announcer__, empty role="status" elements). Do NOT test keyboard shortcuts unless documented in context.
+
+Assertion anti-patterns — NEVER do these:
+- Do NOT guard assertions with if (await locator.count() > 0) — this makes assertions optional and lets tests pass on skeleton content
+- Do NOT use conditional patterns like "if visible, assert visible" — every assertion must be unconditional
+- Do NOT assert on skeleton/loading elements — only assert on real content that appears after data loads
+- Every test MUST have at least one unconditional assertion that would FAIL if only a loading skeleton were shown
 
 CRITICAL — Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.
 
