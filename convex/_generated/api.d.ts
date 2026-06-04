@@ -15,6 +15,7 @@ import type * as ai_browserClient from "../ai/browserClient.js";
 import type * as ai_diff from "../ai/diff.js";
 import type * as ai_errors from "../ai/errors.js";
 import type * as ai_exploreApp from "../ai/exploreApp.js";
+import type * as ai_feedbackDiscovery from "../ai/feedbackDiscovery.js";
 import type * as ai_formatElements from "../ai/formatElements.js";
 import type * as ai_formatPages from "../ai/formatPages.js";
 import type * as ai_generateNlTests from "../ai/generateNlTests.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   "ai/diff": typeof ai_diff;
   "ai/errors": typeof ai_errors;
   "ai/exploreApp": typeof ai_exploreApp;
+  "ai/feedbackDiscovery": typeof ai_feedbackDiscovery;
   "ai/formatElements": typeof ai_formatElements;
   "ai/formatPages": typeof ai_formatPages;
   "ai/generateNlTests": typeof ai_generateNlTests;

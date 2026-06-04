@@ -14,6 +14,9 @@ import { formatCapturedPagesForPrompt, type FormattablePage } from "./formatPage
 import { type SnapshotData } from "./snapshotFormatter";
 import { buildSnapshotContext } from "./workflowShared";
 import { getWorkspaceModel } from "./model";
+import { shouldDiscoverFeedback, buildFeedbackActionFromSnapshot, buildFeedbackPromptContext } from "./feedbackDiscovery";
+import type { FormattableElement } from "./formatElements";
+import type { FeedbackDiscoveryResult } from "./browserClient";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 
@@ -101,7 +104,6 @@ async function resolveExplorationContext(ctx: ActionCtx, explorationId: Id<"expl
     project_id: exploration.project_id,
   });
 
-  const authContext = buildAuthPromptContext(project);
   const navMenuContext = buildNavMenuContext(exploration.nav_menu);
   const pagesContextSummary = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 3000, "summary");
   const pagesContextDetailed = formatCapturedPagesForPrompt(exploration.captured_pages ?? [], 6000, "detailed");
@@ -109,7 +111,7 @@ async function resolveExplorationContext(ctx: ActionCtx, explorationId: Id<"expl
     ? `\nPRD / Product Requirements:\n${project.prd_text.slice(0, PRD_ANALYSIS_LIMIT)}\n`
     : "";
 
-  return { exploration, aiConfig, project, authContext, navMenuContext, pagesContextSummary, pagesContextDetailed, prdSection, capturedPages: exploration.captured_pages ?? [] };
+  return { exploration, aiConfig, project, navMenuContext, pagesContextSummary, pagesContextDetailed, prdSection, capturedPages: exploration.captured_pages ?? [] };
 }
 
 function buildFilteredPagesContext(
@@ -123,6 +125,48 @@ function buildFilteredPagesContext(
   const urlSet = new Set(relevantUrls);
   const filtered = capturedPages.filter((p) => urlSet.has(p.url));
   return formatCapturedPagesForPrompt(filtered.length > 0 ? filtered : capturedPages, budget, "detailed");
+}
+
+function getInteractiveElementsForUrl(
+  capturedPages: FormattablePage[],
+  url: string,
+): FormattableElement[] | undefined {
+  const page = capturedPages.find(
+    (p) => p.url === url || p.url.replace(/\/$/, "") === url.replace(/\/$/, ""),
+  );
+  return page?.interactive_elements;
+}
+
+async function runFeedbackDiscovery(
+  ctx: ActionCtx,
+  scenario: { name: string; flow_summary?: string; relevant_page_urls?: string[] },
+  capturedPages: FormattablePage[],
+  projectId: Id<"projects">,
+  workspaceId: Id<"workspaces">,
+  callerLabel: string,
+): Promise<FeedbackDiscoveryResult | null> {
+  if (!shouldDiscoverFeedback(scenario)) return null;
+
+  const elements = scenario.relevant_page_urls?.[0]
+    ? getInteractiveElementsForUrl(capturedPages, scenario.relevant_page_urls[0])
+    : undefined;
+  const feedbackAction = buildFeedbackActionFromSnapshot(scenario, elements);
+  if (!feedbackAction || !scenario.relevant_page_urls?.[0]) return null;
+
+  try {
+    return await ctx.runAction(
+      internal.ai.feedbackDiscovery.discoverFeedbackAction,
+      {
+        url: scenario.relevant_page_urls[0],
+        project_id: projectId,
+        workspace_id: workspaceId,
+        action: feedbackAction,
+      },
+    ) as FeedbackDiscoveryResult | null;
+  } catch (err) {
+    console.error(`[${callerLabel}] Feedback discovery failed for "${scenario.name}":`, err);
+    return null;
+  }
 }
 
 function mergeLiveAndExplorationContext(
@@ -367,8 +411,8 @@ export const generateExplorationTests = action({
       throw new ConvexError("No scenarios selected");
     }
 
-    const { exploration, aiConfig, authContext, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
-    console.log(`[generateExplorationTests] project auth: mode=${(resolved.project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(resolved.project as Record<string, unknown> | null)?.explore_username ?? "(none)"}, authContext length=${authContext.length}`);
+    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    console.log(`[generateExplorationTests] project auth: mode=${(project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(project as Record<string, unknown> | null)?.explore_username ?? "(none)"}`);
 
     const flowContextSection = args.flow_context
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
@@ -380,10 +424,12 @@ export const generateExplorationTests = action({
     const BATCH_SIZE = 5;
     const totalScenarios = args.selected_scenarios.length;
 
-    const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid", liveSnapshots: SnapshotData[]) => {
+    const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid", liveSnapshots: SnapshotData[], feedbackResult: FeedbackDiscoveryResult | null) => {
+      const authContext = buildAuthPromptContext(project, scenario);
       const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
       const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
-      const context = buildScenarioContext(exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection);
+      const feedbackContext = buildFeedbackPromptContext(feedbackResult, scenario.flow_summary || scenario.name);
+      const context = buildScenarioContext(exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection) + feedbackContext;
       if (kind === "playwright") {
         return `Generate a single Playwright test for the following scenario.\n\n${context}\nGenerate a single, self-contained Playwright test. Rules:\n${PLAYWRIGHT_TEST_RULES}`;
       }
@@ -416,6 +462,12 @@ export const generateExplorationTests = action({
           );
           const hasSnapshots = liveSnapshots.length > 0;
 
+          const feedbackResult = await runFeedbackDiscovery(
+            ctx, scenario, capturedPages,
+            exploration.project_id, exploration.workspace_id,
+            "generateExplorationTests",
+          );
+
           const model = (await import("./model")).getWorkspaceModel(aiConfig);
 
           const [playwrightResult, hybridResult] = await withTimeout(
@@ -427,7 +479,7 @@ export const generateExplorationTests = action({
                 });
                 return thread.generateText({
                   maxRetries: aiMaxRetries,
-                  prompt: promptTemplate(scenario, "playwright", liveSnapshots),
+                  prompt: promptTemplate(scenario, "playwright", liveSnapshots, feedbackResult),
                 });
               })(),
               (async () => {
@@ -438,7 +490,7 @@ export const generateExplorationTests = action({
                   });
                   return await thread.generateText({
                     maxRetries: aiMaxRetries,
-                    prompt: promptTemplate(scenario, "hybrid", liveSnapshots),
+                    prompt: promptTemplate(scenario, "hybrid", liveSnapshots, feedbackResult),
                   });
                 } catch (err) {
                   console.error(`[generateExplorationTests] Hybrid step generation failed for "${scenario.name}":`, err);
@@ -567,7 +619,7 @@ export const generateExplorationTestsForArea = action({
       return { testIds: [] as string[], failed: 0 };
     }
 
-    const { exploration, aiConfig, authContext, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
     const flowContextSection = args.flow_context
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
       : "";
@@ -606,17 +658,25 @@ export const generateExplorationTestsForArea = action({
         );
         const hasSnapshots = liveSnapshots.length > 0;
 
+        const feedbackResult = await runFeedbackDiscovery(
+          ctx, scenario, capturedPages,
+          exploration.project_id, exploration.workspace_id,
+          "generateExplorationTestsForArea",
+        );
+
         const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
         const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
+        const feedbackContext = buildFeedbackPromptContext(feedbackResult, scenario.flow_summary || scenario.name);
 
         const agent = createTestGenerationAgent(model);
         const { thread } = await agent.createThread(ctx, {
           title: `Test — ${scenario.name}`,
         });
 
+        const authContext = buildAuthPromptContext(project, scenario);
         const prompt = buildPlaywrightTestPrompt(
           exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection,
-        );
+        ) + feedbackContext;
 
         await aiDelay();
         const result = await withTimeout(

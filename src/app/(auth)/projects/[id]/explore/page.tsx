@@ -239,21 +239,21 @@ export default function ExplorePage() {
     setError(null);
     try {
       const areas = [...new Set(selected.map((s: Scenario) => s.area))];
+      const resolvedExplorationId = asId(effectiveExplorationId!, "explorations");
       const suiteResults = await createSuitesForExploration({
         project_id: projectId,
         areas,
         source_type: "url_exploration",
         triggered_by: user._id,
-        exploration_id: explorationId,
+        exploration_id: resolvedExplorationId,
       });
 
       router.push(`/projects/${params.id}`);
 
-      const explorationId = asId(effectiveExplorationId!, "explorations");
       for (const { area, suite_id } of suiteResults) {
         const areaScenarios = selected.filter((s: Scenario) => s.area === area);
         generateTestsForArea({
-          exploration_id: explorationId,
+          exploration_id: resolvedExplorationId,
           scenarios: areaScenarios,
           suite_id,
           area,
@@ -266,7 +266,7 @@ export default function ExplorePage() {
         });
       }
 
-      await markExplorationCompleted({ exploration_id: explorationId });
+      await markExplorationCompleted({ exploration_id: resolvedExplorationId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create suites";
       setError(msg);

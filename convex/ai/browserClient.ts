@@ -19,6 +19,47 @@ export type ValidateTestResult = {
   snapshot_at_failure?: string;
 };
 
+export type FillAndSubmitRequest = {
+  type: "fill_and_submit";
+  fields: Array<{ label: string; value: string }>;
+  submit_label: string;
+};
+
+export type ClickRequest = {
+  type: "click";
+  click_label: string;
+};
+
+export type TriggerErrorRequest = {
+  type: "trigger_error";
+  intent: string;
+};
+
+export type FeedbackActionRequest = FillAndSubmitRequest | ClickRequest | TriggerErrorRequest;
+
+export type FeedbackDiscoveryRequest = {
+  url: string;
+  project_id: string;
+  workspace_id: string;
+  action: FeedbackActionRequest;
+};
+
+export type FeedbackDiscoveryResult = {
+  feedback: Array<{
+    type: string;
+    message: string;
+    detection_strategy: string;
+    confidence: string;
+    selector: string;
+    suggested_locator: string;
+    suggested_assertion: string;
+    element_html: string;
+  }>;
+  before_url: string;
+  after_url: string;
+  url_changed: boolean;
+};
+
 const TIMEOUT_MS = 30_000;
 
 export function getRunnerUrl(envVar: string | undefined): string | null {
@@ -64,3 +105,9 @@ export const validateTestFetch = (
   runnerSecret: string,
   req: ValidateTestRequest,
 ) => runnerFetch<ValidateTestResult>(runnerUrl, runnerSecret, "/validate-test", req);
+
+export const feedbackDiscoveryFetch = (
+  runnerUrl: string,
+  runnerSecret: string,
+  req: FeedbackDiscoveryRequest,
+) => runnerFetch<FeedbackDiscoveryResult>(runnerUrl, runnerSecret, "/discover-feedback", req);

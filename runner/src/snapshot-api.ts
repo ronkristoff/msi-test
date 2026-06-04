@@ -6,6 +6,7 @@ import { spawnPlaywright } from "./playwright-spawn";
 import { createTempRunDir, cleanupDir } from "./config";
 import type { StagehandInstance } from "./stagehand";
 import type { AiConfig } from "../../convex/ai/model";
+import { discoverFeedback, type FeedbackDiscoveryResult, type FeedbackAction } from "./feedback-discovery";
 
 export interface SnapshotApiDeps {
   runnerSecret: string;
@@ -35,6 +36,19 @@ const validateTestRequestSchema = z.object({
   url: z.string().min(1),
   workspace_id: z.string().min(1),
   playwright_code: z.string().min(1),
+});
+
+const discoverFeedbackRequestSchema = z.object({
+  project_id: z.string().min(1),
+  url: z.string().min(1),
+  workspace_id: z.string().min(1),
+  action: z.object({
+    type: z.enum(["fill_and_submit", "click", "trigger_error"]),
+    fields: z.array(z.object({ label: z.string(), value: z.string() })).optional(),
+    submit_label: z.string().optional(),
+    click_label: z.string().optional(),
+    intent: z.string().optional(),
+  }),
 });
 
 class SessionManager {
@@ -90,6 +104,7 @@ export function createSnapshotApiServer(deps: SnapshotApiDeps): http.Server {
   const routes: Record<string, (res: http.ServerResponse, body: unknown) => Promise<void>> = {
     "/snapshot": (res, body) => handleSnapshot(res, body, deps, sessionManager),
     "/validate-test": (res, body) => handleValidateTest(res, body, deps),
+    "/discover-feedback": (res, body) => handleDiscoverFeedback(res, body, deps, sessionManager),
   };
 
   const server = http.createServer(async (req, res) => {
@@ -191,6 +206,52 @@ async function handleValidateTest(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sendJson(res, 500, { error: `Validation failed: ${message}` });
+  }
+}
+
+async function handleDiscoverFeedback(
+  res: http.ServerResponse,
+  rawBody: unknown,
+  deps: SnapshotApiDeps,
+  sessionManager: SessionManager,
+) {
+  const parsed = discoverFeedbackRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    sendJson(res, 400, { error: "Invalid request body", details: parsed.error.issues });
+    return;
+  }
+
+  const { project_id, url, workspace_id, action } = parsed.data;
+
+  try {
+    const stagehand = await sessionManager.getOrCreate(project_id, workspace_id, deps);
+    const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
+
+    await page.goto(url, { timeout: 30000 });
+
+    const feedbackAction: FeedbackAction =
+      action.type === "fill_and_submit"
+        ? {
+            type: "fill_and_submit",
+            fields: action.fields ?? [],
+            submit_label: action.submit_label ?? "submit",
+          }
+        : action.type === "trigger_error"
+          ? {
+              type: "trigger_error",
+              intent: action.intent ?? "generic_error",
+            }
+          : {
+              type: "click",
+              click_label: action.click_label ?? "submit",
+            };
+
+    const result: FeedbackDiscoveryResult = await discoverFeedback(page, feedbackAction);
+
+    sendJson(res, 200, result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    sendJson(res, 502, { error: `Feedback discovery failed: ${message}` });
   }
 }
 

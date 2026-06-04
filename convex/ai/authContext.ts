@@ -5,7 +5,44 @@ interface AuthFields {
   explore_password?: string;
 }
 
-export function buildAuthPromptContext(project: AuthFields | null): string {
+interface ScenarioHint {
+  name?: string;
+  description?: string;
+  flow_summary?: string;
+  relevant_page_urls?: string[];
+}
+
+const PUBLIC_PAGE_PATTERNS = [
+  /sign[\s-]?up/i,
+  /register/i,
+  /create.?account/i,
+  /forgot.?password/i,
+  /reset.?password/i,
+  /verify.?email/i,
+  /confirm.?email/i,
+  /invite\/accept/i,
+  /unauth/i,
+];
+
+function isPublicScenario(scenario: ScenarioHint | undefined): boolean {
+  if (!scenario) return false;
+
+  const texts = [
+    scenario.name,
+    scenario.description,
+    scenario.flow_summary,
+    ...(scenario.relevant_page_urls ?? []),
+  ].filter(Boolean);
+
+  return texts.some((text) =>
+    PUBLIC_PAGE_PATTERNS.some((pattern) => pattern.test(text!)),
+  );
+}
+
+export function buildAuthPromptContext(
+  project: AuthFields | null,
+  scenario?: ScenarioHint,
+): string {
   if (!project) {
     return "";
   }
@@ -19,25 +56,30 @@ export function buildAuthPromptContext(project: AuthFields | null): string {
       return "\nNote: The application requires form-based login but no credentials are configured. Generate tests for public pages only unless the test description mentions login.";
     }
 
+    if (isPublicScenario(scenario)) {
+      return `
+
+Note: This application requires authentication for most pages, but THIS scenario tests a public page (sign-up, registration, or password reset). Do NOT perform login steps — navigate directly to the target URL. Authentication is not needed and would interfere with the test.`;
+    }
+
     const loginUrl = project.explore_login_url
       ? `Login page URL: ${project.explore_login_url}`
       : "Login page URL: same as the application URL (navigate there to find the login form)";
 
     return `
 
-CRITICAL — This application requires authentication. EVERY test MUST perform login before interacting with the app.
+CRITICAL — This application requires authentication. This test MUST perform login before interacting with the app.
 
 Authentication details:
 ${loginUrl}
 Username/Email: "${project.explore_username}"
 Password: "${project.explore_password ?? ""}"
 
-You MUST include these login steps at the beginning of EVERY test, right after page.goto():
+You MUST include these login steps at the beginning of this test, right after page.goto():
 
   await page.locator('input[type="email"], input[type="text"][name*="email" i], input[name*="user" i], input[autocomplete="email"]').first().fill("${project.explore_username}");
   await page.locator('input[type="password"]').first().fill("${project.explore_password ?? ""}");
   await page.getByRole("button", { name: /sign.?in|log.?in|submit/i }).click();
-  await page.waitForLoadState("networkidle", { timeout: 10000 });
   await expect(page).not.toHaveURL(/\\/(login|sign-in|signin)/);
 
 After login, navigate to internal pages by clicking navigation links (sidebar, menu items) — do NOT use page.goto() for internal SPA routes. Use page.goto() only for the initial page load.
