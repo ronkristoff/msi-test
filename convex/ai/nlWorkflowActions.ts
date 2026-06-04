@@ -8,6 +8,7 @@ import { buildAuthPromptContext } from "./authContext";
 import { type SnapshotData } from "./snapshotFormatter";
 import { buildSnapshotContext, buildRetryContext } from "./workflowShared";
 import { getWorkspaceModel } from "./model";
+import { aiMaxRetries } from "./aiRateLimit";
 
 export const generateTestsAction = internalAction({
   args: {
@@ -56,6 +57,7 @@ export const generateTestsAction = internalAction({
     const agent = createTestGenerationAgent(getWorkspaceModel(aiConfig));
     const { thread } = await agent.createThread(ctx, { title: `NL Generation — ${project.name}` });
     const result = await thread.generateText({
+      maxRetries: aiMaxRetries,
       prompt: buildNlGenerationPrompt({ ...promptOpts, retryContext }),
     });
 
@@ -65,6 +67,7 @@ export const generateTestsAction = internalAction({
       const retryAgent = createTestGenerationAgent(getWorkspaceModel(aiConfig));
       const { thread: retryThread } = await retryAgent.createThread(ctx, { title: `NL Generation Retry — ${project.name}` });
       const retryResult = await retryThread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: buildNlFormatRetryPrompt(promptOpts),
       });
       testBlocks = extractMultipleTests(retryResult.text);

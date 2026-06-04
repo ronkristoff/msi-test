@@ -6,6 +6,7 @@ import { createFailureAnalysisAgent } from "../ai/agents";
 import { getWorkspaceModel } from "../ai/model";
 import type { AiConfig } from "../ai/model";
 import { extractJsonFromAiResponse } from "../ai/parse";
+import { aiMaxRetries } from "../ai/aiRateLimit";
 import type { Id } from "../_generated/dataModel";
 import { z } from "zod/v3";
 
@@ -73,7 +74,7 @@ Respond with ONLY a JSON array, no markdown fences.`;
 
     try {
       const { thread } = await agent.createThread(ctx, {});
-      const message = await thread.generateText({ prompt });
+      const message = await thread.generateText({ maxRetries: aiMaxRetries, prompt });
       const text: string = message.text ?? "";
 
       const clusters: MapCluster[] | null = extractJsonFromAiResponse(

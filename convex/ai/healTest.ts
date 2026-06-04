@@ -8,9 +8,54 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createHealAgent, extractPlaywrightCode, deriveTestName } from "./agents";
 import { classifyAiError } from "./errors";
+import { aiMaxRetries } from "./aiRateLimit";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
-import { resolveTestContext, resolvePageContext } from "./resolveContext";
+import { resolveTestContext, resolvePageContext, extractTargetUrl } from "./resolveContext";
+import { buildSnapshotContext } from "./workflowShared";
+import type { SnapshotData } from "./snapshotFormatter";
+
+type HealPageContext = {
+  contextSection: string;
+  locatorInstruction: string;
+};
+
+async function resolveHealPageContext(
+  ctx: ActionCtx,
+  testCode: string,
+  projectId: Id<"projects">,
+  workspaceId: Id<"workspaces">,
+): Promise<HealPageContext> {
+  const empty: HealPageContext = { contextSection: "", locatorInstruction: "" };
+
+  const targetUrl = extractTargetUrl(testCode);
+  if (targetUrl) {
+    try {
+      const snapshot: SnapshotData | null = await ctx.runAction(
+        internal.ai.snapshotAction.getLiveSnapshot,
+        { url: targetUrl, project_id: projectId, workspace_id: workspaceId },
+      );
+      if (snapshot) {
+        return {
+          contextSection: `\nCurrent page state (captured just now — prefer these locators):${buildSnapshotContext([snapshot])}`,
+          locatorInstruction: "CRITICAL — A live DOM snapshot of the target page is provided above. Use the locators, roles, and text from that snapshot. They are current and accurate. Do NOT guess or invent locators.\n\n",
+        };
+      }
+    } catch (err) {
+      console.warn("[healTest] Live snapshot failed, falling back to exploration data:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  const pagesContext = await resolvePageContext(ctx, projectId, testCode || undefined);
+  if (pagesContext) {
+    return {
+      contextSection: `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}`,
+      locatorInstruction: "",
+    };
+  }
+
+  return empty;
+}
 
 export const healTest = action({
   args: {
@@ -52,7 +97,10 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
       errorMessage = [failure.error_message, failure.step_errors].filter(Boolean).join("\n");
     }
 
-    const pagesContext = await resolvePageContext(ctx, suite.project_id, test.playwright_code ?? undefined);
+    const testCode = test.playwright_code ?? "";
+    const { contextSection, locatorInstruction } = await resolveHealPageContext(
+      ctx, testCode, suite.project_id, project.workspace_id,
+    );
 
     let responseText = "";
     try {
@@ -63,6 +111,7 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
         title: `AI Heal — ${test.name}`,
       });
       const result = await thread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: `Fix this Playwright test that failed during execution.
 
 Project: ${project.name}
@@ -73,12 +122,12 @@ Test name: ${test.name}
 
 Failing test code:
 \`\`\`typescript
-${test.playwright_code}
+${testCode}
 \`\`\`
 
 Error from test run:
 ${errorMessage}
-${pagesContext ? `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}` : ""}
+${contextSection}
 ${args.user_hint ? `\nUser feedback about this test failure:\n${args.user_hint}` : ""}
 
 Fix the test based on the error. Rules:
@@ -94,7 +143,7 @@ For ALL errors:
 - Never use waitForTimeout(), arbitrary sleeps, or waitForLoadState('networkidle')
 - Wrap the test in a single markdown code fence with language "typescript"
 
-CRITICAL — Only use locators for elements that you can verify exist from the test code, the page context (if provided), or the error message. Do NOT invent or guess locators. If a step cannot be verified, remove that assertion rather than guessing.
+${locatorInstruction}Only use locators for elements that you can verify exist from the test code, the page context (if provided), or the error message. Do NOT invent or guess locators. If a step cannot be verified, remove that assertion rather than guessing.
 
 For text/value mismatch errors:
 - Use the RECEIVED value (not the expected one) — the received value is what the page actually shows

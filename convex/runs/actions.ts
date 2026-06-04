@@ -6,6 +6,7 @@ import { internal } from "../_generated/api";
 import { createFailureAnalysisAgent, failureAnalysisSchema } from "../ai/agents";
 import { getWorkspaceModel } from "../ai/model";
 import { extractJsonFromAiResponse } from "../ai/parse";
+import { aiMaxRetries } from "../ai/aiRateLimit";
 import type { Id } from "../_generated/dataModel";
 import type { AiConfig } from "../ai/model";
 import { validateRunnerSecret } from "../lib/runner";
@@ -159,7 +160,7 @@ ${steps}
 Error: ${result.error_message ?? "See step errors above"}`;
 
         const { thread } = await agent.createThread(ctx, {});
-        const message = await thread.generateText({ prompt });
+        const message = await thread.generateText({ maxRetries: aiMaxRetries, prompt });
         const text = message.text ?? "";
 
         const parsed = extractJsonFromAiResponse(text, failureAnalysisSchema);

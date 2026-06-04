@@ -7,6 +7,7 @@ import { internal, api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createHealAgent, extractPlaywrightCode, deriveTestName } from "./agents";
 import { createAiError, classifyAiError } from "./errors";
+import { aiMaxRetries } from "./aiRateLimit";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
 import { ConvexError } from "convex/values";
@@ -48,6 +49,7 @@ async function regenerateTestInner(ctx: ActionCtx, args: { test_id: Id<"tests"> 
         title: `Regenerate — ${test.name}`,
       });
       const result = await thread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: `Regenerate the following Playwright test with improved code.
 
 Project: ${project.name}

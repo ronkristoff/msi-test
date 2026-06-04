@@ -9,6 +9,7 @@
  */
 
 import type * as ai_agents from "../ai/agents.js";
+import type * as ai_aiRateLimit from "../ai/aiRateLimit.js";
 import type * as ai_authContext from "../ai/authContext.js";
 import type * as ai_browserClient from "../ai/browserClient.js";
 import type * as ai_diff from "../ai/diff.js";
@@ -91,6 +92,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "ai/agents": typeof ai_agents;
+  "ai/aiRateLimit": typeof ai_aiRateLimit;
   "ai/authContext": typeof ai_authContext;
   "ai/browserClient": typeof ai_browserClient;
   "ai/diff": typeof ai_diff;

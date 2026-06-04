@@ -14,7 +14,26 @@ function getRunnerConfig(): { url: string; secret: string } | null {
   return { url, secret: process.env.RUNNER_SECRET ?? "" };
 }
 
-const snapshotCache = new ActionCache(components.actionCache, {
+export const fetchSnapshotForCache = internalAction({
+  args: {
+    url: v.string(),
+    project_id: v.string(),
+    workspace_id: v.string(),
+  },
+  handler: async (_ctx, args) => {
+    const config = getRunnerConfig();
+    if (!config) return null;
+
+    return snapshotFetch(config.url, config.secret, {
+      url: args.url,
+      project_id: args.project_id,
+      workspace_id: args.workspace_id,
+    });
+  },
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const snapshotCache: any = new ActionCache(components.actionCache, {
   action: internal.ai.snapshotAction.fetchSnapshotForCache,
   name: "liveSnapshot",
   ttl: CACHE_TTL_MS,
@@ -47,24 +66,6 @@ export const getLiveSnapshot = internalAction({
     }
 
     return snapshotCache.fetch(ctx, {
-      url: args.url,
-      project_id: args.project_id,
-      workspace_id: args.workspace_id,
-    });
-  },
-});
-
-export const fetchSnapshotForCache = internalAction({
-  args: {
-    url: v.string(),
-    project_id: v.string(),
-    workspace_id: v.string(),
-  },
-  handler: async (_ctx, args) => {
-    const config = getRunnerConfig();
-    if (!config) return null;
-
-    return snapshotFetch(config.url, config.secret, {
       url: args.url,
       project_id: args.project_id,
       workspace_id: args.workspace_id,

@@ -47,6 +47,17 @@ Assertion rules:
 - Never use generic expect() for DOM state — always use expect(locator).matcher()
 - Never use waitForTimeout() or arbitrary sleeps — Playwright auto-waits for actionability
 
+URL assertion rules:
+- Use flexible URL matching: toHaveURL(/settings/) NOT toHaveURL(/\/settings\//) — prefer substring patterns over path-segment patterns
+- Do NOT assert exact URL paths unless the page context shows the exact route
+- After clicking a navigation link, prefer asserting on visible page content (heading, key element) over the URL
+
+Element visibility rules:
+- Before asserting toBeVisible(), check if the page context shows the element as hidden or aria-hidden. If so, do NOT assert visibility unless your test triggers the element to appear
+- Do NOT assert on framework-internal elements (id containing "__next", role="status" with empty content, __next-route-announcer__) — these are not user-facing
+- Do NOT generate tests that verify ARIA live regions contain specific text unless the page context shows them populated with that text
+- Do NOT test keyboard shortcuts unless the page context explicitly documents them as interactive features
+
 Navigation rules:
 - For SPA apps, after login navigate to internal pages by clicking navigation links (sidebar/menu items), NOT by using page.goto() for internal routes
 - After any page.goto() or navigation click, wait for the page to settle: await page.waitForLoadState('networkidle')
@@ -248,6 +259,8 @@ Locator strategy (priority order):
 Assertion rules:
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
+- URL assertions — use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\/settings\//). Prefer asserting on page content over URLs after navigation clicks.
+- Element visibility — do NOT assert toBeVisible() on elements the page context shows as hidden unless your test interaction triggers them. Do NOT assert on framework internals (__next-route-announcer__, empty role="status" elements). Do NOT test keyboard shortcuts unless documented in context.
 
 CRITICAL — Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.
 

@@ -8,6 +8,7 @@ import { buildPrdGenerationPrompt, buildPrdFormatRetryPrompt, createTestGenerati
 import { buildAuthPromptContext } from "./authContext";
 import { type SnapshotData } from "./snapshotFormatter";
 import { buildSnapshotContext, buildRetryContext } from "./workflowShared";
+import { aiMaxRetries } from "./aiRateLimit";
 import { getWorkspaceModel } from "./model";
 
 export const readPrdFile = internalAction({
@@ -67,7 +68,7 @@ export const generateTestsAction = internalAction({
 
     const agent = createTestGenerationAgent(getWorkspaceModel(aiConfig));
     const { thread } = await agent.createThread(ctx, { title: `PRD Generation — ${project.name}` });
-    const result = await thread.generateText({ prompt });
+    const result = await thread.generateText({ maxRetries: aiMaxRetries, prompt });
 
     let testBlocks = extractMultipleTests(result.text);
 
@@ -75,6 +76,7 @@ export const generateTestsAction = internalAction({
       const retryAgent = createTestGenerationAgent(getWorkspaceModel(aiConfig));
       const { thread: retryThread } = await retryAgent.createThread(ctx, { title: `PRD Generation Retry — ${project.name}` });
       const retryResult = await retryThread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: buildPrdFormatRetryPrompt({
           projectName: project.name,
           appUrl: project.app_url,

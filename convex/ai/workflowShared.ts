@@ -6,6 +6,9 @@ import { getOwnedEntity } from "../lib/requireAuth";
 import { formatSnapshotForPrompt, type SnapshotData } from "./snapshotFormatter";
 import type { Id } from "../_generated/dataModel";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StepRunFn = (ref: any, args: Record<string, unknown>) => Promise<any>;
+
 export function buildSnapshotContext(
   snapshots: SnapshotData[],
   loginSnapshot?: SnapshotData | null,
@@ -39,8 +42,8 @@ export function buildRetryContext(
 }
 
 interface WorkflowStep {
-  runMutation: (ref: FunctionReference<"internal">, args: Record<string, unknown>) => Promise<unknown>;
-  runAction: (ref: FunctionReference<"internal">, args: Record<string, unknown>) => Promise<unknown>;
+  runMutation: StepRunFn;
+  runAction: StepRunFn;
 }
 
 type ValidateResult = { passed: boolean; error_message?: string; snapshot_at_failure?: string } | null;
@@ -54,7 +57,7 @@ export async function runVerifyLoop(
     workspace_id: Id<"workspaces">;
     testBlocks: string[];
     hasSnapshots: boolean;
-    retryActionRef: FunctionReference<"internal">;
+    retryActionRef: FunctionReference<"action", "internal">;
     baseActionArgs: Record<string, unknown>;
   },
 ): Promise<{ testBlocks: string[]; validated: boolean }> {
@@ -69,7 +72,7 @@ export async function runVerifyLoop(
   });
 
   const firstBlock = opts.testBlocks[0];
-  const validateResult: ValidateResult = await step.runAction(
+  const validateResult = await step.runAction(
     internal.ai.snapshotAction.validateTest,
     {
       url: opts.app_url,
@@ -77,7 +80,7 @@ export async function runVerifyLoop(
       workspace_id: opts.workspace_id,
       playwright_code: firstBlock,
     },
-  );
+  ) as ValidateResult;
 
   let testBlocks = opts.testBlocks;
   let validated = false;
@@ -89,7 +92,7 @@ export async function runVerifyLoop(
       progress_message: "Retrying test generation with error context...",
     });
 
-    const retryResult: { testBlocks: string[] } = await step.runAction(
+    const retryResult = await step.runAction(
       opts.retryActionRef,
       {
         ...opts.baseActionArgs,
@@ -97,7 +100,7 @@ export async function runVerifyLoop(
         failure_snapshot: validateResult.snapshot_at_failure ?? undefined,
         previous_code: firstBlock,
       },
-    );
+    ) as { testBlocks: string[] };
 
     if (retryResult.testBlocks.length > 0) {
       testBlocks = retryResult.testBlocks;

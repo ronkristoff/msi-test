@@ -7,6 +7,7 @@ import { internal, api } from "../_generated/api";
 import { createExplorationAnalysisAgent, createTestGenerationAgent, createHybridTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema, hybridTestStepSchema } from "./agents";
 import { extractJsonFromAiResponse } from "./parse";
 import { classifyAiError } from "./errors";
+import { aiDelay, aiMaxRetries } from "./aiRateLimit";
 import { markSuiteFailed, markSuiteReady } from "./suiteStatus";
 import { buildAuthPromptContext, buildNavMenuContext } from "./authContext";
 import { formatCapturedPagesForPrompt, type FormattablePage } from "./formatPages";
@@ -40,6 +41,10 @@ const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.de
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
 - For assertions, use ONLY text values that appear in the page context (headings, table data, status text). Do NOT fabricate text that isn't shown in the context.
+- For URL assertions, use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\/settings\//). Prefer asserting on visible content over URL after navigation.
+- Do NOT assert toBeVisible() on elements the page context shows as hidden/aria-hidden unless your test triggers them to appear.
+- Do NOT assert on framework-internal elements (e.g. __next-route-announcer__, empty role="status" divs) — they are not user-facing.
+- Do NOT test keyboard shortcuts or ARIA live region content unless the page context explicitly shows them as interactive features with populated content.
 - Wrap the test in a single markdown code fence with language "typescript"`;
 
 function buildScenarioContext(
@@ -272,6 +277,7 @@ export const analyzeExploration = internalAction({
         : "";
 
       const result = await thread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: `Application: ${exploration.url}
 
 Captured pages:
@@ -395,6 +401,7 @@ export const generateExplorationTests = action({
         });
       }
 
+      await aiDelay();
       const batchResults = await Promise.allSettled(
         batch.map(async (scenario) => {
           const liveSnapshots = await fetchLiveSnapshotsForScenario(
@@ -415,6 +422,7 @@ export const generateExplorationTests = action({
                   title: `Test Generation — ${scenario.name}`,
                 });
                 return thread.generateText({
+                  maxRetries: aiMaxRetries,
                   prompt: promptTemplate(scenario, "playwright", liveSnapshots),
                 });
               })(),
@@ -425,6 +433,7 @@ export const generateExplorationTests = action({
                     title: `Hybrid Steps — ${scenario.name}`,
                   });
                   return await thread.generateText({
+                    maxRetries: aiMaxRetries,
                     prompt: promptTemplate(scenario, "hybrid", liveSnapshots),
                   });
                 } catch (err) {
@@ -605,8 +614,9 @@ export const generateExplorationTestsForArea = action({
           exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection,
         );
 
+        await aiDelay();
         const result = await withTimeout(
-          thread.generateText({ prompt }),
+          thread.generateText({ prompt, maxRetries: aiMaxRetries }),
           SCENARIO_TIMEOUT_MS,
           scenario.name,
         );

@@ -7,6 +7,7 @@ import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { createRefineAgent, extractPlaywrightCode, hybridTestStepSchema } from "./agents";
 import { classifyAiError } from "./errors";
+import { aiMaxRetries } from "./aiRateLimit";
 import { buildAuthPromptContext } from "./authContext";
 import { computeDiff } from "./diff";
 import { resolveTestContext, resolvePageContext } from "./resolveContext";
@@ -80,6 +81,7 @@ ${args.message}`;
     let responseText: string;
     try {
       const result = await thread.generateText({
+        maxRetries: aiMaxRetries,
         prompt: isStepsTest
           ? stepsPrompt(sharedPrompt, test.steps!)
           : codePrompt(sharedPrompt, test.playwright_code ?? ""),

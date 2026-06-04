@@ -6,6 +6,12 @@ import type { AiConfig } from "./model";
 import type { Doc } from "../_generated/dataModel";
 import { formatCapturedPagesForPrompt } from "./formatPages";
 
+const GOTO_URL_RE = /page\.goto\(['"`]([^'"`]+)/;
+
+export function extractTargetUrl(testCode: string): string | null {
+  return testCode.match(GOTO_URL_RE)?.[1] ?? null;
+}
+
 export type TestContext = {
   test: Doc<"tests">;
   suite: { _id: Id<"suites">; project_id: Id<"projects">; name: string; [k: string]: unknown };
@@ -50,7 +56,7 @@ export async function resolvePageContext(
   if (latest.captured_pages && latest.captured_pages.length > 0) {
     const matchingPages = latest.captured_pages.filter((p: { url: string }) => {
       if (!testCode) return true;
-      const testUrl = testCode.match(/page\.goto\(['"`]([^'"`]+)/)?.[1];
+      const testUrl = extractTargetUrl(testCode);
       if (!testUrl) return true;
       try {
         return p.url.includes(new URL(testUrl).pathname);
