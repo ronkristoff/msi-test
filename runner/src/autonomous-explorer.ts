@@ -89,6 +89,8 @@ export async function executeAutonomousExploration(
       }]);
     }
 
+    const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
+
     let navMenu: NavMenuItem[] | undefined;
     try {
       navMenu = await extractNavMenu(page);
@@ -98,8 +100,6 @@ export async function executeAutonomousExploration(
     } catch (err) {
       log(`Autonomous exploration ${work.exploration_id}: nav menu extraction failed: ${err}`);
     }
-
-    const page = stagehand.context.activePage() ?? (await stagehand.context.newPage());
 
     if (work.selected_pages && work.selected_pages.length > 0) {
       for (const pageUrl of work.selected_pages) {

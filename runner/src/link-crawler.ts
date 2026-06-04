@@ -4,7 +4,7 @@ import {
   normalizeUrl,
   isSameOrigin,
   handleFormLoginPlaywright,
-  HYDRATION_WAIT_MS,
+  waitForDomStability,
   NAVIGATION_TIMEOUT_MS,
 } from "./explorer-utils";
 import { discoverFlows } from "./flowDiscovery";
@@ -50,6 +50,16 @@ export async function executeDiscovery(
     if (work.auth_mode === "form" && work.username && work.password) {
       const result = await handleFormLoginPlaywright(page, work, log);
       postLoginUrl = result.postLoginUrl;
+
+      const loginUrl = normalizeUrl(work.login_url || work.url);
+      const normalizedPostLogin = normalizeUrl(postLoginUrl);
+      if (loginUrl && normalizedPostLogin && loginUrl === normalizedPostLogin) {
+        throw new Error(
+          `Login failed — still on login page ${loginUrl} after all attempts. ` +
+          `Check that the login URL, username, and password are correct.`
+        );
+      }
+
       if (postLoginUrl) {
         const cookies = await context.cookies();
         authCookies = cookies.map((c) => ({
@@ -81,6 +91,8 @@ export async function executeDiscovery(
         visited.add(normalizedPostLogin);
 
         try {
+          await waitForDomStability(page, "nav a[href], [role='navigation'] a[href], aside a[href], header a[href]");
+          await waitForDomStability(page);
           const title = await page.title();
           discoveredPages.push({ url: normalizedPostLogin, title });
           await client.updateExplorationProgress(
@@ -96,8 +108,24 @@ export async function executeDiscovery(
             }))
           );
 
+          const navLinks = await page.$$eval("nav a[href], [role='navigation'] a[href], aside a[href], [data-testid*='sidebar'] a[href], [data-testid*='nav'] a[href]", (anchors) =>
+            anchors.map((a) => ({
+              href: (a as HTMLAnchorElement).href,
+              text: a.textContent?.trim() ?? "",
+            }))
+          );
+
+          const allLinks = [...links];
+          const seenHrefs = new Set(links.map((l) => l.href));
+          for (const nl of navLinks) {
+            if (!seenHrefs.has(nl.href)) {
+              allLinks.push(nl);
+              seenHrefs.add(nl.href);
+            }
+          }
+
           const childUrls: string[] = [];
-          for (const link of links) {
+          for (const link of allLinks) {
             const linkNormalized = normalizeUrl(link.href);
             if (
               linkNormalized &&
@@ -112,7 +140,7 @@ export async function executeDiscovery(
           }
           linkGraph.set(normalizedPostLogin, childUrls);
 
-          log(`Discovery ${work.exploration_id}: post-login page ${normalizedPostLogin} — ${links.length} links extracted, ${queue.length} queued`);
+          log(`Discovery ${work.exploration_id}: post-login page ${normalizedPostLogin} — ${allLinks.length} links (${navLinks.length} nav), ${queue.length} queued`);
         } catch (err) {
           log(`Discovery ${work.exploration_id}: error extracting post-login page: ${err}`);
         }
@@ -145,10 +173,11 @@ export async function executeDiscovery(
 
       try {
         log(`Discovery ${work.exploration_id}: visiting ${normalized}`);
-        const response = await page.goto(currentUrl, { timeout: CRAWL_TIMEOUT_MS, waitUntil: "networkidle" });
+        const response = await gotoWithRetry(page, currentUrl, CRAWL_TIMEOUT_MS);
         if (!response || response.status() >= 400) continue;
 
-        await page.waitForTimeout(HYDRATION_WAIT_MS);
+        await waitForDomStability(page, "nav a[href], [role='navigation'] a[href], aside a[href], header a[href]");
+        await waitForDomStability(page);
 
         const title = await page.title();
         discoveredPages.push({ url: normalized, title });
@@ -166,8 +195,24 @@ export async function executeDiscovery(
           }))
         );
 
+        const navLinks = await page.$$eval("nav a[href], [role='navigation'] a[href], aside a[href], [data-testid*='sidebar'] a[href], [data-testid*='nav'] a[href]", (anchors) =>
+          anchors.map((a) => ({
+            href: (a as HTMLAnchorElement).href,
+            text: a.textContent?.trim() ?? "",
+          }))
+        );
+
+        const allLinks = [...links];
+        const seenHrefs = new Set(links.map((l) => l.href));
+        for (const nl of navLinks) {
+          if (!seenHrefs.has(nl.href)) {
+            allLinks.push(nl);
+            seenHrefs.add(nl.href);
+          }
+        }
+
         const childUrls: string[] = [];
-        for (const link of links) {
+        for (const link of allLinks) {
           const linkNormalized = normalizeUrl(link.href);
           if (
             linkNormalized &&
@@ -184,7 +229,7 @@ export async function executeDiscovery(
           linkGraph.set(normalized, childUrls);
         }
 
-        log(`Discovery ${work.exploration_id}: ${normalized} — ${links.length} links, ${childUrls.length} new queued`);
+        log(`Discovery ${work.exploration_id}: ${normalized} — ${allLinks.length} links (${navLinks.length} nav), ${childUrls.length} new queued`);
       } catch (err) {
         log(`Discovery ${work.exploration_id}: error visiting ${normalized}: ${err}`);
       }
@@ -207,4 +252,19 @@ export async function executeDiscovery(
   } finally {
     if (browser) await browser.close().catch(() => {});
   }
+}
+
+async function gotoWithRetry(
+  page: { goto: (url: string, opts?: { timeout?: number; waitUntil?: string }) => Promise<{ status(): number } | null> },
+  url: string,
+  timeoutMs: number,
+): Promise<{ status(): number } | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await page.goto(url, { timeout: timeoutMs, waitUntil: "networkidle" });
+    } catch {
+      if (attempt === 1) return null;
+    }
+  }
+  return null;
 }
