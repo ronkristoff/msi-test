@@ -274,3 +274,54 @@ Default triage label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`
 
 Single-context repo. Read `CONTEXT.md` at root + `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
 
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/graphify` | Full pipeline on current directory |
+| `/graphify <path>` | Full pipeline on specific path |
+| `/graphify <path> --update` | Incremental — only changed files (uses cache) |
+| `/graphify query "<question>"` | BFS traversal — broad context, nearest neighbors first |
+| `/graphify query "<question>" --dfs` | DFS — trace a specific chain or dependency path |
+| `/graphify path "A" "B"` | Shortest path between two concepts |
+| `/graphify explain "Concept"` | Plain-language explanation of a single node |
+| `/graphify --cluster-only` | Re-cluster existing graph (no re-extraction) |
+| `/graphify <path> --mode deep` | Thorough extraction with richer INFERRED edges |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `graphify-out/graph.json` | Raw graph data (2,080 nodes, 3,707 edges, 196 communities) |
+| `graphify-out/graph.html` | Interactive HTML visualization — open in any browser |
+| `graphify-out/GRAPH_REPORT.md` | Audit report with god nodes, surprising connections, suggested questions |
+| `graphify-out/cost.json` | Cumulative token cost tracker across runs |
+| `graphify-out/.cache/` | Extraction cache — skip unchanged files on `--update` |
+| `graphify-out/.manifest.json` | File hashes for incremental update detection |
+
+### Workflow for opencode Agents
+
+- **Before answering codebase architecture questions** — query the graph first: `graphify query "<question>"`. This returns a scoped subgraph (~9K tokens) instead of reading raw files (~285K tokens).
+- **After writing/modifying code files** — run `graphify update .` to rebuild. Code-only changes trigger AST extraction only (no LLM cost, no tokens). The graph and HTML update automatically.
+- **After writing/modifying docs or images** — run `graphify --update`. Semantic re-extraction is required for non-code files (costs tokens). Only changed files are re-extracted thanks to the cache.
+- **When onboarding or exploring unfamiliar code** — open `graphify-out/graph.html` in a browser for the interactive visualization, or read `GRAPH_REPORT.md` for the god nodes and surprising connections.
+
+### Troubleshooting
+
+- **Graph seems stale or missing connections** — run a full `/graphify` rebuild (no `--update`). This re-extracts everything from scratch.
+- **`graphify update` says nothing changed** — the manifest tracks file hashes. If you want to force re-extraction, delete `graphify-out/.cache/` and `graphify-out/.manifest.json`, then run `/graphify --update`.
+- **HTML viz won't load** — check that `graphify-out/graph.json` exists and is valid JSON. If empty or corrupt, rebuild with `/graphify`.
+- **Chunk extraction failures** — if semantic extraction skips chunks (printed warnings), the graph will be incomplete. Re-run `/graphify` to retry.
