@@ -10,7 +10,8 @@ describe("discoverFlows", () => {
     const pages = [{ url: "https://example.com", title: "Home" }];
     const flows = discoverFlows(pages);
     expect(flows).toHaveLength(1);
-    expect(flows[0].name).toBe("Home");
+    expect(flows[0].name).toBe("example.com");
+    expect(flows[0].steps).toEqual(["example.com"]);
     expect(flows[0].pages_involved).toEqual([0]);
     expect(flows[0].complexity).toBe("low");
   });
@@ -92,7 +93,8 @@ describe("discoverFlows", () => {
     ]);
 
     const flows = discoverFlows(pages, linkGraph);
-    expect(flows[0].name).toBe("Login → Dashboard");
+    expect(flows[0].name).toBe("login → dashboard");
+    expect(flows[0].steps).toEqual(["login", "dashboard"]);
   });
 
   it("extracts path name as fallback when title is empty", () => {
@@ -107,6 +109,27 @@ describe("discoverFlows", () => {
 
     const flows = discoverFlows(pages, linkGraph);
     expect(flows[0].name).toBe("login → dashboard");
+    expect(flows[0].steps).toEqual(["login", "dashboard"]);
+  });
+
+  it("uses URL path segments when all titles are identical", () => {
+    const pages = [
+      { url: "https://affilio.io/pricing", title: "Affilio" },
+      { url: "https://affilio.io/features", title: "Affilio" },
+      { url: "https://affilio.io/dashboard", title: "Affilio" },
+      { url: "https://affilio.io/settings", title: "Affilio" },
+    ];
+    const linkGraph = new Map([
+      ["https://affilio.io/pricing", ["https://affilio.io/features"]],
+      ["https://affilio.io/features", ["https://affilio.io/dashboard"]],
+      ["https://affilio.io/dashboard", ["https://affilio.io/settings"]],
+      ["https://affilio.io/settings", []],
+    ]);
+
+    const flows = discoverFlows(pages, linkGraph);
+    expect(flows).toHaveLength(1);
+    expect(flows[0].name).toBe("pricing → settings");
+    expect(flows[0].steps).toEqual(["pricing", "features", "dashboard", "settings"]);
   });
 
   it("handles pages without a link graph", () => {

@@ -37,7 +37,7 @@ export function discoverFlows(
     if (flowPages.length === 0) continue;
 
     const name = buildFlowName(pages, flowPages);
-    const steps = flowPages.map((i) => pages[i].title || pages[i].url);
+    const steps = flowPages.map((i) => extractPathName(pages[i].url));
     const complexity = classifyComplexity(flowPages.length, nodes, flowPages);
 
     flows.push({
@@ -82,14 +82,11 @@ function buildFlowName(
   flowPages: number[],
 ): string {
   if (flowPages.length === 1) {
-    const page = pages[flowPages[0]];
-    return page.title || extractPathName(page.url);
+    return extractPathName(pages[flowPages[0]].url);
   }
 
-  const first = pages[flowPages[0]];
-  const last = pages[flowPages[flowPages.length - 1]];
-  const firstName = first.title || extractPathName(first.url);
-  const lastName = last.title || extractPathName(last.url);
+  const firstName = extractPathName(pages[flowPages[0]].url);
+  const lastName = extractPathName(pages[flowPages[flowPages.length - 1]].url);
   return `${firstName} → ${lastName}`;
 }
 
