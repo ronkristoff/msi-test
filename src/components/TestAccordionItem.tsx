@@ -58,11 +58,9 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
   const deleteTest = useMutation(api.tests.mutations.deleteTest);
   const lockTestMut = useMutation(api.tests.mutations.lockTest);
   const unlockTestMut = useMutation(api.tests.mutations.unlockTest);
-  const regenerateTest = useAction(api.ai.regenerateTest.regenerateTest);
   const healTestAction = useAction(api.ai.healTest.healTest);
   const { logError } = useErrorLogger();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
   const [healing, setHealing] = useState(false);
   const [healSuccess, setHealSuccess] = useState(false);
   const [healHint, setHealHint] = useState("");
@@ -123,18 +121,6 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
     await updateTestStatus({ test_id: test._id, status: newStatus });
     if (newStatus === "approved" && test.last_healed_at) {
       await updateTestCode({ test_id: test._id, playwright_code: test.playwright_code, clear_healed_at: true });
-    }
-  };
-
-  const handleRegenerate = async () => {
-    setRegenerating(true);
-    try {
-      await regenerateTest({ test_id: test._id });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Regeneration failed";
-      logError(msg, { severity: "error", context: { source: "TestAccordionItem.handleRegenerate" } });
-    } finally {
-      setRegenerating(false);
     }
   };
 
@@ -422,17 +408,6 @@ export function TestAccordionItem({ test, environments, onRunTest, workspace, cu
                   </button>
                   {menuOpen && (
                     <div className="absolute right-0 bottom-full mb-1 w-48 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-[var(--elev-raised)] py-1 z-50">
-                      <button
-                        onClick={() => { setMenuOpen(false); handleRegenerate(); }}
-                        disabled={regenerating}
-                        className="w-full text-left px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--border-soft)] transition-colors disabled:opacity-50 flex items-center gap-2"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-                          <polyline points="23 4 23 10 17 10" />
-                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                        </svg>
-                        {regenerating ? "Regenerating..." : "Regenerate"}
-                      </button>
                       {aiConfigReady && (
                         <button
                           onClick={() => { setMenuOpen(false); setChatOpenSignal(true); }}

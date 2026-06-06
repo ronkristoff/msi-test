@@ -3,6 +3,7 @@ import {
   buildInstruction,
   buildVariables,
   extractFlowsFromActions,
+  buildSuggestedLocator,
 } from "./autonomous-explorer";
 import type { ExplorationWorkItem, CapturedPage } from "./types";
 
@@ -181,5 +182,151 @@ describe("extractFlowsFromActions", () => {
 
     const flows = extractFlowsFromActions(actions, capturedPages);
     expect(flows[0].pages_involved).toEqual([0, 1]);
+  });
+});
+
+describe("buildSuggestedLocator", () => {
+  it("returns getByTestId when data-testid exists", () => {
+    const result = buildSuggestedLocator({ dataTestid: "cta-btn", elementType: "button" });
+    expect(result).toBe("page.getByTestId('cta-btn')");
+  });
+
+  it("returns locator by id when element id exists", () => {
+    const result = buildSuggestedLocator({ id: "hero-cta", elementType: "button" });
+    expect(result).toBe("page.locator('#hero-cta')");
+  });
+
+  it("returns unscoped getByRole for non-duplicate elements", () => {
+    const result = buildSuggestedLocator({
+      role: "button",
+      text: "Login",
+      elementType: "button",
+    });
+    expect(result).toBe("page.getByRole('button', { name: 'Login' })");
+  });
+
+  it("scopes to parent id when scopeId is provided", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { scopeId: "features" },
+    );
+    expect(result).toBe("page.locator('#features').getByRole('button', { name: 'Sign up' })");
+  });
+
+  it("scopes to unique landmark when landmark is unique", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { landmarkRole: "banner", isLandmarkUnique: true },
+    );
+    expect(result).toBe("page.getByRole('banner').getByRole('button', { name: 'Sign up' })");
+  });
+
+  it("scopes to labeled unique landmark", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { landmarkRole: "region", landmarkLabel: "Features", isLandmarkUnique: true },
+    );
+    expect(result).toBe("page.getByRole('region', { name: 'Features' }).getByRole('button', { name: 'Sign up' })");
+  });
+
+  it("prefers scopeId over landmark when both are available", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { scopeId: "features", landmarkRole: "banner", isLandmarkUnique: true },
+    );
+    expect(result).toBe("page.locator('#features').getByRole('button', { name: 'Sign up' })");
+  });
+
+  it("falls back to nth when duplicate with no unique scope", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { isDuplicate: true, duplicateIndex: 2 },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'Sign up' }).nth(2)");
+  });
+
+  it("falls back to nth when landmark is not unique", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "Sign up", elementType: "button" },
+      { landmarkRole: "navigation", isLandmarkUnique: false, isDuplicate: true, duplicateIndex: 0 },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'Sign up' }).nth(0)");
+  });
+
+  it("uses nth(0) for first duplicate element", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "CTA", elementType: "button" },
+      { isDuplicate: true, duplicateIndex: 0 },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'CTA' }).nth(0)");
+  });
+
+  it("handles text with single quotes", () => {
+    const result = buildSuggestedLocator(
+      { role: "button", text: "It's a test", elementType: "button" },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'It\\'s a test' })");
+  });
+
+  it("uses getByLabel when labelText is provided", () => {
+    const result = buildSuggestedLocator({
+      labelText: "Email address",
+      elementType: "input",
+    });
+    expect(result).toBe("page.getByLabel('Email address')");
+  });
+
+  it("uses getByPlaceholder when placeholder is provided", () => {
+    const result = buildSuggestedLocator({
+      placeholder: "Enter your email",
+      elementType: "input",
+    });
+    expect(result).toBe("page.getByPlaceholder('Enter your email')");
+  });
+
+  it("uses getByText for button with text but no role", () => {
+    const result = buildSuggestedLocator({
+      text: "Click me",
+      elementType: "button",
+    });
+    expect(result).toBe("page.getByText('Click me')");
+  });
+
+  it("uses name locator as fallback", () => {
+    const result = buildSuggestedLocator({
+      name: "email",
+      elementType: "input",
+    });
+    expect(result).toBe("page.locator('[name=\"email\"]')");
+  });
+
+  it("falls through data-testid when isDuplicate is true", () => {
+    const result = buildSuggestedLocator(
+      { dataTestid: "cta-btn", role: "button", text: "CTA", elementType: "button" },
+      { isDuplicate: true, duplicateIndex: 0 },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'CTA' }).nth(0)");
+  });
+
+  it("falls through id when isDuplicate is true", () => {
+    const result = buildSuggestedLocator(
+      { id: "hero-cta", role: "button", text: "Sign up", elementType: "button" },
+      { isDuplicate: true, duplicateIndex: 1 },
+    );
+    expect(result).toBe("page.getByRole('button', { name: 'Sign up' }).nth(1)");
+  });
+
+  it("uses data-testid when not duplicate", () => {
+    const result = buildSuggestedLocator(
+      { dataTestid: "cta-btn", role: "button", text: "CTA", elementType: "button" },
+    );
+    expect(result).toBe("page.getByTestId('cta-btn')");
+  });
+
+  it("uses id when not duplicate", () => {
+    const result = buildSuggestedLocator(
+      { id: "hero-cta", role: "button", text: "Sign up", elementType: "button" },
+    );
+    expect(result).toBe("page.locator('#hero-cta')");
   });
 });

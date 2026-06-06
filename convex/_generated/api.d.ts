@@ -28,7 +28,6 @@ import type * as ai_parse from "../ai/parse.js";
 import type * as ai_prdWorkflow from "../ai/prdWorkflow.js";
 import type * as ai_prdWorkflowActions from "../ai/prdWorkflowActions.js";
 import type * as ai_refineTest from "../ai/refineTest.js";
-import type * as ai_regenerateTest from "../ai/regenerateTest.js";
 import type * as ai_resolveContext from "../ai/resolveContext.js";
 import type * as ai_snapshotAction from "../ai/snapshotAction.js";
 import type * as ai_snapshotFormatter from "../ai/snapshotFormatter.js";
@@ -112,7 +111,6 @@ declare const fullApi: ApiFromModules<{
   "ai/prdWorkflow": typeof ai_prdWorkflow;
   "ai/prdWorkflowActions": typeof ai_prdWorkflowActions;
   "ai/refineTest": typeof ai_refineTest;
-  "ai/regenerateTest": typeof ai_regenerateTest;
   "ai/resolveContext": typeof ai_resolveContext;
   "ai/snapshotAction": typeof ai_snapshotAction;
   "ai/snapshotFormatter": typeof ai_snapshotFormatter;

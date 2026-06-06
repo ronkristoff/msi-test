@@ -10,7 +10,7 @@ const modules = import.meta.glob("../**/*.ts");
 
 describe("Refine Agent", () => {
   it("createRefineAgent creates agent with correct name and prompt", async () => {
-    const { createRefineAgent, TEST_REFINEMENT_PROMPT } = await import("./agents");
+    const { createRefineAgent, TEST_GENERATION_PROMPT, TEST_REFINEMENT_PROMPT } = await import("./agents");
     const { getWorkspaceModel } = await import("./model");
 
     const model = getWorkspaceModel({
@@ -22,7 +22,7 @@ describe("Refine Agent", () => {
 
     expect(agent).toBeDefined();
     expect(agent.options.name).toBe("Test Refinement");
-    expect(agent.options.instructions).toBe(TEST_REFINEMENT_PROMPT);
+    expect(agent.options.instructions).toBe(`${TEST_GENERATION_PROMPT}\n\n${TEST_REFINEMENT_PROMPT}`);
   });
 
   it("TEST_REFINEMENT_PROMPT contains key rules", async () => {

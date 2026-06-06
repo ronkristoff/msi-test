@@ -431,7 +431,34 @@ export function deriveTestName(code: string, index?: number): string {
   return index !== undefined ? `Generated Test ${index + 1}` : "Generated Test";
 }
 
-const TEST_GENERATION_INSTRUCTIONS = `Generate complete, runnable Playwright tests. Each test must be in its own markdown code fence with the "typescript" language tag. Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach(). Each test should navigate to the project URL using page.goto() at the start.`;
+const TEST_GENERATION_INSTRUCTIONS = `Generate complete, runnable Playwright tests. Each test must be in its own markdown code fence with the "typescript" language tag. Each code fence must contain exactly ONE top-level test() call — do NOT use test.describe(), test.beforeEach(), or test.afterEach(). Each test should navigate to the project URL using page.goto() at the start.
+
+CRITICAL — When live page context is provided, it includes interactive elements with "→" suggested locators. You MUST use those EXACT suggested locators. Do NOT invent your own locators or scope. The suggested locators are pre-scoped when duplicates exist on the page — copy them verbatim.
+
+Duplicate element handling:
+- If the page context shows multiple elements with the same role and text, the suggested locators will already be scoped (e.g. page.locator('#features').getByRole('button', { name: 'Sign up' }))
+- NEVER use unscoped getByRole/getByText/getByPlaceholder for elements that appear multiple times on the page
+- If no scoped suggested locator exists, use .nth(N) or scope to a parent section with an id
+
+Locator strategy (priority order):
+1. Use the suggested locator from the page context exactly as provided
+2. Semantic locators: getByRole, getByLabel, getByPlaceholder, getByText
+3. getByTestId for data-test/data-testid attributes
+4. NEVER use raw CSS selectors or XPath
+
+Assertion rules:
+- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
+- Never use waitForTimeout() or arbitrary sleeps
+- Do NOT use waitForLoadState('networkidle') or waitForLoadState('domcontentloaded')
+- After navigation, wait for a specific real element: await expect(page.getByRole('heading', { name: /pattern/ })).toBeVisible({ timeout: 15000 })
+- URL assertions — use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\\/settings\\//)
+
+Assertion anti-patterns — NEVER:
+- Do NOT guard assertions with if (await locator.count() > 0)
+- Do NOT use conditional patterns like "if visible, assert visible"
+- Every test MUST have at least one unconditional assertion
+
+Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.`;
 
 export function buildNlGenerationPrompt(opts: {
   projectName: string;

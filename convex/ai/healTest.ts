@@ -18,6 +18,7 @@ import type { SnapshotData } from "./snapshotFormatter";
 type HealPageContext = {
   contextSection: string;
   locatorInstruction: string;
+  hasLiveSnapshot: boolean;
 };
 
 async function resolveHealPageContext(
@@ -26,7 +27,7 @@ async function resolveHealPageContext(
   projectId: Id<"projects">,
   workspaceId: Id<"workspaces">,
 ): Promise<HealPageContext> {
-  const empty: HealPageContext = { contextSection: "", locatorInstruction: "" };
+  const empty: HealPageContext = { contextSection: "", locatorInstruction: "", hasLiveSnapshot: false };
 
   const targetUrl = extractTargetUrl(testCode);
   if (targetUrl) {
@@ -39,6 +40,7 @@ async function resolveHealPageContext(
         return {
           contextSection: `\nCurrent page state (captured just now — prefer these locators):${buildSnapshotContext([snapshot])}`,
           locatorInstruction: "CRITICAL — A live DOM snapshot of the target page is provided above. Use the locators, roles, and text from that snapshot. They are current and accurate. Do NOT guess or invent locators.\n\n",
+          hasLiveSnapshot: true,
         };
       }
     } catch (err) {
@@ -51,6 +53,7 @@ async function resolveHealPageContext(
     return {
       contextSection: `\nPage context (for reference — use actual locators and text values shown here):\n${pagesContext}`,
       locatorInstruction: "",
+      hasLiveSnapshot: false,
     };
   }
 
@@ -98,12 +101,16 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
     }
 
     const testCode = test.playwright_code ?? "";
-    const { contextSection, locatorInstruction } = await resolveHealPageContext(
-      ctx, testCode, suite.project_id, project.workspace_id,
-    );
+    const { contextSection, locatorInstruction, hasLiveSnapshot } = await resolveHealPageContext(
+        ctx, testCode, suite.project_id, project.workspace_id,
+      );
 
-    let responseText = "";
-    try {
+      const liveSnapshotNote = hasLiveSnapshot
+        ? "\nCRITICAL — Live page context was captured just now. Prefer its locators, roles, and text over the original test code when they differ. Do NOT guess or invent locators.\n"
+        : "";
+
+      let responseText = "";
+      try {
       const agent = createHealAgent(
         (await import("./model")).getWorkspaceModel(aiConfig),
       );
@@ -120,55 +127,26 @@ ${buildAuthPromptContext(project)}
 
 Test name: ${test.name}
 
-Failing test code:
+## Failing Test Code
+
 \`\`\`typescript
 ${testCode}
 \`\`\`
 
-Error from test run:
+## Error From Test Run
+
 ${errorMessage}
 ${contextSection}
-${args.user_hint ? `\nUser feedback about this test failure:\n${args.user_hint}` : ""}
+${liveSnapshotNote}
+${args.user_hint ? `User feedback about this test failure:\n${args.user_hint}` : ""}
 
-Fix the test based on the error. Rules:
+---
 
-For ALL errors:
-- Preserve the test structure and flow as much as possible
-- Keep it as a single test() call — no test.describe() or beforeEach()
-- Navigate to ${project.app_url} using page.goto() at the start
-- Use semantic locators first (getByRole, getByLabel, getByPlaceholder, getByText), then getByTestId
-- NEVER use raw CSS selectors
-- Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
-- Prefer toContainText() over toHaveText() for partial matches — it's more resilient
-- Never use waitForTimeout(), arbitrary sleeps, or waitForLoadState('networkidle')
-- Do NOT use waitForLoadState('domcontentloaded') — it fires while loading skeletons are still visible
-- Wrap the test in a single markdown code fence with language "typescript"
+Repair the failing test while preserving the original test intent. Make the smallest safe change necessary to resolve the failure. Do NOT rewrite the entire test when a localized fix is sufficient.
 
-${locatorInstruction}Only use locators for elements that you can verify exist from the test code, the page context (if provided), or the error message. Do NOT invent or guess locators. If a step cannot be verified, remove that assertion rather than guessing.
+${locatorInstruction}Only use locators for elements that you can verify exist from the test code, the page context (if provided), the error message, or user feedback. Do NOT invent or guess locators. If a step cannot be verified, preserve the failing assertion rather than removing it.
 
-For text/value mismatch errors:
-- Use the RECEIVED value (not the expected one) — the received value is what the page actually shows
-
-For TimeoutError (element not found within timeout):
-- Simplify the test to only assert what the existing code structure suggests should be present
-- After login or any navigation, wait for real content instead of using waitForLoadState: await expect(page.getByRole('heading', { name: /pattern/ })).toBeVisible({ timeout: 15000 })
-- After page.goto(), add await expect(locator).toBeVisible({ timeout: 15000 }) before clicking anything
-
-For assertion failures (visible/enabled/text mismatch):
-- Fix ONLY the broken assertion. Use the actual received value from the error.
-- If the error shows an element is not visible, it may need a longer timeout or a scroll-into-view first
-
-For form submissions and mutations (clicking Create/Save/Submit buttons):
-- Wrap the submission in a retry loop — the backend may intermittently timeout (e.g. Convex 1s function limit).
-- Pattern: click submit, check if dialog closes (success) or stays open (failure). If still open, retry up to 3 times.
-- Example:
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await submitBtn.click();
-    const closed = await expect(dialog).toBeHidden({ timeout: 10000 }).then(() => true).catch(() => false);
-    if (closed) break;
-  }
-  await expect(dialog).toBeHidden({ timeout: 5000 });
-- Use this pattern whenever a form submit button is clicked and the test then verifies the result.`,
+Wrap the repaired test in a single markdown code fence with language "typescript". Navigate to ${project.app_url} using page.goto() at the start.`,
       });
       responseText = result.text;
     } catch (err: unknown) {

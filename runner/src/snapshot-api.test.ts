@@ -156,8 +156,8 @@ describe("Snapshot API — POST /snapshot", () => {
     expect(body).toHaveProperty("aria_snapshot");
     expect(body).toHaveProperty("page_title", "Example Page");
     expect(body).toHaveProperty("url", "https://example.com");
+    expect(body).toHaveProperty("interactive_elements");
     expect(body).not.toHaveProperty("structure_text");
-    expect(body).not.toHaveProperty("interactive_elements");
   });
 
   it("returns 400 for missing required fields", async () => {

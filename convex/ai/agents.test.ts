@@ -317,3 +317,52 @@ describe("Agent tools", () => {
     expect(result).toEqual([]);
   });
 });
+
+describe("Prompt content snapshots", () => {
+  it("TEST_GENERATION_PROMPT contains key rules", async () => {
+    const { TEST_GENERATION_PROMPT } = await import("./agents");
+
+    expect(TEST_GENERATION_PROMPT).toContain("Duplicate Element Rules");
+    expect(TEST_GENERATION_PROMPT).toContain(".nth(");
+    expect(TEST_GENERATION_PROMPT).toContain("Landmark");
+    expect(TEST_GENERATION_PROMPT).toContain("strict mode violation");
+    expect(TEST_GENERATION_PROMPT).toContain("Grounding Rules");
+    expect(TEST_GENERATION_PROMPT).toContain("Form Submission Resilience");
+  });
+
+  it("TEST_HEALING_PROMPT contains key rules", async () => {
+    const { TEST_HEALING_PROMPT } = await import("./agents");
+
+    expect(TEST_HEALING_PROMPT).toContain("Strict Mode Violation Rules");
+    expect(TEST_HEALING_PROMPT).toContain("Test Intent Preservation");
+    expect(TEST_HEALING_PROMPT).toContain("Root Cause Analysis");
+  });
+
+  it("createHealAgent uses combined generation + healing prompts", async () => {
+    const { createHealAgent, TEST_GENERATION_PROMPT, TEST_HEALING_PROMPT } = await import("./agents");
+    const { getWorkspaceModel } = await import("./model");
+
+    const model = getWorkspaceModel({
+      endpoint_url: "https://api.example.com/v1",
+      api_key: "test-key",
+      model_name: "gpt-4",
+    });
+    const agent = createHealAgent(model);
+
+    expect(agent.options.instructions).toBe(`${TEST_GENERATION_PROMPT}\n\n${TEST_HEALING_PROMPT}`);
+  });
+
+  it("createRefineAgent uses combined generation + refinement prompts", async () => {
+    const { createRefineAgent, TEST_GENERATION_PROMPT, TEST_REFINEMENT_PROMPT } = await import("./agents");
+    const { getWorkspaceModel } = await import("./model");
+
+    const model = getWorkspaceModel({
+      endpoint_url: "https://api.example.com/v1",
+      api_key: "test-key",
+      model_name: "gpt-4",
+    });
+    const agent = createRefineAgent(model);
+
+    expect(agent.options.instructions).toBe(`${TEST_GENERATION_PROMPT}\n\n${TEST_REFINEMENT_PROMPT}`);
+  });
+});
