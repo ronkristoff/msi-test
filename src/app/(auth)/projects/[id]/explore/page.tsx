@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api, asId } from "@/lib/convex";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useErrorLogger } from "@/lib/error-logger";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { PhaseIndicator } from "@/components/PhaseIndicator";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import Link from "next/link";
 import { FlowCard } from "./FlowCard";
 import { ScenarioList } from "./ScenarioList";
@@ -23,7 +24,6 @@ import {
   type SelectionMode,
   makeToggleHandler,
   toggleAll,
-  matchScenariosToFlows,
   toggleArea,
   areasWithoutScenarios,
 } from "./types";
@@ -31,7 +31,6 @@ import { PageChecklist } from "./PageChecklist";
 
 export default function ExplorePage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const { logError } = useErrorLogger();
   const projectId = asId(params.id, "projects");
   const project = useQuery(api.projects.queries.getProject, { project_id: projectId });
@@ -41,10 +40,12 @@ export default function ExplorePage() {
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
   const [selectedFlows, setSelectedFlows] = useState<Set<number>>(new Set());
   const [selectedDiscoveredPages, setSelectedDiscoveredPages] = useState<Set<number>>(new Set());
+  const [pageAuthFlags, setPageAuthFlags] = useState<Map<number, boolean>>(new Map());
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("flows");
   const [generating, setGenerating] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
   const [showListView, setShowListView] = useState(false);
+  const [showNewExplorationConfirm, setShowNewExplorationConfirm] = useState(false);
 
   const [goal, setGoal] = useState("");
   const [additionalUrlInput, setAdditionalUrlInput] = useState("");
@@ -58,7 +59,7 @@ export default function ExplorePage() {
   const updateDiscoveredPages = useMutation(api.explorations.mutations.updateDiscoveredPages);
   const createSuitesForExploration = useMutation(api.suites.mutations.createSuitesForExploration);
   const generateTestsForArea = useAction(api.ai.exploreApp.generateExplorationTestsForArea);
-  const markExplorationCompleted = useMutation(api.explorations.mutations.markExplorationCompleted);
+  const markGeneratedAreas = useMutation(api.explorations.mutations.markGeneratedAreas);
   const user = useQuery(api.workspaces.queries.getCurrentUser);
 
   const latestActive = useQuery(
@@ -73,6 +74,11 @@ export default function ExplorePage() {
 
   const exploration = useQuery(
     api.explorations.queries.getExploration,
+    effectiveExplorationId ? { exploration_id: asId(effectiveExplorationId, "explorations") } : "skip",
+  );
+
+  const explorationSuites = useQuery(
+    api.explorations.queries.getSuitesForExploration,
     effectiveExplorationId ? { exploration_id: asId(effectiveExplorationId, "explorations") } : "skip",
   );
 
@@ -106,6 +112,11 @@ export default function ExplorePage() {
     [exploration],
   );
 
+  const generatedAreas = useMemo<Set<string>>(
+    () => new Set((exploration as { generated_areas?: string[] } | null)?.generated_areas ?? []),
+    [exploration],
+  );
+
   const emptyAreas = useMemo(
     () => areasWithoutScenarios(scenarios, prdGaps.map((g) => g.feature)),
     [scenarios, prdGaps],
@@ -127,6 +138,7 @@ export default function ExplorePage() {
     setSelectedScenarios(new Set());
     setSelectedFlows(new Set());
     setSelectedDiscoveredPages(new Set());
+    setPageAuthFlags(new Map());
     setExplorationId(null);
     setUserDismissed(false);
     try {
@@ -147,26 +159,41 @@ export default function ExplorePage() {
     }
   }, [createExploration, projectId, goal, additionalUrlInput, logError]);
 
+  const handleAuthToggle = useCallback((index: number) => {
+    setPageAuthFlags((prev) => {
+      const next = new Map(prev);
+      const current = next.get(index) ?? true;
+      next.set(index, !current);
+      return next;
+    });
+  }, []);
+
   const handleExploreSelected = useCallback(async () => {
     if (!effectiveExplorationId) return;
     setError(null);
     try {
-      const selectedUrls = discoveredPagesList
-        .filter((_: DiscoveredPage, i: number) => selectedDiscoveredPages.has(i))
-        .map((p: DiscoveredPage) => p.url);
+      const selectedPages = discoveredPagesList
+        .filter((_: DiscoveredPage, i: number) => selectedDiscoveredPages.has(i));
 
-      if (selectedUrls.length === 0) return;
+      if (selectedPages.length === 0) return;
+
+      const pageAuthFlagsArg = discoveredPagesList
+        .map((p: DiscoveredPage, i: number) => ({
+          url: p.url,
+          auth_required: pageAuthFlags.get(i) ?? true,
+        }));
 
       await startDeepExploration({
         exploration_id: asId(effectiveExplorationId, "explorations"),
-        selected_pages: selectedUrls,
+        selected_pages: selectedPages.map((p: DiscoveredPage) => p.url),
+        page_auth_flags: pageAuthFlagsArg,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start deep exploration";
       setError(msg);
       logError(msg, { severity: "error", context: { source: "ExplorePage" } });
     }
-  }, [effectiveExplorationId, discoveredPagesList, selectedDiscoveredPages, startDeepExploration, logError]);
+  }, [effectiveExplorationId, discoveredPagesList, selectedDiscoveredPages, pageAuthFlags, startDeepExploration, logError]);
 
   const handleAddManualUrls = useCallback(async () => {
     if (!effectiveExplorationId || !manualUrlInput.trim()) return;
@@ -192,7 +219,10 @@ export default function ExplorePage() {
     const selectedFlowNames = discoveredFlows
       .filter((_: DiscoveredFlow, i: number) => selectedFlows.has(i))
       .map((f) => f.name);
-    return matchScenariosToFlows(selectedFlowNames, scenarios);
+    const flowNameSet = new Set(selectedFlowNames);
+    return scenarios.filter((s) =>
+      s.related_flows?.some((rf) => flowNameSet.has(rf)),
+    );
   }, [selectionMode, selectedFlows, discoveredFlows, scenarios]);
 
   const handleCancel = useCallback(async () => {
@@ -208,7 +238,9 @@ export default function ExplorePage() {
     }
   }, [cancelExploration, effectiveExplorationId, logError]);
 
-  const totalSelected = selectionMode === "flows" ? matchedScenarios.length : selectedScenarios.size;
+  const selectableCount = selectionMode === "flows"
+    ? matchedScenarios.filter((s) => !generatedAreas.has(s.area)).length
+    : [...selectedScenarios].filter((i) => scenarios[i] && !generatedAreas.has(scenarios[i].area)).length;
 
   const handleGenerateTests = useCallback(async () => {
     if (!user) return;
@@ -217,7 +249,8 @@ export default function ExplorePage() {
     let flowContext: string | undefined;
 
     if (selectionMode === "flows" && selectedFlows.size > 0) {
-      selected = matchedScenarios.length > 0 ? matchedScenarios : scenarios;
+      selected = matchedScenarios.filter((s) => !generatedAreas.has(s.area));
+      if (selected.length === 0) return;
       const selectedFlowData = discoveredFlows.filter((_: DiscoveredFlow, i: number) =>
         selectedFlows.has(i),
       );
@@ -229,7 +262,7 @@ export default function ExplorePage() {
         .join("\n\n");
     } else {
       selected = scenarios.filter((_: Scenario, i: number) =>
-        selectedScenarios.has(i),
+        selectedScenarios.has(i) && !generatedAreas.has(scenarios[i].area),
       );
     }
 
@@ -248,8 +281,6 @@ export default function ExplorePage() {
         exploration_id: resolvedExplorationId,
       });
 
-      router.push(`/projects/${params.id}`);
-
       for (const { area, suite_id } of suiteResults) {
         const areaScenarios = selected.filter((s: Scenario) => s.area === area);
         generateTestsForArea({
@@ -266,7 +297,13 @@ export default function ExplorePage() {
         });
       }
 
-      await markExplorationCompleted({ exploration_id: resolvedExplorationId });
+      await markGeneratedAreas({
+        exploration_id: resolvedExplorationId,
+        areas,
+      });
+
+      setSelectedScenarios(new Set());
+      setSelectedFlows(new Set());
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create suites";
       setError(msg);
@@ -274,7 +311,19 @@ export default function ExplorePage() {
     } finally {
       setGenerating(false);
     }
-  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTestsForArea, markExplorationCompleted, effectiveExplorationId, router, params.id, logError, user, projectId]);
+  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTestsForArea, markGeneratedAreas, effectiveExplorationId, logError, user, projectId, generatedAreas]);
+
+  const handleNewExploration = useCallback(() => {
+    setExplorationId(null);
+    setSelectedScenarios(new Set());
+    setSelectedFlows(new Set());
+    setSelectedDiscoveredPages(new Set());
+    setPageAuthFlags(new Map());
+    setGoal("");
+    setAdditionalUrlInput("");
+    setUserDismissed(true);
+    setShowNewExplorationConfirm(false);
+  }, []);
 
   const isInProgress =
     exploration?.status === "discovering" ||
@@ -282,14 +331,14 @@ export default function ExplorePage() {
     exploration?.status === "captured" ||
     exploration?.status === "analyzing";
 
-  const showScenarios = exploration?.status === "analyzed" && scenarios.length > 0;
+  const showScenarios = (exploration?.status === "analyzed" || exploration?.status === "completed") && scenarios.length > 0;
 
   const phases = useMemo(() => {
     if (!effectiveExplorationId) {
       return [
         { label: "Configure", status: "current" as const },
         { label: "Discover", status: "upcoming" as const },
-        { label: "Analyze", status: "upcoming" as const },
+        { label: "Deep Explore", status: "upcoming" as const },
         { label: "Select", status: "upcoming" as const },
         { label: "Generate", status: "upcoming" as const },
       ];
@@ -313,7 +362,7 @@ export default function ExplorePage() {
         { label: "Generate", status: "upcoming" as const },
       ];
     }
-    if (showScenarios) {
+    if (showScenarios && exploration?.status !== "completed") {
       return [
         { label: "Configure", status: "completed" as const },
         { label: "Discover", status: "completed" as const },
@@ -334,7 +383,7 @@ export default function ExplorePage() {
     return [
       { label: "Configure", status: "current" as const },
       { label: "Discover", status: "upcoming" as const },
-      { label: "Analyze", status: "upcoming" as const },
+      { label: "Deep Explore", status: "upcoming" as const },
       { label: "Select", status: "upcoming" as const },
       { label: "Generate", status: "upcoming" as const },
     ];
@@ -442,6 +491,9 @@ export default function ExplorePage() {
                 {exploration.pages_captured} page{exploration.pages_captured !== 1 ? "s" : ""} captured
               </div>
             )}
+            <div className="text-xs text-[var(--muted)]">
+              This usually takes 30-60 seconds depending on the number of pages.
+            </div>
             <Button variant="secondary" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
@@ -457,6 +509,8 @@ export default function ExplorePage() {
               onToggle={makeToggleHandler(setSelectedDiscoveredPages)}
               onSelectAll={() => setSelectedDiscoveredPages(new Set(Array.from({ length: discoveredPagesList.length }, (_, i) => i)))}
               onDeselectAll={() => setSelectedDiscoveredPages(new Set())}
+              authFlags={pageAuthFlags}
+              onAuthToggle={handleAuthToggle}
             />
 
             <div>
@@ -471,18 +525,18 @@ export default function ExplorePage() {
                   className="flex-1 min-h-[36px] max-h-[60px] px-3 py-2 border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)] focus:shadow-[var(--focus-ring)] transition-all duration-[var(--motion-fast)] placeholder:text-[var(--muted)] resize-y"
                 />
                 <Button variant="secondary" onClick={handleAddManualUrls} disabled={!manualUrlInput.trim()}>
-                  Add
+                  Add URLs
                 </Button>
               </div>
             </div>
 
             <div className="flex gap-3">
               <Button onClick={handleExploreSelected} disabled={selectedDiscoveredPages.size === 0}>
-                Explore Selected ({selectedDiscoveredPages.size})
+                Deep Explore Selected ({selectedDiscoveredPages.size})
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => { setExplorationId(null); setError(null); setUserDismissed(true); setSelectedDiscoveredPages(new Set()); }}
+                onClick={() => { setExplorationId(null); setError(null); setUserDismissed(true); setSelectedDiscoveredPages(new Set()); setPageAuthFlags(new Map()); }}
               >
                 Cancel
               </Button>
@@ -507,9 +561,15 @@ export default function ExplorePage() {
           </div>
         )}
 
-        {/* Phase: Select scenarios */}
+        {/* Phase: Select scenarios (analyzed or partially completed) */}
         {showScenarios && (
           <div className="space-y-5">
+            {generatedAreas.size > 0 && (
+              <Alert variant="success">
+                {generatedAreas.size} area{generatedAreas.size !== 1 ? "s" : ""} already generated. Select more scenarios below, or view your suites.
+              </Alert>
+            )}
+
             {capturedPages.length > 0 && (
               <div>
                 <div className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
@@ -618,7 +678,7 @@ export default function ExplorePage() {
             )}
 
             <div>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-1">
                 {hasFlows && (
                   <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
                     <button
@@ -660,6 +720,11 @@ export default function ExplorePage() {
                   </button>
                 )}
               </div>
+              {hasFlows && (
+                <p className="text-xs text-[var(--muted)] mb-3">
+                  Select flows to auto-match related scenarios, or pick individual scenarios.
+                </p>
+              )}
             </div>
 
             {showScenarioSelection && !showListView && (
@@ -669,6 +734,7 @@ export default function ExplorePage() {
                 selectedIndices={selectedScenarios}
                 onToggleScenario={toggleScenario}
                 onToggleArea={handleToggleArea}
+                generatedAreas={generatedAreas}
               />
             )}
 
@@ -679,16 +745,16 @@ export default function ExplorePage() {
                 onToggle={toggleScenario}
                 onSelectAll={() => toggleAll(setSelectedScenarios, selectedScenarios, scenarios.length)}
                 totalScenarios={scenarios.length}
+                generatedAreas={generatedAreas}
               />
             )}
 
             {selectionMode === "flows" && selectedFlows.size > 0 && (
               <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--border-soft)]">
                 <div className="text-xs text-[var(--muted)]">
-                  {selectedFlows.size} flow{selectedFlows.size !== 1 ? "s" : ""} selected
                   {matchedScenarios.length > 0
-                    ? ` — ${matchedScenarios.length} matching scenario${matchedScenarios.length !== 1 ? "s" : ""} will be generated.`
-                    : " — all scenarios will be generated (no specific matches found)."}
+                    ? `${matchedScenarios.length} matching scenario${matchedScenarios.length !== 1 ? "s" : ""} will be generated.`
+                    : "No scenarios match the selected flows. Switch to scenario selection to choose manually."}
                 </div>
               </div>
             )}
@@ -696,26 +762,27 @@ export default function ExplorePage() {
             <div className="flex gap-3 pt-4 border-t border-[var(--border-soft)]">
               <Button
                 onClick={handleGenerateTests}
-                disabled={totalSelected === 0 || generating}
+                disabled={selectableCount === 0 || generating}
               >
                 {generating
                   ? "Generating..."
-                  : `Generate Tests from Selected (${totalSelected})`}
+                  : scenarios.every((s) => generatedAreas.has(s.area))
+                    ? "All scenarios generated"
+                    : `Generate Tests from Selected (${selectableCount})`}
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => {
-                  setExplorationId(null);
-                  setSelectedScenarios(new Set());
-                  setSelectedFlows(new Set());
-                  setSelectedDiscoveredPages(new Set());
-                  setGoal("");
-                  setAdditionalUrlInput("");
-                  setUserDismissed(true);
-                }}
+                onClick={() => setShowNewExplorationConfirm(true)}
               >
                 New Exploration
               </Button>
+              {explorationSuites && explorationSuites.length > 0 && (
+                <Link href={`/projects/${params.id}`} className="ml-auto self-center">
+                  <Button variant="secondary" size="sm">
+                    View Suites ({explorationSuites.length})
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -723,7 +790,26 @@ export default function ExplorePage() {
         {/* Phase: Completed */}
         {exploration?.status === "completed" && !showScenarios && (
           <div className="space-y-4">
-            <Alert variant="success">Tests generated successfully!</Alert>
+            <Alert variant="success">All test scenarios generated.</Alert>
+            {explorationSuites && explorationSuites.length > 0 && (
+              <div>
+                <div className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] mb-2">
+                  Created Suites ({explorationSuites.length})
+                </div>
+                <div className="space-y-1.5">
+                  {explorationSuites.map((suite) => (
+                    <Link
+                      key={suite._id}
+                      href={`/projects/${params.id}/suites/${suite._id}`}
+                      className="flex items-center justify-between px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+                    >
+                      <span className="text-sm font-medium text-[var(--fg)]">{suite.name}</span>
+                      <span className="text-[10px] font-[var(--font-mono)] text-[var(--muted)]">{suite.area}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex gap-3">
               <Link href={`/projects/${params.id}`}>
                 <Button>Back to Project</Button>
@@ -732,6 +818,17 @@ export default function ExplorePage() {
           </div>
         )}
       </div>
+
+      {showNewExplorationConfirm && (
+        <ConfirmDialog
+          title="Start new exploration?"
+          message="This will discard the current exploration and all discovered pages. This cannot be undone."
+          confirmLabel="Start New"
+          variant="primary"
+          onConfirm={handleNewExploration}
+          onCancel={() => setShowNewExplorationConfirm(false)}
+        />
+      )}
     </div>
   );
 }

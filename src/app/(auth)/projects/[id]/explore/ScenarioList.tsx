@@ -8,6 +8,7 @@ interface ScenarioListProps {
   onToggle: (index: number) => void;
   onSelectAll: () => void;
   totalScenarios: number;
+  generatedAreas?: Set<string>;
 }
 
 export function ScenarioList({
@@ -16,8 +17,10 @@ export function ScenarioList({
   onToggle,
   onSelectAll,
   totalScenarios,
+  generatedAreas = new Set(),
 }: ScenarioListProps) {
-  const allSelected = selectedIndices.size === totalScenarios && totalScenarios > 0;
+  const selectableScenarios = scenarios.filter((s) => !generatedAreas.has(s.area));
+  const allSelected = selectableScenarios.length > 0 && selectableScenarios.every((s) => selectedIndices.has(scenarios.indexOf(s)));
 
   return (
     <>
@@ -31,14 +34,18 @@ export function ScenarioList({
         </button>
       </div>
       <div className="space-y-3 mb-4">
-        {scenarios.map((scenario, i) => (
-          <ScenarioItem
-            key={i}
-            scenario={scenario}
-            selected={selectedIndices.has(i)}
-            onToggle={() => onToggle(i)}
-          />
-        ))}
+        {scenarios.map((scenario, i) => {
+          const isGenerated = generatedAreas.has(scenario.area);
+          return (
+            <ScenarioItem
+              key={i}
+              scenario={scenario}
+              selected={selectedIndices.has(i)}
+              onToggle={() => onToggle(i)}
+              generated={isGenerated}
+            />
+          );
+        })}
       </div>
     </>
   );
@@ -48,31 +55,41 @@ function ScenarioItem({
   scenario,
   selected,
   onToggle,
+  generated,
 }: {
   scenario: Scenario;
   selected: boolean;
   onToggle: () => void;
+  generated: boolean;
 }) {
   return (
     <label
-      className={`flex items-start gap-3 p-3 rounded-[var(--radius-sm)] border cursor-pointer transition-colors duration-[var(--motion-fast)] ${
-        selected
-          ? "border-[var(--accent)] bg-[var(--accent)]/5"
-          : "border-[var(--border)] hover:border-[var(--border-strong)]"
+      className={`flex items-start gap-3 p-3 rounded-[var(--radius-sm)] border transition-colors duration-[var(--motion-fast)] ${
+        generated
+          ? "border-[var(--border-soft)] bg-[var(--border-soft)] cursor-default opacity-60"
+          : selected
+            ? "border-[var(--accent)] bg-[var(--accent)]/5 cursor-pointer"
+            : "border-[var(--border)] hover:border-[var(--border-strong)] cursor-pointer"
       }`}
     >
       <input
         type="checkbox"
         checked={selected}
         onChange={onToggle}
+        disabled={generated}
         className="mt-0.5 accent-[var(--accent)]"
       />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <div className="text-sm font-medium text-[var(--fg)]">{scenario.name}</div>
           <span className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--accent)]">
             {scenario.area}
           </span>
+          {generated && (
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-semibold text-green-700">
+              Generated
+            </span>
+          )}
         </div>
         <div className="text-xs text-[var(--muted)] mt-1">{scenario.description}</div>
         <div className="text-xs text-[var(--muted)] mt-1 font-[var(--font-mono)] whitespace-pre-wrap">

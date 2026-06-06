@@ -89,7 +89,8 @@ export default defineSchema({
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
     .index("by_project_id_and_suite_type", ["project_id", "suite_type"])
-    .index("by_workspace_id_and_status", ["workspace_id", "status"]),
+    .index("by_workspace_id_and_status", ["workspace_id", "status"])
+    .index("by_exploration_id", ["exploration_id"]),
 
   tests: defineTable({
     workspace_id: v.id("workspaces"),
@@ -112,9 +113,11 @@ export default defineSchema({
     last_healed_diff: v.optional(v.string()),
     locked_by: v.optional(v.string()),
     locked_at: v.optional(v.number()),
+    healing_started_at: v.optional(v.number()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_workspace_id_and_status", ["workspace_id", "status"])
+    .index("by_status", ["status"])
     .index("by_suite_id", ["suite_id"]),
 
   runs: defineTable({
@@ -289,6 +292,7 @@ export default defineSchema({
         }),
       ),
     ),
+    generated_areas: v.optional(v.array(v.string())),
     error_message: v.optional(v.string()),
     auth_cookies: v.optional(v.array(v.object({
       name: v.string(),

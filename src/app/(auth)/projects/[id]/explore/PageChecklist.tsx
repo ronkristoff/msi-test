@@ -8,6 +8,8 @@ interface PageChecklistProps {
   onToggle: (index: number) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
+  authFlags: Map<number, boolean>;
+  onAuthToggle: (index: number) => void;
 }
 
 export function PageChecklist({
@@ -16,6 +18,8 @@ export function PageChecklist({
   onToggle,
   onSelectAll,
   onDeselectAll,
+  authFlags,
+  onAuthToggle,
 }: PageChecklistProps) {
   const allSelected = selectedIndices.size === pages.length && pages.length > 0;
 
@@ -56,6 +60,28 @@ export function PageChecklist({
               <div className="text-xs text-[var(--muted)] truncate font-mono">
                 {page.url}
               </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-mono text-[var(--muted)]">Needs login</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={authFlags.get(i) ?? true}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAuthToggle(i);
+                }}
+                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                  authFlags.get(i) !== false ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                    authFlags.get(i) !== false ? "translate-x-3.5" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
             </div>
           </label>
         ))}

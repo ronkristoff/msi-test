@@ -99,3 +99,16 @@ export const getPendingExplorations = query({
     return enriched;
   },
 });
+
+export const getSuitesForExploration = query({
+  args: { exploration_id: v.id("explorations") },
+  handler: async (ctx, args) => {
+    const ws = await getOptionalOwnedWorkspace(ctx);
+    if (!ws) return [];
+
+    return ctx.db
+      .query("suites")
+      .withIndex("by_exploration_id", (q) => q.eq("exploration_id", args.exploration_id))
+      .collect();
+  },
+});

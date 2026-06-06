@@ -58,6 +58,10 @@ export const startDeepExploration = mutation({
   args: {
     exploration_id: v.id("explorations"),
     selected_pages: v.array(v.string()),
+    page_auth_flags: v.optional(v.array(v.object({
+      url: v.string(),
+      auth_required: v.boolean(),
+    }))),
   },
   handler: async (ctx, args) => {
     const { entity: exploration } = await getOwnedEntity(ctx, args.exploration_id, "explorations");
@@ -72,12 +76,29 @@ export const startDeepExploration = mutation({
       }
     }
 
-    await ctx.db.patch(args.exploration_id, {
-      status: "pending",
-      selected_pages: args.selected_pages,
-      runner_id: undefined,
-      progress_message: "Queuing deep exploration...",
-    });
+    if (args.page_auth_flags && args.page_auth_flags.length > 0) {
+      const authMap = new Map(args.page_auth_flags.map((f) => [f.url, f.auth_required]));
+      const updatedPages = (exploration.discovered_pages ?? []).map(
+        (p: { url: string; title: string; auth_required?: boolean }) => ({
+          ...p,
+          auth_required: authMap.has(p.url) ? authMap.get(p.url)! : p.auth_required,
+        }),
+      );
+      await ctx.db.patch(args.exploration_id, {
+        status: "pending",
+        selected_pages: args.selected_pages,
+        discovered_pages: updatedPages,
+        runner_id: undefined,
+        progress_message: "Queuing deep exploration...",
+      });
+    } else {
+      await ctx.db.patch(args.exploration_id, {
+        status: "pending",
+        selected_pages: args.selected_pages,
+        runner_id: undefined,
+        progress_message: "Queuing deep exploration...",
+      });
+    }
   },
 });
 
@@ -118,6 +139,35 @@ export const markExplorationCompleted = mutation({
     await ctx.db.patch(args.exploration_id, {
       status: "completed",
       progress_message: "Test generation dispatched. Check individual suites for progress.",
+    });
+  },
+});
+
+export const markGeneratedAreas = mutation({
+  args: {
+    exploration_id: v.id("explorations"),
+    areas: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { entity: exploration } = await getOwnedEntity(ctx, args.exploration_id, "explorations");
+
+    const existing = new Set(exploration.generated_areas ?? []);
+    for (const area of args.areas) {
+      existing.add(area);
+    }
+    const generatedAreas = [...existing];
+
+    const scenarioAreas = new Set(
+      ((exploration.proposed_scenarios ?? []) as Array<{ area: string }>).map((s) => s.area),
+    );
+    const allCovered = scenarioAreas.size > 0 && [...scenarioAreas].every((a) => generatedAreas.includes(a));
+
+    await ctx.db.patch(args.exploration_id, {
+      generated_areas: generatedAreas,
+      status: allCovered ? "completed" : "analyzed",
+      progress_message: allCovered
+        ? "All scenarios generated. View suites for details."
+        : `${generatedAreas.length} area${generatedAreas.length !== 1 ? "s" : ""} generated. Select more scenarios or start a new exploration.`,
     });
   },
 });
