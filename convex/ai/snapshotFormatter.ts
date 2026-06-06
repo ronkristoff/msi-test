@@ -5,6 +5,8 @@ export type SnapshotData = {
   page_title: string;
   url: string;
   interactive_elements?: FormattableElement[];
+  duplicate_text_patterns?: string[];
+  page_sections?: Array<{ id: string; tag: string; label?: string }>;
 };
 
 export function formatSnapshotForPrompt(snapshot: SnapshotData): string {
@@ -27,6 +29,24 @@ export function formatSnapshotForPrompt(snapshot: SnapshotData): string {
     lines.push("Interactive Elements:");
     for (const el of snapshot.interactive_elements) {
       lines.push(formatElementLine(el));
+    }
+  }
+
+  if (snapshot.duplicate_text_patterns && snapshot.duplicate_text_patterns.length > 0) {
+    lines.push("");
+    lines.push("Duplicate Text Patterns (WARNING — getByText with these will match multiple elements):");
+    for (const pattern of snapshot.duplicate_text_patterns) {
+      lines.push(`  - "${pattern}"`);
+    }
+    lines.push("You MUST scope any assertion using these text patterns to a specific section (e.g. page.locator('#hero').getByText(...)) or use getByRole('heading', ...) instead.");
+  }
+
+  if (snapshot.page_sections && snapshot.page_sections.length > 0) {
+    lines.push("");
+    lines.push("Page Sections (use these IDs for scoping locators):");
+    for (const section of snapshot.page_sections) {
+      const label = section.label ? ` — ${section.label}` : "";
+      lines.push(`  - #${section.id} (${section.tag})${label}`);
     }
   }
 

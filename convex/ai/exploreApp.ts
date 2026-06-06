@@ -41,10 +41,15 @@ const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.de
 - The element you wait for must be real content (heading, data, button) — never a skeleton or loading indicator
 - Use the EXACT suggested locators from the Interactive Elements section — do NOT invent or guess locators
 - Each interactive element shows a "→" line with the recommended Playwright locator. USE IT.
+- If a suggested locator includes .nth(N), use it exactly as provided — the index is computed from the element's DOM position among its duplicates
 - If no suggested locator exists, use semantic locators: getByRole, getByLabel, getByPlaceholder, getByTestId
 - NEVER use raw CSS selectors unless no semantic locator is available
+- When the page context shows multiple elements with the same role and text (e.g. repeated CTA buttons across sections), you MUST use the scoped locator from the suggested locators (e.g. page.locator('#features').getByRole(...)). If no scoped locator is available, scope it yourself using the nearest unique ancestor: parent section with id, landmark role (page.getByRole('banner')), or .first()/.nth(N) as a last resort. NEVER use unscoped getByRole/getByText when duplicates exist — Playwright strict mode will throw an error resolving to multiple elements.
+- When the page context includes a "Duplicate Text Patterns" section, treat EVERY listed pattern as a strict mode hazard. Never use unscoped getByText with any of those patterns — always scope to a section or use getByRole('heading', ...) instead.
+- When the page context includes a "Page Sections" list, use those section IDs for scoping text assertions on non-interactive elements.
 - Use web-first assertions: await expect(locator).toBeVisible(), toHaveText(), toContainText(), toHaveURL()
 - Never use waitForTimeout() or arbitrary sleeps
+- For assertions on non-interactive text (taglines, descriptions, body content), prefer getByRole('heading', { name: /pattern/ }) over getByText. If you must use getByText, always scope it to a section: page.locator('#hero').getByText('pattern'). NEVER use unscoped getByText with regex patterns on pages that may repeat text across sections.
 - For assertions, use ONLY text values that appear in the page context (headings, table data, status text). Do NOT fabricate text that isn't shown in the context.
 - For URL assertions, use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\/settings\//). Prefer asserting on visible content over URL after navigation.
 - Do NOT assert toBeVisible() on elements the page context shows as hidden/aria-hidden unless your test triggers them to appear.
@@ -111,7 +116,7 @@ async function resolveExplorationContext(ctx: ActionCtx, explorationId: Id<"expl
     ? `\nPRD / Product Requirements:\n${project.prd_text.slice(0, PRD_ANALYSIS_LIMIT)}\n`
     : "";
 
-  return { exploration, aiConfig, project, navMenuContext, pagesContextSummary, pagesContextDetailed, prdSection, capturedPages: exploration.captured_pages ?? [] };
+  return { exploration, aiConfig, project, navMenuContext, pagesContextSummary, pagesContextDetailed, prdSection, capturedPages: exploration.captured_pages ?? [], discoveredPages: exploration.discovered_pages ?? [] };
 }
 
 function buildFilteredPagesContext(
@@ -411,9 +416,8 @@ export const generateExplorationTests = action({
       throw new ConvexError("No scenarios selected");
     }
 
-    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages, discoveredPages } = resolved;
     console.log(`[generateExplorationTests] project auth: mode=${(project as Record<string, unknown> | null)?.explore_auth_mode}, username=${(project as Record<string, unknown> | null)?.explore_username ?? "(none)"}`);
-
     const flowContextSection = args.flow_context
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
       : "";
@@ -425,7 +429,7 @@ export const generateExplorationTests = action({
     const totalScenarios = args.selected_scenarios.length;
 
     const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid", liveSnapshots: SnapshotData[], feedbackResult: FeedbackDiscoveryResult | null) => {
-      const authContext = buildAuthPromptContext(project, scenario);
+      const authContext = buildAuthPromptContext(project, scenario, discoveredPages);
       const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
       const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
       const feedbackContext = buildFeedbackPromptContext(feedbackResult, scenario.flow_summary || scenario.name);
@@ -619,7 +623,7 @@ export const generateExplorationTestsForArea = action({
       return { testIds: [] as string[], failed: 0 };
     }
 
-    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages } = resolved;
+    const { exploration, aiConfig, project, navMenuContext, pagesContextDetailed, prdSection, capturedPages, discoveredPages } = resolved;
     const flowContextSection = args.flow_context
       ? `\nDiscovered navigation flow context:\n${args.flow_context}\n`
       : "";
@@ -673,7 +677,7 @@ export const generateExplorationTestsForArea = action({
           title: `Test — ${scenario.name}`,
         });
 
-        const authContext = buildAuthPromptContext(project, scenario);
+      const authContext = buildAuthPromptContext(project, scenario, discoveredPages);
         const prompt = buildPlaywrightTestPrompt(
           exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection,
         ) + feedbackContext;

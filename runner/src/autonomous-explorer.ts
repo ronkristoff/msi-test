@@ -428,14 +428,26 @@ async function extractStructuredText(page: {
   return sections.join("\n\n");
 }
 
-async function extractInteractiveElements(page: {
-  $$eval: (selector: string, fn: (els: Element[]) => Array<Record<string, string | undefined>>) => Promise<Array<Record<string, string | undefined>>>;
-}): Promise<InteractiveElement[] | undefined> {
+export type PageWithEval = {
+  $$eval: (selector: string, fn: (els: Element[]) => { elements: Array<Record<string, string | undefined>>; landmarkCounts: Record<string, number> }) => Promise<{ elements: Array<Record<string, string | undefined>>; landmarkCounts: Record<string, number> }>;
+  evaluate: (fn: () => { patterns: string[]; sections: Array<{ id: string; tag: string; label?: string }> }) => Promise<{ patterns: string[]; sections: Array<{ id: string; tag: string; label?: string }> }>;
+};
+
+export async function extractInteractiveElements(page: PageWithEval): Promise<InteractiveElement[] | undefined> {
   try {
-    const rawElements = await page.$$eval(
+    const { elements: rawElements, landmarkCounts } = await page.$$eval(
       'button, input, select, textarea, a[href], [role="button"], [role="link"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="searchbox"], [role="textbox"]',
-      (els) =>
-        els.slice(0, 100).map((el) => {
+      (els) => {
+        const LANDMARK_TAG_MAP: Record<string, string> = {
+          header: 'banner',
+          footer: 'contentinfo',
+          nav: 'navigation',
+          main: 'main',
+          aside: 'complementary',
+        };
+        const LANDMARK_ROLES = ['banner', 'contentinfo', 'navigation', 'main', 'complementary', 'region', 'search'];
+
+        const rawElements = els.slice(0, 100).map((el) => {
           const tag = el.tagName.toLowerCase();
           const type = (el as HTMLInputElement).type?.toLowerCase() ?? "";
           const role = el.getAttribute("role") ?? "";
@@ -495,15 +507,114 @@ async function extractInteractiveElements(page: {
 
           const description = text || ariaLabel || placeholder || labelText || name || id || tag;
 
+          let parentId = "";
+          let ancestor = el.parentElement;
+          while (ancestor) {
+            if (
+              ancestor.id &&
+              ancestor.id !== "" &&
+              !ancestor.id.startsWith("__") &&
+              !ancestor.id.startsWith("radix-") &&
+              ancestor.tagName !== "BODY" &&
+              ancestor.tagName !== "HTML"
+            ) {
+              parentId = ancestor.id;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+
+          let landmarkRole = "";
+          let landmarkLabel = "";
+          let landmarkAnc = el.parentElement;
+          while (landmarkAnc && landmarkAnc.tagName !== "BODY" && landmarkAnc.tagName !== "HTML") {
+            const aTag = landmarkAnc.tagName.toLowerCase();
+            const aRole = landmarkAnc.getAttribute("role") ?? "";
+            const detected = LANDMARK_TAG_MAP[aTag] || (LANDMARK_ROLES.includes(aRole) ? aRole : "");
+            if (detected) {
+              landmarkRole = detected;
+              let label = landmarkAnc.getAttribute("aria-label") ?? "";
+              if (!label) {
+                const lBy = landmarkAnc.getAttribute("aria-labelledby");
+                if (lBy) { const lEl = document.getElementById(lBy); if (lEl) label = (lEl.textContent ?? "").trim(); }
+              }
+              landmarkLabel = label;
+              break;
+            }
+            landmarkAnc = landmarkAnc.parentElement;
+          }
+
           return {
             tag, type, role, text, ariaLabel, placeholder, href, name, id, dataTestid,
-            labelText, elementType, selector, description,
+            labelText, elementType, selector, description, parentId, landmarkRole, landmarkLabel,
           };
-        }),
+        });
+
+        const landmarkCounts: Record<string, number> = {};
+        const landmarkSelector = 'header, footer, nav, main, aside, [role="banner"], [role="contentinfo"], [role="navigation"], [role="main"], [role="complementary"], [role="region"], [role="search"]';
+        const landmarkEls = document.querySelectorAll(landmarkSelector);
+        for (const lm of landmarkEls) {
+          const lTag = lm.tagName.toLowerCase();
+          const lRole = lm.getAttribute("role") ?? "";
+          const detected = LANDMARK_TAG_MAP[lTag] || (LANDMARK_ROLES.includes(lRole) ? lRole : "");
+          if (!detected) continue;
+          let label = lm.getAttribute("aria-label") ?? "";
+          if (!label) {
+            const lBy = lm.getAttribute("aria-labelledby");
+            if (lBy) { const lEl = document.getElementById(lBy); if (lEl) label = (lEl.textContent ?? "").trim(); }
+          }
+          const key = label ? `${detected}:${label}` : detected;
+          landmarkCounts[key] = (landmarkCounts[key] ?? 0) + 1;
+        }
+
+        return { elements: rawElements, landmarkCounts };
+      },
     );
 
+    const locatorDupKey = (el: Record<string, string | undefined>): string | null => {
+      if (el.role && el.text) return `${el.role}|${el.text}`;
+      if (el.elementType === "button" && el.text) return `btn|${el.text}`;
+      if (el.elementType === "link" && el.text) return `link|${el.text}`;
+      if (el.dataTestid) return `testid|${el.dataTestid}`;
+      if (el.id) return `id|${el.id}`;
+      if (el.placeholder) return `ph|${el.placeholder}`;
+      if (el.labelText) return `lbl|${el.labelText}`;
+      return null;
+    };
+
+    const dupCounts = new Map<string, number>();
+    for (const el of rawElements) {
+      const key = locatorDupKey(el);
+      if (key) dupCounts.set(key, (dupCounts.get(key) ?? 0) + 1);
+    }
+
+    const dupIndices = new Map<string, number>();
+
     const elements: InteractiveElement[] = rawElements.map((el) => {
-      const suggestedLocator = buildSuggestedLocator(el);
+      const key = locatorDupKey(el);
+      const isDuplicate = key != null && (dupCounts.get(key) ?? 0) > 1;
+      const scopeId = isDuplicate && el.parentId ? el.parentId : undefined;
+
+      let duplicateIndex: number | undefined;
+      if (isDuplicate && key) {
+        duplicateIndex = dupIndices.get(key) ?? 0;
+        dupIndices.set(key, duplicateIndex + 1);
+      }
+
+      let isLandmarkUnique: boolean | undefined;
+      if (el.landmarkRole) {
+        const lKey = el.landmarkLabel ? `${el.landmarkRole}:${el.landmarkLabel}` : el.landmarkRole;
+        isLandmarkUnique = (landmarkCounts[lKey] ?? 0) <= 1;
+      }
+
+      const suggestedLocator = buildSuggestedLocator(el, {
+        scopeId,
+        landmarkRole: el.landmarkRole || undefined,
+        landmarkLabel: el.landmarkLabel || undefined,
+        isLandmarkUnique,
+        isDuplicate,
+        duplicateIndex,
+      });
       return {
         selector: el.selector ?? "",
         description: el.description ?? "",
@@ -527,32 +638,116 @@ async function extractInteractiveElements(page: {
   }
 }
 
-function buildSuggestedLocator(el: Record<string, string | undefined>): string {
+export type PageSectionInfo = {
+  id: string;
+  tag: string;
+  label?: string;
+};
+
+export async function extractDuplicateTextPatterns(page: {
+  evaluate: (fn: () => { patterns: string[]; sections: Array<{ id: string; tag: string; label?: string }> }) => Promise<{ patterns: string[]; sections: Array<{ id: string; tag: string; label?: string }> }>;
+}): Promise<{ patterns: string[]; sections: PageSectionInfo[] }> {
+  try {
+    const result = await page.evaluate(() => {
+      const MIN_LENGTH = 15;
+      const MAX_ELEMENTS = 50;
+
+      const textElements = Array.from(document.querySelectorAll("p, span, h1, h2, h3, h4, h5, h6, li, td, th, div"))
+        .filter((el) => {
+          const text = (el.textContent ?? "").trim();
+          if (text.length < MIN_LENGTH) return false;
+          if (el.children.length > 3) return false;
+          return true;
+        })
+        .slice(0, MAX_ELEMENTS);
+
+      const textCounts = new Map<string, number>();
+      for (const el of textElements) {
+        const text = (el.textContent ?? "").trim().slice(0, 100).toLowerCase();
+        if (text) textCounts.set(text, (textCounts.get(text) ?? 0) + 1);
+      }
+
+      const patterns: string[] = [];
+      for (const [text, count] of textCounts) {
+        if (count >= 2) {
+          const original = (textElements.find((el) => (el.textContent ?? "").trim().slice(0, 100).toLowerCase() === text)?.textContent ?? "").trim().slice(0, 100);
+          if (original) patterns.push(original);
+        }
+      }
+
+      const sections: Array<{ id: string; tag: string; label?: string }> = [];
+      const sectionEls = document.querySelectorAll("section, article, [role='region'], main, header, footer, nav");
+      for (const el of sectionEls) {
+        const id = el.id;
+        if (!id || id.startsWith("__") || id.startsWith("radix-")) continue;
+        const tag = el.tagName.toLowerCase();
+        let label = el.getAttribute("aria-label") ?? "";
+        if (!label) {
+          const lBy = el.getAttribute("aria-labelledby");
+          if (lBy) {
+            const lEl = document.getElementById(lBy);
+            if (lEl) label = (lEl.textContent ?? "").trim().slice(0, 80);
+          }
+        }
+        const heading = el.querySelector("h1, h2, h3");
+        if (!label && heading) label = (heading.textContent ?? "").trim().slice(0, 80);
+        sections.push({ id, tag, label: label || undefined });
+      }
+
+      return { patterns, sections };
+    });
+
+    return result;
+  } catch {
+    return { patterns: [], sections: [] };
+  }
+}
+
+export function buildSuggestedLocator(
+  el: Record<string, string | undefined>,
+  opts?: {
+    scopeId?: string;
+    landmarkRole?: string;
+    landmarkLabel?: string;
+    isLandmarkUnique?: boolean;
+    isDuplicate?: boolean;
+    duplicateIndex?: number;
+  }
+): string {
+  if (el.dataTestid && !opts?.isDuplicate) return `page.getByTestId('${el.dataTestid}')`;
+  if (el.id && !opts?.isDuplicate) return `page.locator('#${el.id}')`;
+
+  let locator: string | null = null;
+
   if (el.role && el.text) {
-    return `page.getByRole('${el.role}', { name: '${el.text.replace(/'/g, "\\'")}' })`;
-  }
-  if (el.role && el.ariaLabel) {
-    return `page.getByRole('${el.role}', { name: '${el.ariaLabel.replace(/'/g, "\\'")}' })`;
-  }
-  if (el.labelText) {
-    return `page.getByLabel('${el.labelText.replace(/'/g, "\\'")}')`;
-  }
-  if (el.placeholder) {
-    return `page.getByPlaceholder('${el.placeholder.replace(/'/g, "\\'")}')`;
-  }
-  if (el.dataTestid) {
-    return `page.getByTestId('${el.dataTestid}')`;
-  }
-  if (el.text && (el.elementType === "button" || el.elementType === "link")) {
-    return `page.getByText('${el.text.slice(0, 60).replace(/'/g, "\\'")}')`;
-  }
-  if (el.name) {
+    locator = `getByRole('${el.role}', { name: '${el.text.replace(/'/g, "\\'")}' })`;
+  } else if (el.role && el.ariaLabel) {
+    locator = `getByRole('${el.role}', { name: '${el.ariaLabel.replace(/'/g, "\\'")}' })`;
+  } else if (el.labelText) {
+    locator = `getByLabel('${el.labelText.replace(/'/g, "\\'")}')`;
+  } else if (el.placeholder) {
+    locator = `getByPlaceholder('${el.placeholder.replace(/'/g, "\\'")}')`;
+  } else if (el.text && (el.elementType === "button" || el.elementType === "link")) {
+    locator = `getByText('${el.text.slice(0, 60).replace(/'/g, "\\'")}')`;
+  } else if (el.name) {
     return `page.locator('[name="${el.name}"]')`;
+  } else {
+    return `page.locator('${el.selector ?? el.tag ?? "*"}')`;
   }
-  if (el.id) {
-    return `page.locator('#${el.id}')`;
+
+  if (opts?.scopeId && locator) {
+    return `page.locator('#${opts.scopeId}').${locator}`;
   }
-  return `page.locator('${el.selector ?? el.tag ?? "*"}')`;
+  if (opts?.isLandmarkUnique && opts.landmarkRole && locator) {
+    const scope = opts.landmarkLabel
+      ? `getByRole('${opts.landmarkRole}', { name: '${opts.landmarkLabel.replace(/'/g, "\\'")}' })`
+      : `getByRole('${opts.landmarkRole}')`;
+    return `page.${scope}.${locator}`;
+  }
+  if (opts?.isDuplicate && opts?.duplicateIndex !== undefined && locator) {
+    return `page.${locator}.nth(${opts.duplicateIndex})`;
+  }
+  return `page.${locator}`;
 }
 
 async function extractNavMenu(page: import("playwright").Page): Promise<NavMenuItem[]> {

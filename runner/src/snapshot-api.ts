@@ -7,6 +7,7 @@ import { createTempRunDir, cleanupDir } from "./config";
 import type { StagehandInstance } from "./stagehand";
 import type { AiConfig } from "../../convex/ai/model";
 import { discoverFeedback, type FeedbackDiscoveryResult, type FeedbackAction } from "./feedback-discovery";
+import { extractInteractiveElements, extractDuplicateTextPatterns, type PageWithEval } from "./autonomous-explorer";
 
 export interface SnapshotApiDeps {
   runnerSecret: string;
@@ -169,10 +170,21 @@ async function handleSnapshot(
     const pageTitle = await page.title();
     const pageUrl = page.url();
 
+    const interactiveElements = await extractInteractiveElements(
+      page as unknown as PageWithEval,
+    );
+
+    const { patterns: duplicateTextPatterns, sections: pageSections } = await extractDuplicateTextPatterns(
+      page as unknown as Parameters<typeof extractDuplicateTextPatterns>[0],
+    );
+
     sendJson(res, 200, {
       aria_snapshot: ariaSnapshot,
       page_title: pageTitle,
       url: pageUrl,
+      interactive_elements: interactiveElements ?? [],
+      duplicate_text_patterns: duplicateTextPatterns,
+      page_sections: pageSections,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
