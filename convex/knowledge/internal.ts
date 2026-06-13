@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getOwnedEntity } from "../lib/requireAuth";
 import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
+import { MAX_EMBEDDING_CHUNKS } from "../lib/constraints";
 
 export const _patchProjectRepo = internalMutation({
   args: {
@@ -229,5 +230,82 @@ export const _getMembershipForUser = internalQuery({
       workspace_id: workspace._id,
       role: membership.role,
     };
+  },
+});
+
+export const _setLastSyncedAt = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.knowledge_base_id, {
+      last_synced_at: Date.now(),
+    });
+  },
+});
+
+export const _getChunksForEmbedding = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("code_chunks")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.knowledge_base_id),
+      )
+      .take(MAX_EMBEDDING_CHUNKS);
+  },
+});
+
+export const _getWorkspaceAiConfig = internalQuery({
+  args: {
+    workspace_id: v.id("workspaces"),
+  },
+  handler: async (ctx, args) => {
+    const workspace = await ctx.db.get(args.workspace_id);
+    if (!workspace) return null;
+    return {
+      ai_config: workspace.ai_config,
+    };
+  },
+});
+
+export const _handleIngestionComplete = internalMutation({
+  args: {
+    workflowId: v.string(),
+    context: v.object({
+      knowledge_base_id: v.id("knowledge_bases"),
+      project_id: v.id("projects"),
+    }),
+    result: v.union(
+      v.object({
+        kind: v.literal("success"),
+        returnValue: v.any(),
+      }),
+      v.object({
+        kind: v.literal("failed"),
+        error: v.string(),
+      }),
+      v.object({
+        kind: v.literal("canceled"),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (args.result.kind !== "failed") return;
+
+    const kb = await ctx.db.get(args.context.knowledge_base_id);
+    if (!kb) return;
+    if (kb.status !== "building") return;
+
+    await ctx.db.patch(args.context.knowledge_base_id, {
+      status: "error",
+      error_message: args.result.error || "Ingestion workflow failed",
+      progress_message: undefined,
+    });
+    await ctx.db.patch(args.context.project_id, {
+      kb_status: "error",
+    });
   },
 });

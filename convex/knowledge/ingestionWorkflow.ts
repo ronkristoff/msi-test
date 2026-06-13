@@ -81,7 +81,28 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
     knowledge_base_id: args.knowledge_base_id,
     project_id: args.project_id,
     status: "building",
-    progress_message: `Chunking complete. ${chunkResult.chunkCount} chunks created from ${chunkResult.totalFiles} files. Ready for embedding.`,
+    progress_message: `Chunking complete. ${chunkResult.chunkCount} chunks created from ${chunkResult.totalFiles} files. Generating embeddings...`,
+  });
+
+  await step.runAction(
+    internal.knowledge.embeddingActions.embedChunks,
+    {
+      project_id: args.project_id,
+      knowledge_base_id: args.knowledge_base_id,
+      workspace_id: project.workspace_id,
+    },
+    { retry: true },
+  );
+
+  await step.runMutation(internal.knowledge.internal._updateKbStatus, {
+    knowledge_base_id: args.knowledge_base_id,
+    project_id: args.project_id,
+    status: "ready",
+    progress_message: "Knowledge Base ready",
+  });
+
+  await step.runMutation(internal.knowledge.internal._setLastSyncedAt, {
+    knowledge_base_id: args.knowledge_base_id,
   });
 
   return { success: true, chunkCount: chunkResult.chunkCount };

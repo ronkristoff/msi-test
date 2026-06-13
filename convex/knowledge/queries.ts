@@ -1,7 +1,15 @@
-import { query, internalQuery } from "../_generated/server";
+import { query, internalQuery, action } from "../_generated/server";
 import { v } from "convex/values";
+import { ConvexError } from "convex/values";
 import { getOptionalOwnedEntity, getOwnedEntity } from "../lib/requireAuth";
-import { OLD_RD_PREVIEW_LENGTH } from "../lib/constraints";
+import {
+  OLD_RD_PREVIEW_LENGTH,
+  EMBEDDING_MAX_QUERY_LENGTH,
+  EMBEDDING_SEARCH_MIN_LIMIT,
+  EMBEDDING_SEARCH_MAX_LIMIT,
+} from "../lib/constraints";
+import { createProjectRag, getProjectNamespace } from "./rag";
+import { internal } from "../_generated/api";
 
 type FileMetadata = {
   _id: string;
@@ -92,5 +100,84 @@ export const getIngestionProgress = query({
       total_files: kb.total_files ?? 0,
       total_size_bytes: kb.total_size_bytes ?? 0,
     };
+  },
+});
+
+export const _getProjectWorkspaceForSearch = internalQuery({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
+    if (!result) return null;
+    const kb = await ctx.db
+      .query("knowledge_bases")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .order("desc")
+      .first();
+    if (!kb) return null;
+    if (kb.workspace_id !== result.entity.workspace_id) return null;
+    return {
+      workspace_id: result.entity.workspace_id,
+      kb_status: kb.status,
+    };
+  },
+});
+
+export const searchProjectRag = action({
+  args: {
+    project_id: v.id("projects"),
+    query_string: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (!args.query_string || args.query_string.length > EMBEDDING_MAX_QUERY_LENGTH) {
+      throw new ConvexError(
+        `Query must be between 1 and ${EMBEDDING_MAX_QUERY_LENGTH} characters.`,
+      );
+    }
+
+    const clampedLimit = Math.max(
+      EMBEDDING_SEARCH_MIN_LIMIT,
+      Math.min(args.limit ?? 10, EMBEDDING_SEARCH_MAX_LIMIT),
+    );
+
+    const projectInfo = await ctx.runQuery(
+      internal.knowledge.queries._getProjectWorkspaceForSearch,
+      { project_id: args.project_id },
+    );
+
+    if (!projectInfo || projectInfo.kb_status !== "ready") {
+      return null;
+    }
+
+    const workspace = await ctx.runQuery(
+      internal.knowledge.internal._getWorkspaceAiConfig,
+      { workspace_id: projectInfo.workspace_id },
+    );
+
+    if (!workspace?.ai_config) {
+      return null;
+    }
+
+    const rag = createProjectRag({
+      endpoint_url: workspace.ai_config.endpoint_url,
+      api_key: workspace.ai_config.api_key,
+    });
+    const namespace = getProjectNamespace(args.project_id);
+
+    try {
+      const { results, text } = await rag.search(ctx, {
+        namespace,
+        query: args.query_string,
+        limit: clampedLimit,
+      });
+
+      return { results, text };
+    } catch {
+      throw new ConvexError(
+        "Search failed. The AI provider may be unavailable. Check your workspace AI configuration.",
+      );
+    }
   },
 });

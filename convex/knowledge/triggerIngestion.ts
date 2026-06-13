@@ -64,6 +64,13 @@ export const triggerIngestion = action({
           project_id: args.project_id,
           knowledge_base_id: kbId,
         },
+        {
+          onComplete: internal.knowledge.internal._handleIngestionComplete,
+          context: {
+            knowledge_base_id: kbId,
+            project_id: args.project_id,
+          },
+        },
       );
     } catch (err) {
       await ctx.runMutation(internal.knowledge.internal._updateKbStatus, {

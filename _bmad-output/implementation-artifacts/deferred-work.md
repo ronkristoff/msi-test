@@ -1,0 +1,14 @@
+## Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, initial)
+
+- Stale embeddings after re-ingestion — no namespace cleanup [convex/knowledge/embeddingActions.ts] — RAG vector store retains embeddings for deleted files when repo is re-ingested. RAG's `delete`/`deleteByKey` methods exist but are never called. Should be addressed in story 1-8 (KB re-sync) which owns namespace lifecycle.
+- searchProjectRag implemented as action not query [convex/knowledge/queries.ts:120] — rag.search() requires action context (CtxWith<"runAction">), so cannot be a query. Documented deviation from spec Task 5 which said "query". Future frontend consumers must use useAction() instead of useQuery(), losing real-time reactivity.
+- No AbortController/network timeout on embedding calls [convex/knowledge/embeddingActions.ts] — Spec error handling table mentions "30s AbortController timeout" but RAG component manages fetch internally. Cannot easily inject timeout without forking the component. Relies on Convex's function-level timeout (~5 min for actions).
+- Re-embeds entire chunk set on workflow retry [convex/knowledge/embeddingActions.ts] — Key-based upsert ensures correctness (no duplicates), but workflow retry after partial success re-embeds already-completed batches. Cost/latency impact only, no data integrity issue.
+
+## Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, re-review)
+
+- searchProjectRag has no rate limiting — cost abuse vector [convex/knowledge/queries.ts] — Every search call embeds the query via the workspace's API key. No per-user throttle. Malicious client can incur unbounded embedding costs. Cross-cutting concern not specific to this story's ACs; follows existing query pattern in the codebase.
+- _getProjectWorkspaceForSearch uses .first() without ordering [convex/knowledge/queries.ts:107-110] — If a project has multiple knowledge bases (from re-ingestion), .first() returns oldest by default. Should use .order("desc").first() like getIngestionProgress does. Multiple KBs per project is story 1-8 scope.
+- Sequential embedding, not batched — EMBEDDING_BATCH_SIZE only controls progress [convex/knowledge/embeddingActions.ts] — Each rag.add() is awaited sequentially. The RAG component likely supports batch insertion. For 10k chunks this is 10k sequential awaits. Performance concern only, not correctness.
+- Separate mutations for ready+synced — partial failure [convex/knowledge/ingestionWorkflow.ts] — "ready" status and last_synced_at are in two separate step.runMutation calls. If first succeeds but second fails, workflow retries and re-runs embedChunks from scratch. Cost concern; key-based upsert ensures correctness.
+- 429 ignores Retry-After header [convex/knowledge/embeddingActions.ts:78] — Uses fixed 30s instead of server-provided backoff. Requires extracting Retry-After from AI SDK error responseHeaders. Blocked by the 429 statusCode property fix (patch finding #2).
