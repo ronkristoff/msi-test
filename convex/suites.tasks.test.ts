@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import {
   seedWorkspace,
@@ -325,5 +326,252 @@ describe("getActiveTasks", () => {
     });
 
     expect(ws2Explorations).toHaveLength(1);
+  });
+});
+
+describe("getTaskOutcomes", () => {
+  it("returns empty for unauthenticated user", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { suiteId } = await seedSuite(t, workspaceId);
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(suiteId as Id<"suites">, { status: "ready" });
+    });
+
+    const outcomes = await t.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "generating", id: suiteId }],
+    });
+
+    expect(outcomes).toHaveLength(0);
+  });
+
+  it("returns success for a suite that transitioned to ready", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { suiteId, projectId } = await seedSuite(t, workspaceId);
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(suiteId as Id<"suites">, { status: "ready" });
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "generating", id: suiteId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      type: "generating",
+      id: suiteId,
+      outcome: "success",
+      name: "Test Suite",
+      projectId,
+    });
+  });
+
+  it("returns failed for a suite that transitioned to failed", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { suiteId } = await seedSuite(t, workspaceId);
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(suiteId as Id<"suites">, {
+        status: "failed",
+        generation_error: "timeout",
+      });
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "generating", id: suiteId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("failed");
+  });
+
+  it("skips suites still generating", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { suiteId } = await seedSuite(t, workspaceId, {
+      status: "generating",
+      triggered_by: "user1",
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "generating", id: suiteId }],
+    });
+
+    expect(outcomes).toHaveLength(0);
+  });
+
+  it("returns success for a run that passed", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { projectId, suiteId } = await seedTestDoc(t, workspaceId);
+
+    const runId = await seedRun(t, workspaceId, projectId, suiteId, null, {
+      status: "passed",
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "running", id: runId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({
+      type: "running",
+      outcome: "success",
+    });
+  });
+
+  it("returns failed for a run that failed", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { projectId, suiteId } = await seedTestDoc(t, workspaceId);
+
+    const runId = await seedRun(t, workspaceId, projectId, suiteId, null, {
+      status: "failed",
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "running", id: runId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("failed");
+  });
+
+  it("returns failed for a cancelled run", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { projectId, suiteId } = await seedTestDoc(t, workspaceId);
+
+    const runId = await seedRun(t, workspaceId, projectId, suiteId, null, {
+      status: "cancelled",
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "running", id: runId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("failed");
+  });
+
+  it("returns success for a completed exploration", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const projectId = await seedProject(t, workspaceId);
+
+    const explorationId = await t.run(async (ctx) => {
+      return ctx.db.insert("explorations", {
+        workspace_id: workspaceId as Id<"workspaces">,
+        project_id: projectId as Id<"projects">,
+        url: "https://example.com",
+        status: "completed",
+      });
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "exploring", id: explorationId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("success");
+  });
+
+  it("returns failed for a failed exploration", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const projectId = await seedProject(t, workspaceId);
+
+    const explorationId = await t.run(async (ctx) => {
+      return ctx.db.insert("explorations", {
+        workspace_id: workspaceId as Id<"workspaces">,
+        project_id: projectId as Id<"projects">,
+        url: "https://example.com",
+        status: "failed",
+      });
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "exploring", id: explorationId }],
+    });
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].outcome).toBe("failed");
+  });
+
+  it("handles mixed task types", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t, "user1");
+    const { suiteId } = await seedSuite(t, workspaceId);
+    const { projectId, suiteId: suiteId2, testId } = await seedTestDoc(
+      t,
+      workspaceId,
+    );
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(suiteId as Id<"suites">, { status: "ready" });
+    });
+
+    const runId = await seedRun(t, workspaceId, projectId, suiteId2, null, {
+      status: "failed",
+    });
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [
+        { type: "generating", id: suiteId },
+        { type: "running", id: runId },
+      ],
+    });
+
+    expect(outcomes).toHaveLength(2);
+    expect(outcomes.find((o) => o.type === "generating")!.outcome).toBe(
+      "success",
+    );
+    expect(outcomes.find((o) => o.type === "running")!.outcome).toBe("failed");
+  });
+
+  it("returns empty for invalid ids without throwing", async () => {
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t, "user1");
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [
+        { type: "generating", id: "nonexistent" },
+        { type: "running", id: "nonexistent" },
+      ],
+    });
+
+    expect(outcomes).toHaveLength(0);
+  });
+
+  it("excludes outcomes from other workspaces", async () => {
+    const t = convexTest(schema, modules);
+    const ws1 = await seedWorkspace(t, "user1");
+    const ws2 = await seedWorkspace(t, "user2");
+    const { suiteId } = await seedSuite(t, ws2);
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(suiteId as Id<"suites">, { status: "ready" });
+    });
+
+    const asUser1 = t.withIdentity({ subject: "user1", issuer: "test" });
+    const outcomes = await asUser1.query(api.suites.queries.getTaskOutcomes, {
+      tasks: [{ type: "generating", id: suiteId }],
+    });
+
+    expect(outcomes).toHaveLength(0);
   });
 });

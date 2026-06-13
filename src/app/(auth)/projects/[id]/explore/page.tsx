@@ -21,7 +21,6 @@ import {
   type DiscoveredFlow,
   type DiscoveredPage,
   type PrdCoverageItem,
-  type SelectionMode,
   makeToggleHandler,
   toggleAll,
   toggleArea,
@@ -38,10 +37,8 @@ export default function ExplorePage() {
   const [error, setError] = useState<string | null>(null);
   const [explorationId, setExplorationId] = useState<string | null>(null);
   const [selectedScenarios, setSelectedScenarios] = useState<Set<number>>(new Set());
-  const [selectedFlows, setSelectedFlows] = useState<Set<number>>(new Set());
   const [selectedDiscoveredPages, setSelectedDiscoveredPages] = useState<Set<number>>(new Set());
   const [pageAuthFlags, setPageAuthFlags] = useState<Map<number, boolean>>(new Map());
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>("flows");
   const [generating, setGenerating] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
   const [showListView, setShowListView] = useState(false);
@@ -113,8 +110,17 @@ export default function ExplorePage() {
   );
 
   const generatedAreas = useMemo<Set<string>>(
-    () => new Set((exploration as { generated_areas?: string[] } | null)?.generated_areas ?? []),
-    [exploration],
+    () => {
+      if (explorationSuites !== undefined) {
+        return new Set(
+          explorationSuites
+            .map((s: { area?: string }) => s.area)
+            .filter((a): a is string => !!a),
+        );
+      }
+      return new Set((exploration as { generated_areas?: string[] } | null)?.generated_areas ?? []);
+    },
+    [explorationSuites, exploration],
   );
 
   const emptyAreas = useMemo(
@@ -123,9 +129,7 @@ export default function ExplorePage() {
   );
 
   const hasFlows = discoveredFlows.length > 0;
-  const showScenarioSelection = selectionMode === "scenarios" || !hasFlows;
 
-  const toggleFlow = useMemo(() => makeToggleHandler(setSelectedFlows), []);
   const toggleScenario = useMemo(() => makeToggleHandler(setSelectedScenarios), []);
 
   const handleToggleArea = useCallback(
@@ -136,7 +140,6 @@ export default function ExplorePage() {
   const handleDiscoverPages = useCallback(async () => {
     setError(null);
     setSelectedScenarios(new Set());
-    setSelectedFlows(new Set());
     setSelectedDiscoveredPages(new Set());
     setPageAuthFlags(new Map());
     setExplorationId(null);
@@ -214,16 +217,7 @@ export default function ExplorePage() {
     }
   }, [effectiveExplorationId, manualUrlInput, updateDiscoveredPages, logError]);
 
-  const matchedScenarios = useMemo(() => {
-    if (selectionMode !== "flows" || selectedFlows.size === 0) return [];
-    const selectedFlowNames = discoveredFlows
-      .filter((_: DiscoveredFlow, i: number) => selectedFlows.has(i))
-      .map((f) => f.name);
-    const flowNameSet = new Set(selectedFlowNames);
-    return scenarios.filter((s) =>
-      s.related_flows?.some((rf) => flowNameSet.has(rf)),
-    );
-  }, [selectionMode, selectedFlows, discoveredFlows, scenarios]);
+  const selectableCount = [...selectedScenarios].filter((i) => scenarios[i] && !generatedAreas.has(scenarios[i].area)).length;
 
   const handleCancel = useCallback(async () => {
     if (!effectiveExplorationId) return;
@@ -238,35 +232,23 @@ export default function ExplorePage() {
     }
   }, [cancelExploration, effectiveExplorationId, logError]);
 
-  const selectableCount = selectionMode === "flows"
-    ? matchedScenarios.filter((s) => !generatedAreas.has(s.area)).length
-    : [...selectedScenarios].filter((i) => scenarios[i] && !generatedAreas.has(scenarios[i].area)).length;
-
   const handleGenerateTests = useCallback(async () => {
     if (!user) return;
 
-    let selected: Scenario[];
-    let flowContext: string | undefined;
-
-    if (selectionMode === "flows" && selectedFlows.size > 0) {
-      selected = matchedScenarios.filter((s) => !generatedAreas.has(s.area));
-      if (selected.length === 0) return;
-      const selectedFlowData = discoveredFlows.filter((_: DiscoveredFlow, i: number) =>
-        selectedFlows.has(i),
-      );
-      flowContext = selectedFlowData
-        .map(
-          (f) =>
-            `Flow: ${f.name}\nComplexity: ${f.complexity}\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.map((pi) => capturedPages[pi]?.title ?? `Page ${pi}`).join(", ")}`,
-        )
-        .join("\n\n");
-    } else {
-      selected = scenarios.filter((_: Scenario, i: number) =>
-        selectedScenarios.has(i) && !generatedAreas.has(scenarios[i].area),
-      );
-    }
+    const selected = scenarios.filter((_: Scenario, i: number) =>
+      selectedScenarios.has(i) && !generatedAreas.has(scenarios[i].area),
+    );
 
     if (selected.length === 0) return;
+
+    const flowContext = hasFlows
+      ? discoveredFlows
+          .map(
+            (f) =>
+              `Flow: ${f.name}\nComplexity: ${f.complexity}\nSteps: ${f.steps.join(" → ")}\nPages: ${f.pages_involved.map((pi) => capturedPages[pi]?.title ?? `Page ${pi}`).join(", ")}`,
+          )
+          .join("\n\n")
+      : undefined;
 
     setGenerating(true);
     setError(null);
@@ -303,7 +285,6 @@ export default function ExplorePage() {
       });
 
       setSelectedScenarios(new Set());
-      setSelectedFlows(new Set());
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create suites";
       setError(msg);
@@ -311,12 +292,11 @@ export default function ExplorePage() {
     } finally {
       setGenerating(false);
     }
-  }, [selectionMode, selectedFlows, selectedScenarios, matchedScenarios, scenarios, discoveredFlows, capturedPages, createSuitesForExploration, generateTestsForArea, markGeneratedAreas, effectiveExplorationId, logError, user, projectId, generatedAreas]);
+  }, [selectedScenarios, scenarios, discoveredFlows, capturedPages, hasFlows, createSuitesForExploration, generateTestsForArea, markGeneratedAreas, effectiveExplorationId, logError, user, projectId, generatedAreas]);
 
   const handleNewExploration = useCallback(() => {
     setExplorationId(null);
     setSelectedScenarios(new Set());
-    setSelectedFlows(new Set());
     setSelectedDiscoveredPages(new Set());
     setPageAuthFlags(new Map());
     setGoal("");
@@ -615,30 +595,15 @@ export default function ExplorePage() {
 
             {hasFlows && (
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
-                    Discovered Flows ({discoveredFlows.length})
-                  </span>
-                  {selectionMode === "flows" && (
-                    <button
-                      type="button"
-                      onClick={() => toggleAll(setSelectedFlows, selectedFlows, discoveredFlows.length)}
-                      className="text-[10px] font-[var(--font-mono)] text-[var(--accent)] hover:underline"
-                    >
-                      {selectedFlows.size === discoveredFlows.length ? "Deselect all" : "Select all"}
-                    </button>
-                  )}
-                </div>
+                <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] mb-2 block">
+                  Discovered Flows ({discoveredFlows.length})
+                </span>
                 <div className="space-y-2">
                   {discoveredFlows.map((flow, i) => (
                     <FlowCard
                       key={i}
                       flow={flow}
-                      index={i}
-                      selected={selectedFlows.has(i)}
-                      mode={selectionMode}
                       capturedPages={capturedPages}
-                      onToggle={toggleFlow}
                     />
                   ))}
                 </div>
@@ -679,55 +644,20 @@ export default function ExplorePage() {
 
             <div>
               <div className="flex items-center gap-2 mb-1">
-                {hasFlows && (
-                  <div className="flex rounded-[var(--radius-sm)] border border-[var(--border)] overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setSelectionMode("flows")}
-                      className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
-                        selectionMode === "flows"
-                          ? "bg-[var(--accent)] text-white"
-                          : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--fg)]"
-                      }`}
-                    >
-                      Select Flows
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectionMode("scenarios")}
-                      className={`px-3 py-1 text-[11px] font-[var(--font-mono)] transition-colors ${
-                        selectionMode === "scenarios"
-                          ? "bg-[var(--accent)] text-white"
-                          : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--fg)]"
-                      }`}
-                    >
-                      Select Scenarios
-                    </button>
-                  </div>
-                )}
-                {!hasFlows && (
-                  <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
-                    Proposed Scenarios ({scenarios.length})
-                  </span>
-                )}
-                {showScenarioSelection && (
-                  <button
-                    type="button"
-                    onClick={() => setShowListView((v) => !v)}
-                    className="ml-auto text-[10px] font-[var(--font-mono)] text-[var(--accent)] hover:underline"
-                  >
-                    {showListView ? "Map View" : "List View"}
-                  </button>
-                )}
+                <span className="text-[11px] font-[var(--font-mono)] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
+                  Proposed Scenarios ({scenarios.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowListView((v) => !v)}
+                  className="ml-auto text-[10px] font-[var(--font-mono)] text-[var(--accent)] hover:underline"
+                >
+                  {showListView ? "Map View" : "List View"}
+                </button>
               </div>
-              {hasFlows && (
-                <p className="text-xs text-[var(--muted)] mb-3">
-                  Select flows to auto-match related scenarios, or pick individual scenarios.
-                </p>
-              )}
             </div>
 
-            {showScenarioSelection && !showListView && (
+            {!showListView && (
               <FeatureMapGraph
                 scenarios={scenarios}
                 emptyAreas={emptyAreas}
@@ -738,7 +668,7 @@ export default function ExplorePage() {
               />
             )}
 
-            {showScenarioSelection && showListView && (
+            {showListView && (
               <ScenarioList
                 scenarios={scenarios}
                 selectedIndices={selectedScenarios}
@@ -747,16 +677,6 @@ export default function ExplorePage() {
                 totalScenarios={scenarios.length}
                 generatedAreas={generatedAreas}
               />
-            )}
-
-            {selectionMode === "flows" && selectedFlows.size > 0 && (
-              <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--border-soft)]">
-                <div className="text-xs text-[var(--muted)]">
-                  {matchedScenarios.length > 0
-                    ? `${matchedScenarios.length} matching scenario${matchedScenarios.length !== 1 ? "s" : ""} will be generated.`
-                    : "No scenarios match the selected flows. Switch to scenario selection to choose manually."}
-                </div>
-              </div>
             )}
 
             <div className="flex gap-3 pt-4 border-t border-[var(--border-soft)]">

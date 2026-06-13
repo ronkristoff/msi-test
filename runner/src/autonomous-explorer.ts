@@ -11,6 +11,7 @@ import {
   captureScreenshot,
   handleFormLogin,
   sleep,
+  waitForDomStability,
   NAVIGATION_TIMEOUT_MS,
 } from "./explorer-utils";
 import type { CapturedPage, DiscoveredFlow, ExplorationWorkItem, InteractiveElement, NavMenuItem } from "./types";
@@ -110,7 +111,11 @@ export async function executeAutonomousExploration(
 
         try {
           await page.goto(pageUrl, { timeoutMs: NAVIGATION_TIMEOUT_MS });
-          await sleep(page);
+          try {
+            await waitForDomStability(page, "h1, h2, h3, main, [role='main'], table, form, a[href]");
+          } catch {
+            await sleep(page);
+          }
 
           const title = await page.title();
 
@@ -153,7 +158,11 @@ export async function executeAutonomousExploration(
       }
     } else if (!skipNavigation) {
       await page.goto(work.url, { timeoutMs: NAVIGATION_TIMEOUT_MS });
-      await sleep(page);
+      try {
+        await waitForDomStability(page, "h1, h2, h3, main, [role='main'], table, form, a[href]");
+      } catch {
+        await sleep(page);
+      }
     }
 
     const instruction = buildInstruction(work) + buildReauthInstruction(work);
@@ -198,6 +207,8 @@ export async function executeAutonomousExploration(
           log(`Agent step: new page ${normalized}`);
 
           try {
+            await sleep(page);
+
             const title = await page.title();
             const extraction = await stagehand.extract();
             const pageText = getPageText(extraction);

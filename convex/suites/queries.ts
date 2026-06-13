@@ -1,6 +1,11 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { getOptionalOwnedEntity, getOptionalMemberWorkspace, getUserName } from "../lib/requireAuth";
+
+const ACTIVE_EXPLORATION_STATUSES = new Set([
+  "pending", "capturing", "analyzing", "discovering", "discovered", "captured", "analyzed",
+]);
 
 export const getSuites = query({
   args: { project_id: v.id("projects") },
@@ -359,5 +364,96 @@ export const getActiveTasks = query({
     }
 
     return tasks;
+  },
+});
+
+export const getTaskOutcomes = query({
+  args: {
+    tasks: v.array(
+      v.object({
+        type: v.union(
+          v.literal("generating"),
+          v.literal("running"),
+          v.literal("exploring"),
+          v.literal("healing"),
+        ),
+        id: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const memberWs = await getOptionalMemberWorkspace(ctx);
+    if (!memberWs) return [];
+    const workspaceId = memberWs.workspace._id;
+
+    const results: {
+      type: "generating" | "running" | "exploring" | "healing";
+      id: string;
+      outcome: "success" | "failed";
+      name: string;
+      projectId: string;
+      suiteId?: string;
+    }[] = [];
+
+    for (const task of args.tasks) {
+      try {
+        if (task.type === "generating") {
+          const doc = await ctx.db.get(task.id as Id<"suites">);
+          if (doc && doc.workspace_id === workspaceId && doc.status !== "generating") {
+            results.push({
+              type: "generating",
+              id: task.id,
+              outcome: doc.status === "failed" ? "failed" : "success",
+              name: doc.name,
+              projectId: doc.project_id,
+              suiteId: doc._id,
+            });
+          }
+        } else if (task.type === "running") {
+          const doc = await ctx.db.get(task.id as Id<"runs">);
+          if (doc && doc.workspace_id === workspaceId && doc.status !== "running") {
+            const failed =
+              doc.status === "failed" ||
+              doc.status === "cancelled" ||
+              doc.status === "timed_out";
+            results.push({
+              type: "running",
+              id: task.id,
+              outcome: failed ? "failed" : "success",
+              name: doc.suite_id ? "Suite run" : "Test run",
+              projectId: doc.project_id,
+              suiteId: doc.suite_id ?? undefined,
+            });
+          }
+        } else if (task.type === "exploring") {
+          const doc = await ctx.db.get(task.id as Id<"explorations">);
+          if (doc && doc.workspace_id === workspaceId && !ACTIVE_EXPLORATION_STATUSES.has(doc.status)) {
+            results.push({
+              type: "exploring",
+              id: task.id,
+              outcome: doc.status === "failed" ? "failed" : "success",
+              name: `Exploring ${doc.url}`,
+              projectId: doc.project_id,
+            });
+          }
+        } else if (task.type === "healing") {
+          const doc = await ctx.db.get(task.id as Id<"tests">);
+          if (doc && doc.workspace_id === workspaceId && doc.status !== "healing") {
+            results.push({
+              type: "healing",
+              id: task.id,
+              outcome: doc.status === "draft" ? "failed" : "success",
+              name: doc.name,
+              projectId: "",
+              suiteId: doc.suite_id,
+            });
+          }
+        }
+      } catch {
+        // Entity may have been deleted; skip silently.
+      }
+    }
+
+    return results;
   },
 });

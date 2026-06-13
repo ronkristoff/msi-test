@@ -52,6 +52,12 @@ const PLAYWRIGHT_TEST_RULES = `- Use a single test() call — do NOT use test.de
 - For assertions on non-interactive text (taglines, descriptions, body content), prefer getByRole('heading', { name: /pattern/ }) over getByText. If you must use getByText, always scope it to a section: page.locator('#hero').getByText('pattern'). NEVER use unscoped getByText with regex patterns on pages that may repeat text across sections.
 - For assertions, use ONLY text values that appear in the page context (headings, table data, status text). Do NOT fabricate text that isn't shown in the context.
 - For URL assertions, use flexible patterns: toHaveURL(/settings/) not toHaveURL(/\/settings\//). Prefer asserting on visible content over URL after navigation.
+- NEVER derive URL paths from page titles. A page titled "Dashboard" may live at "/", "/home", or any other path. ALWAYS use the exact URL shown in parentheses in the page context, not a path invented from the title. After login, do NOT assert toHaveURL(/\/dashboard/) unless the auth context explicitly provides the post-login URL containing "dashboard".
+- NEVER use getByRole('main'), getByRole('navigation'), getByRole('banner'), or getByRole('contentinfo') as assertion targets — these ARIA landmarks frequently appear multiple times on a page. Use specific headings, visible text, or URL assertions instead.
+- For password fields, ALWAYS use page.locator('input[type="password"]') — do NOT use getByLabel('Password') because it may match a "Show password" toggle button whose aria-label contains "Password".
+- STRICT MODE IS NON-NEGOTIABLE: When the page context shows the same button or link text repeated across sections (e.g. "Start your free trial" in hero, features, integration, how-it-works, and footer), you MUST scope the locator to a specific section. Example: page.locator('#hero').getByRole('button', { name: 'Start your free trial' }).first(). Unscoped locators for known duplicates WILL cause strict mode failure.
+- When a button or link appears multiple times, ALWAYS append .first() even after scoping. Scoping to getByRole('main') is NOT sufficient if duplicates exist in multiple sections within main — only section ID scoping (#hero, #features) eliminates duplicates. When no section ID is available, .first() is mandatory.
+- Playwright locators match case-insensitively by substring by default. getByRole('link', { name: 'How It Works' }) will ALSO match "See how it works". When a link/button name could be a substring of another element's text, use { exact: true }: getByRole('link', { name: 'How It Works', exact: true }).
 - Do NOT assert toBeVisible() on elements the page context shows as hidden/aria-hidden unless your test triggers them to appear.
 - Do NOT assert on framework-internal elements (e.g. __next-route-announcer__, empty role="status" divs) — they are not user-facing.
 - Do NOT test keyboard shortcuts or ARIA live region content unless the page context explicitly shows them as interactive features with populated content.
@@ -429,7 +435,7 @@ export const generateExplorationTests = action({
     const totalScenarios = args.selected_scenarios.length;
 
     const promptTemplate = (scenario: typeof args.selected_scenarios[number], kind: "playwright" | "hybrid", liveSnapshots: SnapshotData[], feedbackResult: FeedbackDiscoveryResult | null) => {
-      const authContext = buildAuthPromptContext(project, scenario, discoveredPages);
+      const authContext = buildAuthPromptContext(project, scenario, discoveredPages, capturedPages);
       const pagesCtx = buildFilteredPagesContext(capturedPages, scenario.relevant_page_urls, 6000);
       const pagesSection = mergeLiveAndExplorationContext(liveSnapshots, pagesCtx);
       const feedbackContext = buildFeedbackPromptContext(feedbackResult, scenario.flow_summary || scenario.name);
@@ -631,6 +637,7 @@ export const generateExplorationTestsForArea = action({
     const model = getWorkspaceModel(aiConfig);
     const testIds: string[] = [];
     let failed = 0;
+    const failedScenarioNames: string[] = [];
     const startTime = Date.now();
 
     for (let i = 0; i < args.scenarios.length; i++) {
@@ -677,7 +684,7 @@ export const generateExplorationTestsForArea = action({
           title: `Test — ${scenario.name}`,
         });
 
-      const authContext = buildAuthPromptContext(project, scenario, discoveredPages);
+      const authContext = buildAuthPromptContext(project, scenario, discoveredPages, capturedPages);
         const prompt = buildPlaywrightTestPrompt(
           exploration.url, authContext, navMenuContext, scenario, pagesSection, flowContextSection, prdSection,
         ) + feedbackContext;
@@ -713,14 +720,23 @@ export const generateExplorationTestsForArea = action({
         console.log(`[generateExplorationTestsForArea] ${scenario.name}: ${blocks.length} test(s) generated (live snapshots: ${hasSnapshots})`);
       } catch (err) {
         failed++;
+        failedScenarioNames.push(scenario.name);
         console.error(`[generateExplorationTestsForArea] Failed for "${scenario.name}":`, err);
       }
     }
 
     if (testIds.length > 0) {
-      await markSuiteReady(ctx, args.suite_id);
+      if (failedScenarioNames.length > 0) {
+        await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+          suite_id: args.suite_id,
+          status: "ready",
+          failed_scenarios: failedScenarioNames,
+        });
+      } else {
+        await markSuiteReady(ctx, args.suite_id);
+      }
     } else {
-      await markSuiteFailed(ctx, args.suite_id, failed > 0 ? `AI failed to generate tests for all ${args.scenarios.length} scenarios` : "No test blocks generated");
+      await markSuiteFailed(ctx, args.suite_id, failed > 0 ? `AI failed to generate tests for all ${args.scenarios.length} scenarios` : "No test blocks generated", failedScenarioNames);
     }
 
     return { testIds, failed };
@@ -764,6 +780,64 @@ export const retryExplorationGeneration = action({
     await ctx.runAction(api.ai.exploreApp.generateExplorationTestsForArea, {
       exploration_id: suite.exploration_id as Id<"explorations">,
       scenarios: areaScenarios,
+      suite_id: args.suite_id,
+      area: suite.area,
+    });
+  },
+});
+
+export const retryFailedScenarios = action({
+  args: {
+    suite_id: v.id("suites"),
+  },
+  handler: async (ctx, args) => {
+    const suite = await ctx.runQuery(api.suites.queries.getSuite, {
+      suite_id: args.suite_id,
+    });
+    if (!suite) {
+      throw new ConvexError("Suite not found");
+    }
+
+    if (!suite.exploration_id) {
+      throw new ConvexError("Suite has no associated exploration");
+    }
+
+    if (!suite.area) {
+      throw new ConvexError("Suite has no area");
+    }
+
+    if (!suite.failed_scenarios || suite.failed_scenarios.length === 0) {
+      throw new ConvexError("No failed scenarios to retry");
+    }
+
+    const exploration = await ctx.runQuery(api.explorations.queries.getExploration, {
+      exploration_id: suite.exploration_id as Id<"explorations">,
+    });
+    if (!exploration) {
+      throw new ConvexError("Exploration not found");
+    }
+
+    const allScenarios = exploration.proposed_scenarios ?? [];
+    const failedNames = new Set(suite.failed_scenarios);
+    const failedScenarios = allScenarios.filter(
+      (s: { name: string; area: string }) =>
+        s.area === suite.area && failedNames.has(s.name),
+    );
+
+    if (failedScenarios.length === 0) {
+      throw new ConvexError("Failed scenarios no longer found in exploration data");
+    }
+
+    await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
+      suite_id: args.suite_id,
+      status: "generating",
+      failed_scenarios: undefined,
+      progress_message: `Retrying ${failedScenarios.length} failed scenario(s)...`,
+    });
+
+    ctx.scheduler.runAfter(0, api.ai.exploreApp.generateExplorationTestsForArea, {
+      exploration_id: suite.exploration_id as Id<"explorations">,
+      scenarios: failedScenarios,
       suite_id: args.suite_id,
       area: suite.area,
     });

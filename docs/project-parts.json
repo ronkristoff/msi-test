@@ -1,0 +1,72 @@
+{
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "part_id": "frontend",
+      "display_name": "Frontend (Next.js)",
+      "project_type_id": "web",
+      "root_path": "src/",
+      "tech_stack": {
+        "framework": "Next.js",
+        "version": "16.2.6",
+        "language": "TypeScript",
+        "ui_library": "React 19.2.4",
+        "styling": "Tailwind CSS v4",
+        "forms": "react-hook-form + zod",
+        "testing": "vitest + @testing-library/react + jsdom"
+      }
+    },
+    {
+      "part_id": "backend",
+      "display_name": "Backend (Convex)",
+      "project_type_id": "backend",
+      "root_path": "convex/",
+      "tech_stack": {
+        "platform": "Convex",
+        "version": "1.39.1",
+        "language": "TypeScript",
+        "auth": "better-auth 1.6.11",
+        "ai": "@convex-dev/agent 0.6.1",
+        "browser": "stagehand 3.4.0",
+        "testing": "vitest + convex-test + edge-runtime"
+      }
+    },
+    {
+      "part_id": "runner",
+      "display_name": "Runner (Playwright)",
+      "project_type_id": "backend",
+      "root_path": "runner/",
+      "tech_stack": {
+        "runtime": "Node.js (tsx)",
+        "language": "TypeScript",
+        "browser": "Playwright 1.60.0",
+        "ai_browser": "Stagehand 3.4.0",
+        "testing": "vitest"
+      }
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "frontend",
+      "to": "backend",
+      "type": "Convex Reactive Queries + Mutations + Actions",
+      "protocol": "WebSocket (queries) + HTTP POST (mutations/actions)",
+      "auth": "Better Auth session token via ConvexBetterAuthProvider"
+    },
+    {
+      "from": "runner",
+      "to": "backend",
+      "type": "Convex Actions (HTTP POST)",
+      "protocol": "ConvexHttpClient",
+      "auth": "Shared RUNNER_SECRET"
+    },
+    {
+      "from": "backend",
+      "to": "runner",
+      "type": "HTTP API",
+      "protocol": "HTTP POST (JSON)",
+      "endpoints": ["/snapshot", "/validate-test", "/discover-feedback"],
+      "auth": "Internal (called from within Convex actions)"
+    }
+  ]
+}

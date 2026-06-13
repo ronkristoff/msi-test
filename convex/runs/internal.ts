@@ -326,3 +326,65 @@ export const recordHealingHistory = internalMutation({
     });
   },
 });
+
+export const markAutoHealAttempted = internalMutation({
+  args: {
+    run_id: v.id("runs"),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.run_id);
+    if (!run) return;
+    await ctx.db.patch(args.run_id, { auto_heal_attempted: true });
+  },
+});
+
+export const createAutoHealRerun = internalMutation({
+  args: {
+    original_run_id: v.id("runs"),
+    project_id: v.id("projects"),
+    suite_id: v.optional(v.id("suites")),
+    environment_id: v.id("environments"),
+    test_ids: v.array(v.id("tests")),
+    workspace_id: v.id("workspaces"),
+  },
+  handler: async (ctx, args) => {
+    const runId = await ctx.db.insert("runs", {
+      workspace_id: args.workspace_id,
+      project_id: args.project_id,
+      suite_id: args.suite_id,
+      test_id: args.test_ids.length === 1 ? args.test_ids[0] : undefined,
+      rerun_of_run_id: args.original_run_id,
+      rerun_of_test_id: args.test_ids.length === 1 ? args.test_ids[0] : undefined,
+      environment_id: args.environment_id,
+      trigger_type: "rerun",
+      status: "running",
+      triggered_by: "auto-heal",
+    });
+
+    for (const testId of args.test_ids) {
+      const test = await ctx.db.get(testId);
+      if (test && test.status === "draft") {
+        await ctx.db.patch(testId, { status: "approved", healing_started_at: undefined });
+      }
+
+      await ctx.db.insert("run_results", {
+        workspace_id: args.workspace_id,
+        run_id: runId,
+        test_id: testId,
+        status: "pending",
+        duration_ms: 0,
+        retries: 0,
+      });
+    }
+
+    if (args.suite_id) {
+      await ctx.db.patch(args.suite_id, {
+        locked_by: "auto-heal",
+        locked_at: Date.now(),
+        locked_reason: "running",
+      });
+    }
+
+    return runId;
+  },
+});

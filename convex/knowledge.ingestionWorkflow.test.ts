@@ -486,4 +486,60 @@ describe("knowledge ingestion: data layer", () => {
       expect(kb).toBeNull();
     });
   });
+
+  describe("extraction step wiring", () => {
+    it("ingestion workflow and extraction action are both registered", async () => {
+      const workflowSource = await import("./knowledge/ingestionWorkflow");
+      expect(workflowSource.ingestionWorkflow).toBeDefined();
+
+      const { internal } = await import("./_generated/api");
+      expect(
+        internal.knowledge.extractionActions.extractArchitectureAndModules,
+      ).toBeDefined();
+    });
+
+    it("extractionActions module exports extractArchitectureAndModules", async () => {
+      const extractionModule = await import("./knowledge/extractionActions");
+      expect(extractionModule.extractArchitectureAndModules).toBeDefined();
+    });
+
+    it("empty-repo guard: _getChunksForExtraction returns empty when no chunks", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+
+      const { internal } = await import("./_generated/api");
+      const chunks = await t.query(
+        internal.knowledge.internal._getChunksForExtraction,
+        { knowledge_base_id: kbId },
+      );
+
+      expect(chunks).toHaveLength(0);
+    });
+
+    it("extraction error helper: 401 → auth error message", async () => {
+      const { buildExtractionErrorMessage } = await import(
+        "./knowledge/extractionActions"
+      );
+      const msg = buildExtractionErrorMessage({ statusCode: 401, message: "bad key" });
+      expect(msg).toContain("authentication");
+    });
+
+    it("extraction error helper: 404 → model not available", async () => {
+      const { buildExtractionErrorMessage } = await import(
+        "./knowledge/extractionActions"
+      );
+      const msg = buildExtractionErrorMessage({ statusCode: 404, message: "not found" });
+      expect(msg).toContain("model not available");
+    });
+
+    it("extraction error helper: generic error → message included", async () => {
+      const { buildExtractionErrorMessage } = await import(
+        "./knowledge/extractionActions"
+      );
+      const msg = buildExtractionErrorMessage(new Error("rate limited"));
+      expect(msg).toContain("rate limited");
+    });
+  });
 });

@@ -109,6 +109,22 @@ Prefer asserting column headers, stable statuses, table structure, and row exist
 
 Use flexible URL matching: toHaveURL(/settings/) NOT toHaveURL(/\\/settings\\//) — prefer substring patterns over path-segment patterns. Do NOT assert exact URL paths unless the page context shows the exact route. After clicking a navigation link, prefer asserting on visible page content (heading, key element) over the URL.
 
+NEVER derive URL paths from page titles. A page titled "Dashboard" may live at "/", "/home", or any other path. ALWAYS use the exact URL shown in parentheses in the page context, not a path invented from the title. After login, do NOT assert toHaveURL(/\/dashboard/) unless the auth context explicitly provides the post-login URL containing "dashboard". The not.toHaveURL assertion is sufficient to confirm successful login.
+
+## Landmark Role Rules
+
+NEVER use getByRole('main'), getByRole('navigation'), getByRole('banner'), or getByRole('contentinfo') as assertion targets — these are ARIA landmarks that frequently appear multiple times on a page (e.g. one in the app shell layout and one in the content area). Use specific headings, visible text, or URL assertions to verify page load instead. Example: replace await expect(page.getByRole('main')).toBeVisible() with await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible() or await expect(page).toHaveURL(/settings/).
+
+## Password Field Rules
+
+For password fields, ALWAYS use page.locator('input[type="password"]') — do NOT use getByLabel('Password') because it may match a "Show password" toggle button whose aria-label contains "Password".
+
+## Strict Mode Enforcement
+
+STRICT MODE IS NON-NEGOTIABLE: When the page context shows the same button or link text repeated across sections (e.g. "Start your free trial" in hero, features, integration, how-it-works, and footer), you MUST scope the locator to a specific section. Example: page.locator('#hero').getByRole('button', { name: 'Start your free trial' }).first(). Unscoped locators for known duplicates WILL cause strict mode failure.
+
+When a button or link appears multiple times, ALWAYS append .first() even after scoping. Scoping to getByRole('main') is NOT sufficient if duplicates exist in multiple sections within main — only section ID scoping (#hero, #features) eliminates duplicates. When no section ID is available, .first() is mandatory.
+
 ## Element Visibility Rules
 
 Before asserting toBeVisible(), check if the page context shows the element as hidden or aria-hidden. If so, do NOT assert visibility unless your test triggers the element to appear. Do NOT assert on framework-internal elements (id containing "__next", role="status" with empty content, __next-route-announcer__). Do NOT test ARIA live regions unless the page context shows them populated. Do NOT test keyboard shortcuts unless explicitly documented.
@@ -278,6 +294,25 @@ MANDATORY SAFETY: After applying any scoping strategy above, ALWAYS append .firs
 
 Check the live page context for section ids, landmark roles, or headings to use as scope. Do NOT remove or weaken the assertion — fix the locator instead. Do NOT leave the locator unscoped — it will fail again with the same error. When the error shows which element index is needed, use .nth(N) with that index.
 
+## Landmark Strict Mode Rules
+
+When the failing locator is a landmark role (main, navigation, banner, complementary, contentinfo), do NOT try to scope or filter it — REPLACE the entire assertion. Landmarks are structural containers, not reliable test targets. Fix strategy:
+1. Replace with a heading assertion: page.getByRole('heading', { name: /dashboard/i })
+2. Replace with a URL assertion: await expect(page).toHaveURL(/pattern/)
+3. Replace with specific visible text: page.getByText(/welcome/i).first()
+Example: replace await expect(page.getByRole('main')).toBeVisible() with await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible()
+
+## URL Assertion Timeout Rules
+
+When a toHaveURL() assertion times out, the expected URL path may be wrong — not just slow. Check the authentication context section above for the actual post-login redirect URL. If the test asserts toHaveURL(/\/dashboard/) or any hardcoded path but the auth context provides a different post-login URL, replace the URL pattern with the correct one. If no post-login URL is provided in the auth context, replace toHaveURL with: await expect(page).not.toHaveURL(/\/(login|sign-in|signin)/) which is sufficient to confirm login succeeded.
+
+## Anti-Pattern Cleanup Rules
+
+While you should make minimal changes, you MUST also fix these known anti-patterns when you spot them in the code, even if they are not the direct cause of the reported error:
+- toHaveURL(/\/dashboard/) or any hardcoded URL path when the auth context provides a different post-login URL — replace with the correct URL or remove the assertion
+- getByRole('main'), getByRole('navigation'), getByRole('banner'), getByRole('contentinfo') used as assertion targets — replace with heading, text, or URL assertions
+- After login, do NOT assume URL paths from page titles. A page titled "Dashboard" may live at /, /home, /app, or any other path.
+
 ## Text Assertion Duplicate Rules
 
 When the original test uses getByText with a regex or substring that matches multiple non-interactive elements (e.g. the same tagline in a hero section and body text):
@@ -439,6 +474,9 @@ Duplicate element handling:
 - If the page context shows multiple elements with the same role and text, the suggested locators will already be scoped (e.g. page.locator('#features').getByRole('button', { name: 'Sign up' }))
 - NEVER use unscoped getByRole/getByText/getByPlaceholder for elements that appear multiple times on the page
 - If no scoped suggested locator exists, use .nth(N) or scope to a parent section with an id
+- When a button or link appears multiple times, ALWAYS append .first() even after scoping. Scoping to getByRole('main') is NOT sufficient if duplicates exist in multiple sections within main — only section ID scoping (#hero, #features) eliminates duplicates. When no section ID is available, .first() is mandatory.
+- Playwright locators match case-insensitively by substring by default. getByRole('link', { name: 'How It Works' }) will ALSO match "See how it works". When a link/button name could be a substring of another element's text, use { exact: true }: getByRole('link', { name: 'How It Works', exact: true }).
+- NEVER use getByRole('main'), getByRole('navigation'), getByRole('banner'), or getByRole('contentinfo') as assertion targets — these ARIA landmarks frequently appear multiple times on a page. Use specific headings, visible text, or URL assertions instead.
 
 Locator strategy (priority order):
 1. Use the suggested locator from the page context exactly as provided

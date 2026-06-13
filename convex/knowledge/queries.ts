@@ -1,7 +1,7 @@
 import { query, internalQuery, action } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { getOptionalOwnedEntity, getOwnedEntity } from "../lib/requireAuth";
+import { getOptionalOwnedEntity, getOwnedEntity, getOptionalMemberWorkspace } from "../lib/requireAuth";
 import {
   OLD_RD_PREVIEW_LENGTH,
   EMBEDDING_MAX_QUERY_LENGTH,
@@ -100,6 +100,56 @@ export const getIngestionProgress = query({
       total_files: kb.total_files ?? 0,
       total_size_bytes: kb.total_size_bytes ?? 0,
     };
+  },
+});
+
+export const getKnowledgeBase = query({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const result = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
+    if (!result) return null;
+
+    const kb = await ctx.db
+      .query("knowledge_bases")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .order("desc")
+      .first();
+
+    if (!kb) return null;
+    if (kb.workspace_id !== result.entity.workspace_id) return null;
+
+    return kb;
+  },
+});
+
+export const getModules = query({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    const memberWorkspace = await getOptionalMemberWorkspace(ctx);
+    if (!memberWorkspace) return null;
+
+    const kb = await ctx.db.get(args.knowledge_base_id);
+    if (!kb) return null;
+    if (kb.workspace_id !== memberWorkspace.workspace._id) return null;
+
+    const modules = await ctx.db
+      .query("kb_modules")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.knowledge_base_id),
+      )
+      .collect();
+
+    return modules.map((m) => ({
+      _id: m._id,
+      name: m.name,
+      description: m.description ?? null,
+      file_count: m.file_count ?? 0,
+      dependencies: m.dependencies ?? [],
+    }));
   },
 });
 

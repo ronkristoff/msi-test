@@ -12,6 +12,17 @@ interface ScenarioHint {
   relevant_page_urls?: string[];
 }
 
+interface PageAuthInfo {
+  url: string;
+  title?: string;
+  auth_required?: boolean;
+}
+
+interface CapturedPageForAuth {
+  url: string;
+  title?: string;
+}
+
 const PUBLIC_PAGE_PATTERNS = [
   /sign[\s-]?up/i,
   /register/i,
@@ -24,24 +35,33 @@ const PUBLIC_PAGE_PATTERNS = [
   /unauth/i,
 ];
 
-function isPublicScenario(scenario: ScenarioHint | undefined): boolean {
+function isPublicScenario(scenario?: ScenarioHint): boolean {
   if (!scenario) return false;
+  const text = `${scenario.name ?? ""} ${scenario.description ?? ""} ${scenario.flow_summary ?? ""}`;
+  return PUBLIC_PAGE_PATTERNS.some((p) => p.test(text));
+}
 
-  const texts = [
-    scenario.name,
-    scenario.description,
-    scenario.flow_summary,
-    ...(scenario.relevant_page_urls ?? []),
-  ].filter(Boolean);
+function isPublicByPageAuth(scenario?: ScenarioHint, pages?: PageAuthInfo[]): boolean | null {
+  if (!scenario || !pages || !scenario.relevant_page_urls) return null;
+  const urls = scenario.relevant_page_urls;
+  const matching = pages.filter((p) => urls.some((u) => p.url.includes(new URL(u).pathname)));
+  if (matching.length === 0) return null;
+  return matching.every((p) => p.auth_required === false);
+}
 
-  return texts.some((text) =>
-    PUBLIC_PAGE_PATTERNS.some((pattern) => pattern.test(text!)),
-  );
+function normalizeUrlKey(url: string): string {
+  try {
+    return new URL(url).pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    return url.replace(/\/+$/, "");
+  }
 }
 
 export function buildAuthPromptContext(
   project: AuthFields | null,
   scenario?: ScenarioHint,
+  pages?: PageAuthInfo[],
+  _capturedPages?: CapturedPageForAuth[],
 ): string {
   if (!project) {
     return "";
@@ -54,6 +74,13 @@ export function buildAuthPromptContext(
   if (project.explore_auth_mode === "form") {
     if (!project.explore_username) {
       return "\nNote: The application requires form-based login but no credentials are configured. Generate tests for public pages only unless the test description mentions login.";
+    }
+
+    const pageAuthResult = isPublicByPageAuth(scenario, pages);
+    if (pageAuthResult === true) {
+      return `
+
+Note: This application requires authentication for most pages, but THIS scenario tests a page marked as public (no auth required). Do NOT perform login steps — navigate directly to the target URL. Authentication is not needed and would interfere with the test.`;
     }
 
     if (isPublicScenario(scenario)) {
@@ -75,14 +102,23 @@ ${loginUrl}
 Username/Email: "${project.explore_username}"
 Password: "${project.explore_password ?? ""}"
 
+IMPORTANT — Post-login URL rules:
+- Do NOT assume a post-login URL path. A page titled "Dashboard" may live at /, /home, /app, or any other path.
+- Do NOT add any toHaveURL assertion after login. The not.toHaveURL check below is sufficient to confirm successful login.
+- Do NOT use toHaveURL(/\/dashboard/) or any other assumed path.
+
 You MUST include these login steps at the beginning of this test, right after page.goto():
 
   await page.locator('input[type="email"], input[type="text"][name*="email" i], input[name*="user" i], input[autocomplete="email"]').first().fill("${project.explore_username}");
   await page.locator('input[type="password"]').first().fill("${project.explore_password ?? ""}");
   await page.getByRole("button", { name: /sign.?in|log.?in|submit/i }).click();
-  await expect(page).not.toHaveURL(/\\/(login|sign-in|signin)/);
+  await expect(page).not.toHaveURL(/\\/(login|sign-in|signin)/, { timeout: 15000 });
+
+Do NOT add any toHaveURL assertion after the not.toHaveURL check. The not.toHaveURL assertion is sufficient to confirm successful login. After login, verify page content using headings, visible elements, or text assertions — NOT URL paths.
 
 After login, navigate to internal pages by clicking navigation links (sidebar, menu items) — do NOT use page.goto() for internal SPA routes. Use page.goto() only for the initial page load.
+
+NEVER derive URL paths from page titles.
 
 Use the EXACT credentials shown above. Do NOT use placeholder values like admin@example.com or process.env.ADMIN_EMAIL. The credentials above are the real ones.`;
   }

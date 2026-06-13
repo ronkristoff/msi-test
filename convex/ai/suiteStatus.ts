@@ -6,11 +6,13 @@ export async function markSuiteFailed(
   ctx: ActionCtx,
   suiteId: Id<"suites">,
   error: string,
+  failedScenarios?: string[],
 ) {
   await ctx.runMutation(internal.suites.mutations.updateSuiteStatus, {
     suite_id: suiteId,
     status: "failed",
     generation_error: error,
+    failed_scenarios: failedScenarios,
   });
 }
 

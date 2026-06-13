@@ -37,6 +37,9 @@ export const EMBEDDING_MAX_QUERY_LENGTH = 8000;
 export const EMBEDDING_SEARCH_MIN_LIMIT = 1;
 export const EMBEDDING_SEARCH_MAX_LIMIT = 50;
 
+export const EXTRACTION_MAX_CONTEXT_CHARS = 80000;
+export const EXTRACTION_MAX_MODULES = 50;
+
 export function prependScheme(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return "";

@@ -1,41 +1,22 @@
 "use client";
 
-import type { CapturedPageWithUrl, DiscoveredFlow, SelectionMode } from "./types";
+import type { CapturedPageWithUrl, DiscoveredFlow } from "./types";
 import { flowDescription, complexityColor } from "./types";
 
 interface FlowCardProps {
   flow: DiscoveredFlow;
-  index: number;
-  selected: boolean;
-  mode: SelectionMode;
   capturedPages: CapturedPageWithUrl[];
-  onToggle: (index: number) => void;
 }
 
-export function FlowCard({ flow, index, selected, mode, capturedPages, onToggle }: FlowCardProps) {
+export function FlowCard({ flow, capturedPages }: FlowCardProps) {
   const flowPages = flow.pages_involved
     .map((pi) => capturedPages[pi])
     .filter(Boolean) as CapturedPageWithUrl[];
   const thumbnails = flowPages.filter((p) => p.screenshot_url);
 
   return (
-    <label
-      className={`block p-3 rounded-[var(--radius-sm)] border cursor-pointer transition-colors duration-[var(--motion-fast)] ${
-        mode === "flows" && selected
-          ? "border-[var(--accent)] bg-[var(--accent)]/5"
-          : "border-[var(--border)] hover:border-[var(--border-strong)]"
-      }`}
-    >
+    <div className="p-3 rounded-[var(--radius-sm)] border border-[var(--border)]">
       <div className="flex items-start gap-3">
-        {mode === "flows" && (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={() => onToggle(index)}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-0.5 accent-[var(--accent)] shrink-0"
-          />
-        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-medium text-[var(--fg)]">{flow.name}</span>
@@ -62,7 +43,7 @@ export function FlowCard({ flow, index, selected, mode, capturedPages, onToggle 
           )}
         </div>
       </div>
-    </label>
+    </div>
   );
 }
 

@@ -15,6 +15,7 @@ type SuiteBannerData = {
   source_type: string;
   project_id: string;
   testCount: number;
+  failed_scenarios?: string[];
 };
 
 type SuiteStatusBannersProps = {
@@ -29,6 +30,7 @@ export function SuiteStatusBanners({ suite, activeRun }: SuiteStatusBannersProps
   const generatePrdTests = useAction(api.ai.generatePrdTests.generatePrdTests);
   const generateNlTests = useAction(api.ai.generateNlTests.generateNlTests);
   const retryExploration = useAction(api.ai.exploreApp.retryExplorationGeneration);
+  const retryFailed = useAction(api.ai.exploreApp.retryFailedScenarios);
 
   const handleRetry = async () => {
     try {
@@ -84,6 +86,39 @@ export function SuiteStatusBanners({ suite, activeRun }: SuiteStatusBannersProps
             {suite.progress_message || "Generating tests..."} {suite.testCount > 0 && `(${suite.testCount} created so far)`}
           </span>
         </div>
+      </div>
+    );
+  }
+
+  if (suite.status === "ready" && suite.failed_scenarios && suite.failed_scenarios.length > 0) {
+    return (
+      <div className="bg-[var(--surface)] border border-[var(--warning)]/40 rounded-[var(--radius-md)] p-4 shadow-[var(--elev-raised)] mb-5">
+        <div className="flex items-center gap-3 mb-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span className="text-sm font-medium text-[var(--fg)]">
+            {suite.failed_scenarios.length} scenario(s) failed to generate
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {suite.failed_scenarios.map((name) => (
+            <span key={name} className="text-xs bg-[var(--warning)]/15 text-[var(--warning)] px-2 py-0.5 rounded-full">
+              {name}
+            </span>
+          ))}
+        </div>
+        <Button size="sm" onClick={() => {
+          retryFailed({ suite_id: suite._id as Id<"suites"> }).catch((err) => {
+            logError(err instanceof Error ? err.message : "Retry failed scenarios failed", {
+              severity: "error",
+              context: { source: "SuiteStatusBanners.retryFailed" },
+            });
+          });
+        }}>
+          Retry Failed Scenarios
+        </Button>
       </div>
     );
   }

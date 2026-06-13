@@ -46,3 +46,6 @@ opencode.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# graphify extraction cache (regenerable)
+graphify-out/cache/ast/

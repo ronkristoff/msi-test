@@ -32,4 +32,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "resetStaleHealingTests",
+  { minutes: 2 },
+  internal.tests.mutations.resetStaleHealingTests,
+  {},
+);
+
 export default crons;

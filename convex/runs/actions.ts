@@ -2,7 +2,7 @@
 
 import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { createFailureAnalysisAgent, failureAnalysisSchema } from "../ai/agents";
 import { getWorkspaceModel } from "../ai/model";
 import { extractJsonFromAiResponse } from "../ai/parse";
@@ -81,6 +81,9 @@ export const runnerCompleteRun = action({
       run_id: args.run_id,
     });
     await ctx.runAction(internal.runs.actions.analyzeFailures, {
+      run_id: args.run_id,
+    });
+    await ctx.runAction(internal.runs.actions.autoHealAndRerun, {
       run_id: args.run_id,
     });
   },
@@ -200,6 +203,93 @@ export const runnerRecordHealingHistory = action({
   handler: async (ctx, args) => {
     validateRunnerSecret(args.runner_secret);
     await ctx.runMutation(internal.runs.internal.recordHealingHistory, stripSecret(args));
+  },
+});
+
+const HEALABLE_PATTERNS = [
+  /timeout/i,
+  /element.*not found/i,
+  /waiting for.*element/i,
+  /strict mode violation/i,
+  /resolved to \d+ elements/i,
+];
+
+function isHealableError(errorMessage: string | null | undefined): boolean {
+  if (!errorMessage) return false;
+  return HEALABLE_PATTERNS.some((p) => p.test(errorMessage));
+}
+
+export const autoHealAndRerun = internalAction({
+  args: {
+    run_id: v.id("runs"),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.runQuery(internal.runs.queries.getRunForAnalysis, {
+      run_id: args.run_id,
+    });
+    if (!run) return;
+
+    if (run.auto_heal_attempted) return;
+
+    const failedResults = run.results.filter(
+      (r: { status: string; error_message: string | null }) =>
+        r.status === "failed" && isHealableError(r.error_message),
+    );
+
+    if (failedResults.length === 0) return;
+
+    console.log(`[autoHealAndRerun] Auto-healing ${failedResults.length} failed test(s) from run ${args.run_id}`);
+
+    await ctx.runMutation(internal.runs.internal.markAutoHealAttempted, {
+      run_id: args.run_id,
+    });
+
+    const healedTestIds: Id<"tests">[] = [];
+
+    for (const result of failedResults) {
+      const errorParts: string[] = [];
+      if (result.error_message) errorParts.push(result.error_message);
+      const failedStepErrors = result.steps
+        .filter((s: { error_message: string | null }) => s.error_message)
+        .map((s: { step_number: number; command: string; error_message: string | null }) =>
+          `Step ${s.step_number} (${s.command}): ${s.error_message}`)
+        .join("\n");
+      if (failedStepErrors.length > 0) errorParts.push(failedStepErrors);
+
+      try {
+        await ctx.runAction(api.ai.healTest.healTest, {
+          test_id: result.test_id as Id<"tests">,
+          error_message: errorParts.join("\n") || undefined,
+        });
+
+        healedTestIds.push(result.test_id as Id<"tests">);
+        console.log(`[autoHealAndRerun] Healed test ${result.test_name}`);
+      } catch (err) {
+        console.error(`[autoHealAndRerun] Failed to heal test ${result.test_name}:`, err);
+      }
+    }
+
+    if (healedTestIds.length === 0) {
+      console.log(`[autoHealAndRerun] No tests were successfully healed`);
+      return;
+    }
+
+    const environmentId = run.environment_id;
+    if (!environmentId) {
+      console.error(`[autoHealAndRerun] No environment found for run, cannot re-run`);
+      return;
+    }
+
+    const runId = await ctx.runMutation(internal.runs.internal.createAutoHealRerun, {
+      original_run_id: args.run_id,
+      project_id: run.project_id,
+      suite_id: run.suite_id ?? undefined,
+      environment_id: environmentId,
+      test_ids: healedTestIds,
+      workspace_id: run.workspace_id,
+    });
+
+    console.log(`[autoHealAndRerun] Created re-run ${runId} with ${healedTestIds.length} healed test(s)`);
   },
 });
 

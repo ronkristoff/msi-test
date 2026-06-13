@@ -417,7 +417,7 @@ describe("ExplorePage", () => {
     expect(screen.getByText(/Navigation from Home through 1 page to About/)).toBeInTheDocument();
   });
 
-  it("defaults to flow selection mode with checkboxes", async () => {
+  it("shows flows as read-only cards", async () => {
     mockQueryResults.project = projectData;
     mockQueryResults.exploration = analyzedWithFlows;
     mockQueryResults.latestActive = { _id: "expl1" };
@@ -425,18 +425,16 @@ describe("ExplorePage", () => {
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    expect(screen.getAllByRole("checkbox").length).toBe(2);
+    expect(screen.getByText("Discovered Flows (2)")).toBeInTheDocument();
   });
 
-  it("switches to scenario selection mode", async () => {
+  it("shows scenario selection directly", async () => {
     mockQueryResults.project = projectData;
     mockQueryResults.exploration = analyzedWithFlows;
     mockQueryResults.latestActive = { _id: "expl1" };
 
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
-
-    await userEvent.click(screen.getByRole("button", { name: /select scenarios/i }));
 
     expect(screen.getByText("Navigate to About")).toBeInTheDocument();
     expect(screen.getByText("Contact form submit")).toBeInTheDocument();
@@ -450,7 +448,6 @@ describe("ExplorePage", () => {
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    expect(screen.queryByText("Select Flows")).not.toBeInTheDocument();
     expect(screen.getByText("Basic test")).toBeInTheDocument();
   });
 
@@ -465,7 +462,7 @@ describe("ExplorePage", () => {
     expect(screen.getByRole("button", { name: /generate tests from selected/i })).toBeDisabled();
   });
 
-  it("generate button shows matched scenario count when flows selected", async () => {
+  it("generate button shows selected scenario count", async () => {
     mockQueryResults.project = projectData;
     mockQueryResults.exploration = analyzedWithFlows;
     mockQueryResults.latestActive = { _id: "expl1" };
@@ -473,24 +470,9 @@ describe("ExplorePage", () => {
     const { default: ExplorePage } = await import("./page");
     render(<ExplorePage />);
 
-    await userEvent.click(screen.getAllByRole("checkbox")[0]);
+    await userEvent.click(screen.getByText("Navigate to About"));
 
     expect(screen.getByRole("button", { name: /generate tests from selected \(1\)/i })).not.toBeDisabled();
-  });
-
-  it("select all / deselect all flows works", async () => {
-    mockQueryResults.project = projectData;
-    mockQueryResults.exploration = analyzedWithFlows;
-    mockQueryResults.latestActive = { _id: "expl1" };
-
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-
-    await userEvent.click(screen.getByText("Select all"));
-    expect(screen.getByRole("button", { name: /generate tests from selected \(2\)/i })).not.toBeDisabled();
-
-    await userEvent.click(screen.getByText("Deselect all"));
-    expect(screen.getByRole("button", { name: /generate tests from selected \(0\)/i })).toBeDisabled();
   });
 
   it("shows page thumbnails in flow cards", async () => {
@@ -505,38 +487,6 @@ describe("ExplorePage", () => {
       (img) => (img as HTMLImageElement).src.includes("img.example"),
     );
     expect(thumbnailImages.length).toBeGreaterThan(0);
-  });
-
-  it("shows matched scenario count in info banner", async () => {
-    mockQueryResults.project = projectData;
-    mockQueryResults.exploration = analyzedWithFlows;
-    mockQueryResults.latestActive = { _id: "expl1" };
-
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-
-    await userEvent.click(screen.getAllByRole("checkbox")[0]);
-
-    expect(screen.getByText(/1 matching scenario/)).toBeInTheDocument();
-  });
-
-  it("shows no-match warning instead of all-scenarios fallback", async () => {
-    mockQueryResults.project = projectData;
-    mockQueryResults.exploration = {
-      ...analyzedWithFlows,
-      proposed_scenarios: [
-        { name: "Navigate to About", description: "Verify About page loads", flow_summary: "Click About link", area: "Navigation", related_flows: ["Other Flow"] },
-      ],
-    };
-    mockQueryResults.latestActive = { _id: "expl1" };
-
-    const { default: ExplorePage } = await import("./page");
-    render(<ExplorePage />);
-
-    const checkboxes = screen.getAllByRole("checkbox");
-    await userEvent.click(checkboxes[0]);
-
-    expect(screen.getByText(/no scenarios match the selected flows/i)).toBeInTheDocument();
   });
 
   it("shows New Exploration confirmation dialog", async () => {
@@ -555,10 +505,8 @@ describe("ExplorePage", () => {
 
   it("shows generated areas badge on completed exploration", async () => {
     mockQueryResults.project = projectData;
-    mockQueryResults.exploration = {
-      ...analyzedWithFlows,
-      generated_areas: ["Navigation"],
-    };
+    mockQueryResults.exploration = analyzedWithFlows;
+    mockQueryResults.explorationSuites = [{ area: "Navigation", status: "ready" }];
     mockQueryResults.latestActive = { _id: "expl1" };
 
     const { default: ExplorePage } = await import("./page");

@@ -7,6 +7,7 @@ export interface PrdCoverageItem {
 export interface DiscoveredPage {
   url: string;
   title: string;
+  auth_required?: boolean;
 }
 
 export interface Scenario {
@@ -39,7 +40,7 @@ export interface DiscoveredFlow {
   complexity: "low" | "medium" | "high";
 }
 
-export type SelectionMode = "flows" | "scenarios";
+export type SelectionMode = "scenarios";
 
 export function flowDescription(flow: DiscoveredFlow): string {
   if (flow.description) return flow.description;

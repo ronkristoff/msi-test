@@ -4,6 +4,8 @@ import { ConvexError } from "convex/values";
 import { getOwnedEntity, getUserName } from "../lib/requireAuth";
 import { validateRequiredField, testStepValidator } from "../lib/validation";
 
+const STALE_HEALING_THRESHOLD_MS = 10 * 60 * 1000;
+
 export const updateTestCode = mutation({
   args: {
     test_id: v.id("tests"),
@@ -36,6 +38,7 @@ export const updateTestCode = mutation({
     }
     if (args.status !== undefined) {
       updates.status = args.status;
+      updates.healing_started_at = undefined;
     }
     if (args.last_healed_at !== undefined) {
       updates.last_healed_at = args.last_healed_at;
@@ -69,7 +72,7 @@ export const setTestHealing = internalMutation({
   handler: async (ctx, args) => {
     const test = await ctx.db.get(args.test_id);
     if (!test) throw new ConvexError("Test not found");
-    await ctx.db.patch(args.test_id, { status: "healing" });
+    await ctx.db.patch(args.test_id, { status: "healing", healing_started_at: Date.now() });
   },
 });
 
@@ -78,7 +81,24 @@ export const setTestDraft = internalMutation({
   handler: async (ctx, args) => {
     const test = await ctx.db.get(args.test_id);
     if (!test) throw new ConvexError("Test not found");
-    await ctx.db.patch(args.test_id, { status: "draft" });
+    await ctx.db.patch(args.test_id, {
+      status: "draft",
+      healing_started_at: undefined,
+      last_healed_at: undefined,
+      last_healed_diff: undefined,
+    });
+  },
+});
+
+export const setTestApproved = internalMutation({
+  args: { test_id: v.id("tests") },
+  handler: async (ctx, args) => {
+    const test = await ctx.db.get(args.test_id);
+    if (!test) throw new ConvexError("Test not found");
+    await ctx.db.patch(args.test_id, {
+      status: "approved",
+      healing_started_at: undefined,
+    });
   },
 });
 
@@ -182,5 +202,29 @@ export const unlockTest = mutation({
       locked_by: undefined,
       locked_at: undefined,
     });
+  },
+});
+
+export const resetStaleHealingTests = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const healingTests = await ctx.db
+      .query("tests")
+      .withIndex("by_status", (q) => q.eq("status", "healing"))
+      .collect();
+
+    let reset = 0;
+    for (const test of healingTests) {
+      const startedAt = test.healing_started_at ?? test._creationTime;
+      if (now - startedAt > STALE_HEALING_THRESHOLD_MS) {
+        await ctx.db.patch(test._id, { status: "draft", healing_started_at: undefined });
+        reset++;
+      }
+    }
+
+    if (reset > 0) {
+      console.log(`[resetStaleHealingTests] Reset ${reset} stale healing test(s) to draft`);
+    }
   },
 });

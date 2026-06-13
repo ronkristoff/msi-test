@@ -489,6 +489,9 @@ export const getRunForAnalysis = internalQuery({
     return {
       workspace_id: run.workspace_id,
       project_id: run.project_id,
+      environment_id: run.environment_id,
+      suite_id: run.suite_id,
+      auto_heal_attempted: run.auto_heal_attempted ?? false,
       results: results.map((r) => ({
         test_id: r.test_id,
         test_name: r.test_name,

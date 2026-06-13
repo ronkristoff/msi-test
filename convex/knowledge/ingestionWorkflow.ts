@@ -97,6 +97,23 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
   await step.runMutation(internal.knowledge.internal._updateKbStatus, {
     knowledge_base_id: args.knowledge_base_id,
     project_id: args.project_id,
+    status: "building",
+    progress_message: "Analyzing code structure...",
+  });
+
+  await step.runAction(
+    internal.knowledge.extractionActions.extractArchitectureAndModules,
+    {
+      project_id: args.project_id,
+      knowledge_base_id: args.knowledge_base_id,
+      workspace_id: project.workspace_id,
+    },
+    { retry: true },
+  );
+
+  await step.runMutation(internal.knowledge.internal._updateKbStatus, {
+    knowledge_base_id: args.knowledge_base_id,
+    project_id: args.project_id,
     status: "ready",
     progress_message: "Knowledge Base ready",
   });

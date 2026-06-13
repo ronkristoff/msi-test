@@ -80,7 +80,7 @@ export const updateSuite = mutation({
 export const deleteSuite = mutation({
   args: { suite_id: v.id("suites") },
   handler: async (ctx, args) => {
-    await getOwnedEntity(ctx, args.suite_id, "suites");
+    const { entity: suite } = await getOwnedEntity(ctx, args.suite_id, "suites");
 
     const tests = await ctx.db
       .query("tests")
@@ -115,6 +115,14 @@ export const deleteSuite = mutation({
     }
 
     await ctx.db.delete(args.suite_id);
+
+    if (suite.exploration_id && suite.area) {
+      const exploration = await ctx.db.get(suite.exploration_id);
+      if (exploration?.generated_areas) {
+        const updated = exploration.generated_areas.filter((a: string) => a !== suite.area);
+        await ctx.db.patch(suite.exploration_id, { generated_areas: updated });
+      }
+    }
   },
 });
 
@@ -263,6 +271,7 @@ export const updateSuiteStatus = internalMutation({
     status: v.union(v.literal("generating"), v.literal("ready"), v.literal("failed")),
     generation_error: v.optional(v.string()),
     progress_message: v.optional(v.string()),
+    failed_scenarios: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const suite = await ctx.db.get(args.suite_id);
@@ -278,6 +287,10 @@ export const updateSuiteStatus = internalMutation({
       updates.progress_message = args.progress_message;
     }
 
+    if (args.failed_scenarios !== undefined) {
+      updates.failed_scenarios = args.failed_scenarios;
+    }
+
     if (args.status === "ready" || args.status === "failed") {
       updates.locked_by = undefined;
       updates.locked_at = undefined;
@@ -291,6 +304,7 @@ export const updateSuiteStatus = internalMutation({
 
     if (args.status === "ready") {
       updates.generation_error = undefined;
+      updates.failed_scenarios = undefined;
     }
 
     await ctx.db.patch(args.suite_id, updates);

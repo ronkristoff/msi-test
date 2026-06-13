@@ -1,417 +1,345 @@
-# MSITest — Autonomous AI Testing Platform
+# MSI Forge — Product Requirements Document
 
-## Problem Statement
+## 1. Vision
 
-Engineering teams using AI coding tools generate code faster than they can verify it. Manual test writing is a bottleneck. Existing test runners (Playwright, Cypress) require developers to hand-author tests. Teams need an autonomous AI agent that generates E2E tests from their app, PRD, or natural language descriptions, executes them in real browsers with full telemetry, analyzes failures with AI-powered root cause analysis, and surfaces everything in an intelligent dashboard — so they can ship production-ready code with confidence.
+Engineering teams using AI coding tools generate code faster than they can verify it. Business analysts responsible for client projects struggle when context is locked in a single BA's head. Requirements Documents go stale; code becomes the only reliable source of truth. Feature requests pile up waiting for the "right" person to return.
 
-## Solution
+**MSI Forge** solves both problems in one platform:
 
-MSITest is an autonomous AI testing platform. Users provide their app URL, a PRD (typed or uploaded as Markdown/PDF), or natural language test descriptions. The AI generates Playwright test suites, the user reviews and approves them, and MSITest executes them with full capture (screenshots at every step, video, console logs, traces). Results surface in a rich dashboard with AI root cause analysis and suggested code fixes for every failure. A flakiness heatmap tracks test stability over time.
+- **Analyst modules** reverse-engineer production code into a living Knowledge Base. Any BA can query any project instantly, generate accurate Baseline Requirements Documents, analyze feature requests with grounded impact analysis, and produce user stories — all backed by actual code evidence.
+- **Test modules** generate and execute Playwright tests using that same code intelligence. Tests are grounded in accurate, code-derived Requirements Documents instead of stale uploads. Live exploration combined with Knowledge Base context produces more precise test plans.
 
-## User Stories
+The integration insight: BAs produce accurate RDs from live code, and those RDs feed test generation with ground-truth context. The result — any BA can work on any project on day one, and any developer can generate accurate tests for any feature.
 
-### Auth & Onboarding
+## 2. Target Users
 
-1. As a developer, I want to sign in with email and password, so that I can access my workspace
-2. As a developer, I want to sign in with Google OAuth, so that I can authenticate without creating a new account
-3. As a developer, I want to create a new account, so that I can start using MSITest
-4. As a developer, I want to reset my password, so that I can recover access to my account
+### 2.1 Business Analysts
 
-### Workspace & Project Management
+Use the **Analyst modules** to onboard projects, generate Baseline RDs from code, analyze feature requests, generate user stories, and answer client questions through a ChatGPT-style interface grounded in the project's Knowledge Base.
 
-5. As a developer, I want to create a workspace with my AI provider config, so that I can start using MSITest immediately
-6. As a developer, I want to create a project by providing an app name and URL, so that MSITest knows what application to test
-7. As a developer, I want to upload a PRD as a text description during project creation, so that the AI generates tests aligned with my requirements
-8. As a developer, I want to upload a PRD as a Markdown or PDF file during project creation, so that I can use existing product documentation
-9. As a developer, I want to view and manage all my projects, so that I can navigate between them
-10. As a developer, I want to update my AI provider config (endpoint URL, API key, model name) in workspace settings, so that MSITest uses my preferred OpenAI-compatible LLM
-11. As a developer, I want to update my profile information, so that my account details stay current
+### 2.2 Developers and QA Engineers
 
-### AI Test Generation — URL-Based Exploration
+Use the **Test modules** to generate Playwright tests from PRDs, Baseline RDs, or natural language; execute tests with full telemetry (screenshots, video, traces, console logs); analyze failures with AI root cause analysis; and monitor test health over time.
 
-12. As a developer, I want the Runner to explore my app by rendering its pages after I provide a URL, so that it captures structure for AI analysis
-13. As a developer, I want to see a list of AI-proposed testable flows (e.g. "Login", "Checkout", "Dashboard") based on rendered page structure, so that I can choose which ones to generate tests for
-14. As a developer, I want to select specific proposed flows for test generation, so that I control which tests are created
-15. As a developer, I want to watch the exploration progress in real-time, so that I can see what's being discovered
+### 2.3 Non-Users (v1)
 
-### AI Test Generation — PRD-Based
+External clients (no client-facing access in v1), developers writing production code (not a code generation tool), automated CI/CD pipelines.
 
-16. As a developer, I want to type feature requirements and have the AI generate Playwright tests from them, so that tests match my product specs
-17. As a developer, I want to upload a Markdown file with requirements and have the AI generate tests from it, so that I can reuse existing documentation
-18. As a developer, I want to upload a PDF file with requirements and have the AI generate tests from it, so that I can use formal product specs
+## 3. Key User Journeys
 
-### AI Test Generation — Natural Language
+### UJ-1: BA onboards a new project
 
-19. As a developer, I want to describe a test scenario in plain English (e.g. "test that checkout works with Visa"), so that the AI generates the corresponding Playwright code
-20. As a developer, I want to specify multiple test scenarios in one request, so that I can batch-generate tests
+Ana is a BA asked to take over a project she's never worked on. She enters the project name and GitHub repo URL, optionally uploads an old Requirements Document, and clicks "Analyze." The system reads the repo, indexes the code, and generates a Baseline RD with a Drift Report showing where the old RD diverges from code reality. Ana reviews, edits, and approves the Baseline RD. She now has a complete, accurate picture of what the app does — without reading a single line of code.
 
-### Test Suite Review & Editing
+### UJ-2: BA analyzes a feature request
 
-21. As a developer, I want to see all AI-generated tests in a suite, so that I can review what will run
-22. As a developer, I want to view the generated Playwright code for each test, so that I can verify correctness
-23. As a developer, I want to edit the generated Playwright code, so that I can customize test behavior
-24. As a developer, I want to approve tests for execution, so that only validated tests run
-25. As a developer, I want to delete individual generated tests, so that I can remove irrelevant scenarios
-26. As a developer, I want to re-generate a specific test with AI, so that I can get a fresh attempt
+Ana receives a feature request from a client for a project she took over yesterday. She pastes the request into the chat. The AI responds with a structured impact analysis: affected modules, APIs, data models, user flows, and hidden dependencies. It generates user stories with acceptance criteria. Ana refines through follow-up questions, approves the stories, and exports them. In under 5 minutes, she has work that would normally take hours.
 
-### Test Execution
+### UJ-3: BA answers an urgent client question
 
-27. As a developer, I want to click "Run Tests" to execute a test suite, so that I can validate my application
-28. As a developer, I want to see real-time progress during test execution (which test is running, which step), so that I can monitor live
-29. As a developer, I want to run a single test individually, so that I can debug specific failures
-30. As a developer, I want to re-run a failed test as a new Run, so that I can check if a failure is flaky
+A client asks whether the system supports multi-currency. The original BA is on leave. Ana asks the chat, which queries the Knowledge Base and responds with specific code evidence: "No — all amounts stored as PHP in a single currency field. The payments module has no currency conversion logic." Ana responds to the client confidently in seconds.
 
-### Dashboard
+### UJ-4: Developer generates context-aware tests
 
-31. As a developer, I want to see overall pass rate as a percentage, so that I can assess test health at a glance
-32. As a developer, I want to see counts of failed, flaky, and total tests with trend arrows, so that I can understand the current state
-33. As a developer, I want to see a pass rate trend chart over the last 20 runs, so that I can spot regressions over time
-34. As a developer, I want to see recent failure cards with AI root cause analysis and suggested fixes, so that I can fix failures quickly
-35. As a developer, I want to see currently running tests with live progress bars, so that I can monitor active executions
-36. As a developer, I want to export dashboard data, so that I can share reports with my team
+A developer opens a project that has a Baseline RD (produced by a BA via the Analyst modules). They trigger PRD-based test generation. The system reads the Baseline RD alongside live page exploration, producing tests that understand the actual module structure, API surface, and user flows — not just the raw PRD text. Tests are more accurate and fewer are needed to cover the same ground.
 
-### Test Runs List
+### UJ-5: Developer runs tests and analyzes failures
 
-37. As a developer, I want to see a paginated list of all test runs, so that I can browse execution history
-38. As a developer, I want to filter runs by status (All/Failed/Flaky/Running/Passed), so that I can find specific run types
-39. As a developer, I want to filter runs by branch, environment, and result, so that I can narrow down to relevant runs
-40. As a developer, I want to search runs by name, file, or ID, so that I can find a specific run quickly
-41. As a developer, I want to sort runs by recency, duration, failure count, or flakiness, so that I can prioritize my attention
-42. As a developer, I want to click a run to see its full detail, so that I can investigate results
+The developer runs the generated test suite. Tests execute with screenshots at every step, video recording, console output capture, and full traces. A test fails. The AI analyzes the failure with root cause analysis and suggests a code fix. The developer applies the fix and re-runs.
 
-### Run Detail
+### UJ-6: Drift triggers test regeneration
 
-43. As a developer, I want to see a split-panel layout with test list on the left and detail on the right, so that I can navigate tests without losing context
-44. As a developer, I want to see failed tests listed first in the test list, so that I can address failures immediately
-45. As a developer, I want to see a step-by-step execution timeline with pass/fail/skipped states, so that I can pinpoint exactly where a test failed
-46. As a developer, I want to see a screenshot captured at every step, so that I can visually trace the test execution
-47. As a developer, I want to navigate between step screenshots (prev/next), so that I can scrub through the test visually
-48. As a developer, I want to see browser console output with color-coded log levels (info/warn/error), so that I can debug client-side issues
-49. As a developer, I want to see AI root cause analysis for every failure with confidence percentage, so that I can understand why the test failed
-50. As a developer, I want to see AI-suggested code fixes with the exact change, so that I can apply the fix directly
-51. As a developer, I want to see the same failure across previous runs, so that I can tell if it's a recurring issue
-52. As a developer, I want to see test metadata (duration, attempts, environment, retries), so that I have full context
-53. As a developer, I want to download test logs, so that I can analyze them offline
+A BA re-syncs a project's Knowledge Base after a code update. The system detects that three modules changed. It flags which existing tests may be stale and suggests regeneration. The developer reviews the flagged tests and triggers targeted regeneration for the affected modules only.
 
-### Flakiness Map
+## 4. Glossary
 
-54. As a developer, I want to see a heatmap grid of tests vs runs color-coded by flakiness, so that I can visually identify flaky patterns
-55. As a developer, I want to filter the heatmap to show only flaky or only stable tests, so that I can focus on problem areas
-56. As a developer, I want to see flakiness percentage per test, so that I can prioritize fixes
-57. As a developer, I want to see AI analysis identifying root-cause clusters of flaky tests, so that I can address systemic issues
-58. As a developer, I want to click a test row to see its detail panel with trend sparkline, so that I can investigate individual flakiness
-59. As a developer, I want to export the flakiness data as CSV, so that I can share it with my team
+### Shared
 
-### Suites Management
+- **MSI Forge** — The unified AI platform combining code intelligence (Analyst) and test automation (Test).
+- **Project** — A client engagement. Has an optional app URL (for testing) and an optional GitHub repo URL (for code analysis). Belongs to a workspace.
+- **Workspace** — Top-level organizational container. Owns all projects, AI provider config, and integrations. Single workspace per user for MVP.
+- **Thread** — A persistent conversation context. BA chat threads are scoped per project. Test generation threads are scoped per suite.
+- **Environment** — A named deployment target (staging, production) with a base URL, scoped to a project.
 
-60. As a developer, I want to see a list of all test suites in a project, so that I can manage test organization
-61. As a developer, I want to see the number of tests for each suite, so that I can assess suite size at a glance
-62. As a developer, I want to create a new suite with one click, so that I can group related tests without filling out a form
-63. As a developer, I want to rename a suite inline, so that I can keep suite names meaningful
-64. As a developer, I want to delete a suite and all its tests, so that I can clean up obsolete tests
+### Analyst
 
-### Environments
+- **Knowledge Base** — A structured, indexed representation of a project's codebase. Contains architecture summary, module map, code chunk embeddings, API surface, data models, and user flows. Built during onboarding, refreshed on demand.
+- **Baseline RD** — A Requirements Document generated by AI from the production codebase. The authoritative description of what the app currently does. Editable by BAs. Versioned.
+- **Old RD** — An existing Requirements Document uploaded by the BA. Serves as format reference and business context, not source of truth.
+- **Drift Report** — A comparison between the Old RD and current codebase. Lists features added, removed, or changed since the Old RD was written.
+- **Code Chunk** — A segment of source code stored in the Knowledge Base with a vector embedding for semantic search.
+- **Module** — A major feature area detected in the codebase by AI. Contains related APIs, data models, and user flows.
+- **Feature Request** — A client requirement analyzed against the Knowledge Base to produce impact analysis and user stories.
+- **Impact Analysis** — A structured breakdown of which modules, APIs, data models, and user flows are affected by a Feature Request.
+- **User Story** — A structured requirement generated by AI with title, description, acceptance criteria, and affected system components.
 
-65. As a developer, I want to define target environments (staging, production, dev) with base URLs, so that I can run tests against different deployments
-66. As a developer, I want to select which environment to run tests against, so that I can validate the right deployment
-67. As a developer, I want to see which environment each run was executed against, so that I can correlate results with deployments
+### Test
 
-### AI Insights
+- **Suite** — A named group of tests within a project.
+- **Test** — A single test scenario. Stored as Playwright TypeScript code or hybrid NL+code steps.
+- **Run** — An execution of one or more tests. Tracks trigger type, environment, overall status, and per-test results.
+- **Step** — A single action within a test execution. Records command, locator, pass/fail status, screenshot, and timing.
+- **Exploration** — A guided flow where the system navigates a target app URL, captures page structure, and proposes testable scenarios.
+- **AI Insight** — An AI-generated analysis linked to a test failure with root cause, suggested fix, and confidence score.
+- **Flakiness** — A measure of test instability computed as the ratio of inconsistent results over recent run history.
 
-68. As a developer, I want to see a consolidated list of all AI-detected issues across runs, so that I can prioritize fixes
-69. As a developer, I want to see severity and frequency for each AI insight, so that I know what matters most
-70. As a developer, I want to click an insight to navigate to the related test failure, so that I can take action
+## 5. Features
 
-### CI Pipelines
+### 5.1 Project Management
 
-71. As a developer, I want to configure GitHub webhook integrations, so that tests can be triggered from CI
-72. As a developer, I want to see the status of connected CI pipelines, so that I know integrations are working
-73. As a developer, I want to see which runs were triggered by CI vs manually, so that I can distinguish run sources
+Projects are the shared foundation. A project can be Analyst-only (repo URL, no app URL), Test-only (app URL, no repo), or both.
 
-### Slack Alerts
+| FR | Requirement |
+|---|---|
+| FR-1 | BA or developer creates a project with a name, optional app URL, and optional GitHub repo URL |
+| FR-2 | BA uploads an existing Requirements Document (Word, PDF, or Markdown) as optional context for drift detection |
+| FR-3 | BA enters a GitHub PAT token to connect the repository; PAT is encrypted at rest and never returned to the frontend |
+| FR-4 | BA clicks "Analyze" to trigger the code ingestion pipeline; progress is visible in real-time with stage indicators |
 
-74. As a developer, I want to configure Slack webhook URLs, so that my team receives test result notifications
-75. As a developer, I want to define alert rules (e.g. "notify on failure", "notify on flaky increase"), so that I only get relevant alerts
-76. As a developer, I want to test my Slack integration with a sample message, so that I can verify it works before relying on it
+### 5.2 Knowledge Base Construction (Analyst)
 
-### Settings
-
-77. As a developer, I want to update my AI provider config (endpoint URL, API key, model name), so that MSITest uses my preferred LLM
-78. As a developer, I want to update my account email and password, so that I can manage my credentials
-79. As a developer, I want to manage my workspace settings, so that I can control project-level defaults
-
-## Implementation Decisions
-
-### Architecture
-
-MSITest is a **two-process system**:
-
-1. **Convex backend** — database, functions, file storage, real-time subscriptions, and all AI interactions
-2. **Runner** — a separate Node.js process that executes Playwright tests and explorations outside Convex
-
-Convex is the source of truth for all state. The Runner is a stateless execution engine that receives work via Convex subscriptions and writes results back via Convex mutations.
-
-The Runner subscribes to a Convex query for pending work items (runs and explorations). When a pending item appears, the Runner picks it up, executes it, and streams results back via Convex mutations. The Runner only makes outbound connections to Convex — no public URL or ingress required.
-
-A heartbeat mechanism detects Runner crashes: the Runner writes `last_heartbeat_at` to the Run record every N seconds. A Convex cron job marks Runs as failed when their heartbeat goes stale.
-
-See `docs/adr/0001-separate-test-runner.md`, `docs/adr/0002-runner-convex-subscriptions.md`.
-
-### Tech Stack
-
-- **Frontend**: Next.js + React (App Router)
-- **Backend**: Convex (database, functions, file storage, real-time subscriptions)
-- **AI**: `@convex-dev/agent` (v0.6.x) + Vercel AI SDK (v6.x) + `@ai-sdk/openai` (v3.x). BYOK via OpenAI-compatible endpoints. Single model config per workspace (endpoint URL, API key, model name). Supports GLM, OpenAI, DeepSeek, Mistral, Ollama, and any OpenAI-compatible provider.
-- **Test Execution**: Playwright running in a separate Runner process
-- **Auth**: Better Auth with email/password and Google OAuth
-- **Real-time**: Convex subscriptions for live run progress and dashboard updates
-
-See `docs/adr/0003-convex-agent-component.md`.
-
-### Data Hierarchy
-
-Workspace → Project → Suite → Test → Run → RunResult → Step
-
-Single workspace per user for MVP. The `workspace_id` foreign key is present on all entities from day one to support multi-tenancy later without a migration.
-
-### Runs
-
-A **Run** is suite-level — one Run record per trigger event. A suite run contains multiple `run_results` (one per test). The Run's status is an aggregate of its test results (`failed` if any test failed, `passed` if all passed).
-
-A **re-run** creates a new Run record with `trigger_type: "rerun"` linked to the original via `rerun_of_run_id`. The original Run stays unchanged as an immutable record.
-
-Runs execute **sequentially** for MVP (one test at a time, one browser instance). Parallel execution is a post-MVP enhancement.
-
-### Exploration
-
-The Runner renders each page with Playwright (capturing SPA content after hydration), takes a DOM snapshot and screenshot, but **does not click or navigate autonomously**. The rendered structure is sent to Convex where the AI analyzes it and proposes testable scenarios. The user selects which scenarios to generate tests for. This "render and capture" approach handles SPAs without the complexity of automated click-crawling.
-
-### Test Code Format
-
-Tests are stored as **complete Playwright test files** — full TypeScript with `import { test, expect } from '@playwright/test'`, `test.describe`, `test()` blocks, etc. The user edits real, portable Playwright code.
-
-The Runner generates a temporary `playwright.config.ts` per execution that sets `use: { baseURL: environment.base_url }`. Tests use relative paths (`page.goto('/login')`) and are environment-portable.
-
-### Suite Auto-Creation
-
-Each generation action (exploration, PRD, natural language) **auto-creates a new Suite** with a descriptive default name (e.g., "Exploration — May 24", "PRD Tests — May 24"). The user can rename or reorganize later.
-
-### AI Provider
-
-AI config (endpoint URL, API key, model name) is **required during workspace creation**. The user cannot proceed without configuring their AI provider, since all core features depend on it. Pre-filled defaults: `https://api.openai.com/v1`, `gpt-4o`. The user pastes their key and moves on.
-
-All AI calls go through Convex actions using `@convex-dev/agent`. The Runner never calls AI directly — it is a pure browser worker. This keeps API keys in Convex only.
-
-### Runner Deployment
-
-The Runner lives in the same repository under `runner/` with a shared root `package.json`. The developer starts both processes with one command (`npm run dev`, using `concurrently`). Single `npm install` for the entire project.
-
-### Modules
-
-#### 1. Auth Module (shallow)
-
-Delegates entirely to Better Auth. Handles session management, email/password flows, Google OAuth. Exposes current user and workspace context to all other modules.
-
-#### 2. Project Module (shallow CRUD)
-
-Convex mutations and queries for projects. Each project stores: name, `app_url`, `prd_text` (optional), `prd_file_id` (optional Convex file storage reference). Project creation is a multi-step wizard in the UI.
-
-#### 3. AI Provider Module (deep)
-
-Configures `@convex-dev/agent` (v0.6.x) with Vercel AI SDK (v6.x) and `@ai-sdk/openai` (v3.x) for BYOK support. Defines three specialized agents as module-level definitions (prompts, schemas, tools) with the AI model injected per-call from workspace config via `getWorkspaceModel(ctx)`:
-
-- **Test Generation Agent** — `generateText`, returns Playwright test code in markdown fence. Thread scoped per suite (derived ID). Tools: `readExistingTests`, `readProjectContext`.
-- **Exploration Analysis Agent** — `generateObject` with zod schema for structured scenario output. Thread managed by caller. Tools: `readProjectContext`, `readPreviousExplorations` (stub).
-- **Failure Analysis Agent** — `generateObject` with zod schema for root cause + suggested fix + confidence score. One-shot (no thread). Tools: `readTestCode`, `readRecentFailures` (stub).
-
-Module organized in `convex/ai/` with agents, model bootstrapping, tools, and structured error handling. Error codes: `invalid_api_key`, `rate_limit`, `timeout`, `malformed_response`. Usage tracking enabled via Agent component (no UI). No rate limiting for MVP.
-
-#### 4. Exploration Module (deep)
-
-The Runner renders the target app URL with Playwright, captures DOM snapshots and screenshots from each visited page (including SPA content), and sends the structure to Convex. The Exploration Analysis Agent proposes testable scenarios (name, description, flow summary). Returns proposed scenarios for user selection. Real-time progress via Convex mutations as each page is rendered.
-
-#### 5. Test Generation Module (deep)
-
-Takes selected exploration scenarios, PRD content, or natural language prompts. Calls the Test Generation Agent to produce complete Playwright test files. Stores generated tests as editable code strings with `draft` status in an auto-created Suite. User reviews, edits, and sets status to `approved`.
-
-#### 6. Test Execution Module (deep — highest risk)
-
-Runs in the separate Runner process. Subscribes to pending Runs via Convex subscriptions. For each approved test in the Run: writes the Playwright code to a temp directory, generates a `playwright.config.ts` with the environment's `baseURL`, spawns Playwright with:
-
-- Screenshots captured at every step via Playwright's reporter and screenshot API
-- Video recording enabled
-- Console output captured via `page.on('console')` events
-- Full trace file captured
-- Step-by-step data parsed from Playwright's JSON reporter output
-
-Streams results back to Convex in real-time via mutations as each step completes. Sends heartbeats to the Run record for crash detection.
-
-#### 7. Run Aggregation Module (deep)
-
-After a run completes, computes: pass/fail/flaky counts, total duration, per-step timing. For each failed test, calls the Failure Analysis Agent with the test code, error message, screenshot at failure point, and console output. Stores the AI insight (root cause analysis, suggested fix, confidence score) linked to the test and run.
-
-#### 8. Flakiness Module (deep)
-
-Computes per-test flakiness scores based on pass/fail history across the last N runs (including re-runs). Powers the heatmap grid with a 5-step color scale (stable → critical). Identifies flakiness clusters (groups of tests that fail together, suggesting a shared root cause). Runs as Convex queries.
-
-#### 9. Real-time Module (shallow)
-
-Convex subscription wiring. Frontend subscribes to: active run progress, step-level updates during execution, dashboard stat changes. No complex logic — leverages Convex's built-in reactivity.
-
-#### 10. Notification Module (medium)
-
-Slack webhook integration. Accepts alert rules (trigger event type, optional threshold). Formats and sends Slack messages with run summary. GitHub webhook listener endpoint that creates runs when receiving push/pull_request events.
-
-### Schema (Convex)
-
-- **workspaces** — id, name, owner_id, ai_config (endpoint_url, api_key, model_name), created_at
-- **projects** — id, workspace_id, name, app_url, prd_text, prd_file_id, created_at
-- **suites** — id, workspace_id, project_id, name, description, source_type (url_exploration | prd | natural_language | manual), created_at
-- **tests** — id, workspace_id, suite_id, name, description, playwright_code (string), source_type (url_exploration | prd | natural_language), status (draft | approved), created_at
-- **runs** — id, suite_id (nullable), rerun_of_run_id (nullable), rerun_of_test_id (nullable), project_id, trigger_type (manual | ci | scheduled | rerun), branch, commit, environment, status (running | passed | failed | flaky), runner_id, last_heartbeat_at, started_at, finished_at, duration_ms
-- **run_results** — id, run_id, test_id, status (passed | failed | skipped), duration_ms, retries, console_logs (array of {level, text, timestamp}), trace_file_id, video_file_id
-- **steps** — id, run_result_id, step_number, command, locator, status (passed | failed | skipped), error_message, screenshot_file_id, duration_ms
-- **ai_insights** — id, workspace_id, test_id, run_id, type (root_cause | flakiness_cluster), analysis_text, suggested_fix, confidence_score, created_at
-- **environments** — id, project_id, name, base_url, created_at
-- **integrations** — id, workspace_id, type (slack | github), config (JSON), status, created_at
-- **alert_rules** — id, integration_id, trigger_event, threshold, enabled
-
-### API Surface (Convex Functions)
-
-**Queries**: `getDashboardStats`, `getRuns` (paginated, filtered, sorted), `getRunDetail`, `getSteps`, `getFlakinessMap`, `getTests`, `getSuites`, `getProjects`, `getAIInsights`, `getEnvironments`, `getIntegrations`, `getPendingWork` (used by Runner subscription)
-
-**Mutations**: `createProject`, `updateProject`, `createSuite`, `updateSuite`, `deleteSuite`, `updateTestStatus` (draft↔approved toggle), `updateTestCode`, `deleteTest`, `triggerRun`, `rerunTest`, `saveAIConfig`, `createEnvironment`, `updateEnvironment`, `saveIntegration`, `saveAlertRule`, `updateRunHeartbeat`, `writeStepResult`, `writeRunResult`
-
-**Actions**: `exploreApp` (async, real-time progress), `generateTests` (from PRD, prompt, or exploration selection), `analyzeFailure` (AI root cause for a specific failure), `sendTestNotification` (Slack webhook dispatch)
-
-**Cron Jobs**: `markStaleRuns` — marks Runs as failed when `last_heartbeat_at` is older than threshold
-
-### Pages & Routes (13 total)
-
-1. `/login` — email/password + Google OAuth
-2. `/onboarding` — workspace creation with required AI provider config
-3. `/dashboard` — stats, trend chart, recent failures with AI insights, active runs
-4. `/runs` — paginated/filterable runs table with tabs
-5. `/runs/[id]` — split-panel run detail with step timeline, screenshots, console, AI root cause
-6. `/flakiness-map` — heatmap grid with AI cluster analysis
-7. `/projects/new` — project creation wizard (name, URL, PRD text/file upload)
-8. `/projects/[id]` — project detail with info card + suite list (with "Create Suite" button)
-9. `/projects/[id]/explore` — AI exploration view with discovered flows and selection
-10. `/projects/[id]/suites/[suiteId]` — suite detail with test accordion, inline code editor (textarea + syntax-highlighted preview), draft/approved toggle
-11. `/insights` — aggregated AI insights across all runs
-12. `/settings` — AI provider config, profile, workspace settings
-
-### Design System
-
-Airtable-inspired blue palette. Accent `#1b61c9`. Large border radii (12px/16px). Blue sidebar with white text. Status pills with dot indicators. Monospace fonts for all technical content. All existing "TestPulse" branding consolidated to "MSITest".
-
-## Testing Decisions
-
-### What Makes a Good Test
-
-Test external behavior, not implementation details. Mock external dependencies (AI Agent calls, Playwright browser instance). Assert on observable outputs: database state after mutations, query return values, AI prompt construction, error handling paths. Tests should be deterministic and not depend on real browser availability or real AI API responses.
-
-### Modules to Test
-
-**AI Provider Module (unit tests)**
-
-- Mock the AI SDK model layer only (not the Agent component). Use `convex-test` with a real test DB so the Agent component runs for real.
-- Use canned fixture responses for the mock model layer (Playwright code, scenario arrays, root cause analyses).
-- Verify correct prompts and configuration are passed to each of the three specialized agents.
-- Verify error handling: rate limits, invalid API keys, timeouts, malformed responses — all via structured `ConvexError` with `{ type: "ai_error", code, message }`.
-- Verify the response parsing extracts test code, root cause text, and confidence scores correctly.
-- Verify Tier 1 tools (`readExistingTests`, `readProjectContext`, `readTestCode`) return data from test DB.
-- Verify Tier 2 stub tools (`readPreviousExplorations`, `readRecentFailures`) return empty arrays.
-
-**Exploration Module (integration tests)**
-
-- Mock Playwright browser. Provide a fixture HTML page structure. Verify the module renders pages, captures DOM snapshots and screenshots, and sends structure to Convex.
-- Verify the Exploration Analysis Agent is called with the correct discovered structure.
-- Verify edge cases: auth walls, infinite redirects, empty pages, SPA hydration.
-
-**Test Generation Module (unit tests)**
-
-- Verify Playwright code is correctly stored in the database with draft status.
-- Verify code validation (does the generated code parse as valid TypeScript with at least one `test()` call?).
-- Verify different source types (url_exploration, prd, natural_language) produce correctly typed records.
-- Verify Suite auto-creation with descriptive default names.
-
-**Test Execution Module (integration tests — highest priority)**
-
-- Use a minimal Playwright test against a local HTML fixture served by the test runner.
-- Verify: screenshots are captured per step, console output is recorded, step trace data is parsed, results are written to Convex via mutations, heartbeats are sent.
-- Verify the generated `playwright.config.ts` sets the correct `baseURL` from the environment.
-- Verify error paths: test timeout, browser crash, invalid test code.
-
-**Run Aggregation Module (unit tests)**
-
-- Seed fixture step results. Verify pass/fail/flaky counts, duration calculations.
-- Verify Failure Analysis Agent is called with correct failure context.
-- Verify AI insights are stored with correct linkage to test and run.
-
-No prior art exists — this is a greenfield project with no existing test patterns to follow.
-
-## Out of Scope
-
-- Multi-tenant workspaces and team management (data model supports it via `workspace_id`, UI and permissioning deferred)
-- Public marketing/landing page
-- Automated CI/CD triggers via GitHub OAuth (webhook listener infrastructure is built, but the GitHub App OAuth flow is deferred)
-- Scheduled/cron test runs
-- URL-based PRD ingestion from Notion, Google Docs, or Confluence
-- Fully autonomous app exploration (guided selection only for MVP — Runner renders and captures, AI proposes, user selects)
-- Separate AI model configs per task (single model for generation, exploration, and analysis)
-- Browser sandboxing and Docker isolation (local Playwright execution only)
-- Parallel test execution (sequential for MVP, parallel is post-MVP)
+The ingestion pipeline reads the production codebase, chunks the code, generates vector embeddings, and extracts structured knowledge.
+
+| FR | Requirement |
+|---|---|
+| FR-5 | System reads all relevant source files from the connected GitHub repository with configurable include/exclude patterns |
+| FR-6 | System splits source code into meaningful chunks grouped by file and directory |
+| FR-7 | System generates vector embeddings for each code chunk stored in per-project namespaces |
+| FR-8 | AI extracts architecture summary: tech stack, framework, folder structure, architecture type |
+| FR-9 | AI identifies major modules and maps files to modules with cross-module dependencies |
+| FR-10 | AI extracts all API endpoints with input/output shapes and HTTP methods |
+| FR-11 | AI extracts database schemas, table definitions, and entity relationships |
+| FR-12 | AI reconstructs user-facing flows by analyzing routes, pages, and component relationships |
+
+### 5.3 Baseline RD and Drift Report (Analyst)
+
+| FR | Requirement |
+|---|---|
+| FR-13 | AI generates a structured Requirements Document from the Knowledge Base with sections: Overview, Tech Stack, Modules, API Surface, Data Model, User Flows. Each section has a confidence score. If an Old RD exists, the Baseline RD mirrors its section format where possible |
+| FR-14 | AI produces a Drift Report comparing Old RD against Knowledge Base with items categorized as added, removed, or changed |
+| FR-15 | BA views the Baseline RD as formatted HTML and edits individual sections inline. Edits are saved and versioned. Confidence scores are visible per section |
+| FR-16 | BA views the Drift Report as a structured list grouped by type, with each item linking to the relevant Baseline RD section |
+
+### 5.4 AI Chat Interface (Analyst)
+
+| FR | Requirement |
+|---|---|
+| FR-17 | BA starts a new chat thread within a project. Thread title is auto-generated from the first message |
+| FR-18 | BA sends messages; AI responds with streaming output. Message history is preserved within the thread |
+| FR-19 | Every AI response is grounded in the project's Knowledge Base using RAG. AI references specific modules, files, APIs, or data models and cites sources. If the KB doesn't contain the answer, the AI says so |
+| FR-20 | When a BA pastes a feature request, AI generates a structured impact analysis: affected modules, APIs, data models, user flows, hidden dependencies |
+| FR-21 | AI generates user stories from a feature request with title, description (As a... I want... So that...), numbered acceptance criteria, and affected components. Stories are stored as structured artifacts |
+| FR-22 | BA refines analysis through follow-up questions ("Expand story 3", "What about the reporting module?"). AI maintains full conversation context |
+| FR-23 | BA asks free-form questions about the project and receives grounded answers citing specific code evidence |
+
+### 5.5 User Story Management (Analyst)
+
+| FR | Requirement |
+|---|---|
+| FR-24 | BA views all user stories across all chat threads for a project, filtered by status |
+| FR-25 | BA changes story status through the lifecycle: draft → approved → exported. Changes tracked with timestamps |
+| FR-26 | BA exports user stories as downloadable Markdown file or copyable text |
+| FR-27 | BA exports the Baseline RD in Markdown or HTML format |
+| FR-28 | BA triggers a re-sync of the Knowledge Base. Previous Baseline RD is archived; a new version is generated |
+
+### 5.6 AI Test Generation — URL-Based Exploration (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-29 | Runner renders app pages with Playwright (including SPA content), takes DOM snapshots and screenshots |
+| FR-30 | AI proposes testable flows based on rendered page structure for user selection |
+| FR-31 | User selects specific proposed flows for test generation |
+| FR-32 | Exploration progress visible in real-time |
+
+### 5.7 AI Test Generation — PRD-Based (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-33 | Developer types feature requirements and AI generates Playwright tests from them |
+| FR-34 | Developer uploads a Markdown or PDF file with requirements for test generation |
+| FR-35 | When a Baseline RD exists for the project, test generation includes its context (modules, API surface, user flows) alongside the PRD text for more accurate tests |
+
+### 5.8 AI Test Generation — Natural Language (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-36 | Developer describes a test scenario in plain English and AI generates Playwright code |
+| FR-37 | Developer specifies multiple scenarios for batch generation |
+| FR-38 | When a Knowledge Base exists, NL generation includes KB context for grounded locator and flow suggestions |
+
+### 5.9 Context-Aware Test Generation (Integration Bridge)
+
+The Analyst-to-Test bridge. When a project has a Knowledge Base and Baseline RD, test generation becomes context-aware.
+
+| FR | Requirement |
+|---|---|
+| FR-39 | Test Generation Agent gains a `readKnowledgeBase` tool that returns module names, API surface, data models, and user flows |
+| FR-40 | Test Generation Agent gains a `readBaselineRd` tool that returns the latest Baseline RD sections and confidence scores |
+| FR-41 | Exploration Analysis Agent cross-references discovered pages against KB modules and flags coverage gaps |
+| FR-42 | When a project's Knowledge Base is re-synced, the system detects which modules changed and flags which tests may need regeneration |
+
+### 5.10 Test Execution and Results (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-43 | Developer runs a test suite with real-time progress monitoring |
+| FR-44 | Screenshots captured at every step, video recording, console output capture, full traces |
+| FR-45 | Developer runs a single test individually for debugging |
+| FR-46 | Developer re-runs a failed test to check for flakiness |
+
+### 5.11 AI Root Cause Analysis and Healing (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-47 | AI generates root cause analysis for every test failure with confidence score and suggested fix |
+| FR-48 | Auto-heal repairs failing tests with a configurable confidence threshold; healed tests saved as draft for review |
+| FR-49 | Healing knowledge persists across runs; fixes applied proactively before tests fail again |
+
+### 5.12 Dashboard and Analytics (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-50 | Overall pass rate, failed/flaky/total counts with trend arrows |
+| FR-51 | Pass rate trend chart over last 20 runs |
+| FR-52 | Recent failure cards with AI root cause analysis and suggested fixes |
+| FR-53 | Currently running tests with live progress bars |
+| FR-54 | Flakiness heatmap grid color-coded by stability with AI cluster analysis |
+
+### 5.13 Suite and Test Management (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-55 | Suite CRUD with descriptive auto-generated names per generation source |
+| FR-56 | Test review: view generated Playwright code, edit inline, approve for execution, delete, re-generate |
+| FR-57 | Environment management: define staging/production/dev targets with base URLs |
+| FR-58 | Test lists: cross-project grouping of tests into named, executable lists |
+
+### 5.14 Monitoring and Scheduling (Test)
+
+| FR | Requirement |
+|---|---|
+| FR-59 | Scheduled test runs on cadence (hourly, daily, weekly) via Convex crons |
+| FR-60 | Monitoring page: all schedules, run history, run-vs-run diffs |
+
+### 5.15 Export and Integrations (Shared)
+
+| FR | Requirement |
+|---|---|
+| FR-61 | Export user stories as Markdown |
+| FR-62 | Export Baseline RD as Markdown or HTML |
+| FR-63 | Export dashboard data |
+| FR-64 | Slack webhook integration with configurable alert rules |
+| FR-65 | GitHub webhook listener for CI-triggered runs |
+
+### 5.16 Settings and Authentication (Shared)
+
+| FR | Requirement |
+|---|---|
+| FR-66 | Sign in with email and password, or Google OAuth |
+| FR-67 | Workspace creation with required AI provider config (BYOK — any OpenAI-compatible endpoint) |
+| FR-68 | Update AI provider config, profile, workspace settings |
+
+## 6. Non-Goals (Explicit)
+
+- Code generation or modification — MSI Forge reads and analyzes code; it does not write or modify production code
+- CI/CD pipeline integration beyond webhook triggers
+- Project management features (not a replacement for Jira or Azure DevOps)
+- Real-time code monitoring (Knowledge Base refreshed on demand, not continuously)
+- Client-facing access (internal BAs and developers only in v1)
+- Role-based access control (all users have equal access in v1)
 - Billing, pricing, and usage metering
-- Video playback in the run detail UI (video files are captured and stored, but the in-app player is post-MVP)
 - Mobile-responsive optimization beyond basic sidebar collapse
 
-## Post-MVP Additions
+## 7. MVP Scope
 
-The following features are planned after the MVP core (issues 001–018) is complete. They are tracked as issues in `docs/issues/` and documented as ADRs in `docs/adr/`.
+### 7.1 In Scope
 
-### Stagehand Integration (Issues 022–036)
+**Analyst modules:**
+- Project creation with GitHub repo connection
+- Old RD upload and text extraction
+- Code ingestion pipeline (read, chunk, embed, index)
+- Knowledge Base construction (architecture, modules, APIs, data models, user flows)
+- Baseline RD generation with confidence scores
+- Drift Report generation
+- Baseline RD viewer and editor
+- ChatGPT-style chat with streaming and RAG
+- Feature request analysis with impact breakdown
+- User story generation with acceptance criteria
+- Story management and export
+- Knowledge Base refresh (manual trigger)
 
-Integrate Stagehand (by Browserbase) for AI-powered browser automation. Stagehand replaces raw Playwright for exploration and enables a new hybrid test format. See ADR 0004 (Stagehand), ADR 0005 (hybrid format), ADR 0006 (Convex-Stagehand component).
+**Test modules:**
+- URL-based exploration with scenario selection
+- PRD-based test generation (enhanced with Baseline RD context)
+- Natural language test generation (enhanced with KB context)
+- Test execution via Runner with full telemetry
+- AI root cause analysis and auto-heal
+- Dashboard, runs list, run detail, flakiness heatmap
+- Suite and test management
+- Environments, test lists, schedules
+- Slack and GitHub integrations
 
-- **Smart Explorer** (024) — Stagehand's `agent()` autonomously navigates the target app, filling forms, clicking buttons, and discovering interactive flows. Replaces the MVP's static render-and-capture approach.
-- **Hybrid Test Format** (027) — Tests stored as natural language instructions + optional inline code assertions. Stagehand executes the NL steps by translating them into browser actions at runtime. Self-healing by default.
-- **Auto-Heal** (029–030) — AI automatically repairs failing tests. Healing confidence threshold determines auto-accept vs. human review. Learned healing persists fixes across runs.
-- **Autonomous Explorer** (034) — Full Stagehand agent that explores without user guidance. User says "test my app" and the system discovers, generates, and executes.
-- **Convex-Stagehand Component** (036) — Lightweight server-side browser tasks (URL checks, single-page extraction, change detection) without the Runner.
+**Shared:**
+- Better Auth (email/password + Google OAuth)
+- Multi-project dashboard
+- BYOK AI provider config
+- Self-hosted deployment via Coolify
 
-### New Features (Issues 037–040)
+### 7.2 Out of Scope for MVP
 
-- **Feature Map Visualization** (037) — Interactive graph rendering of PRD features and use cases. Replaces flat scenario list on the Explore page. Coverage gaps visible at a glance.
-- **Scheduled Monitoring** (038) — Recurring test runs on a cadence (hourly/daily/weekly). Convex crons trigger runs automatically. Run-vs-run diff shows which tests flipped. See ADR 0007.
-- **Test Lists** (039) — Cross-project grouping of tests into named executable lists. Like playlists for tests. Used for targeted re-runs, CI gates, and scheduling targets.
-- **NL Chat Refinement** (040) — Chat interface for modifying tests via natural language. User describes changes, AI applies them. Makes test maintenance accessible to non-developers.
+- Azure DevOps integration (push stories as work items)
+- Confluence or other doc source integration
+- OAuth-based GitHub authentication (PAT only)
+- Automated scheduled Knowledge Base refresh
+- Audit logging of user actions
+- Mobile-responsive design optimization
+- Multi-tenant data isolation
+- Video playback in run detail UI
+- Fully autonomous app exploration (guided selection only)
+- Parallel test execution
+- Separate AI model configs per task
 
-### Long-Term Vision (Phase 3)
+## 8. Success Metrics
 
-See `docs/issues/stagehand-phase3-vision.md` for the full roadmap:
+### Primary
 
-- **Recording/Playback** — User walks through a flow in the browser; AI converts the recording into a test.
-- **SaaS on Coolify** — Runner deployed as container-per-job on Coolify. Isolated Chromium per run. Auto-scaling.
-- **Managed AI Option** — MSITest-provided LLM proxy for users who don't want BYOK. Zero-friction onboarding.
-- **Multi-Model Agent Orchestration** — Different models for different tasks (fast model for browser actions, smart model for generation, vision model for visual regression).
-- **Visual Regression Testing** — Screenshot comparison between runs. Vision model detects layout shifts, missing elements, color changes.
-- **Test Suite Optimization** — AI analyzes suite health, removes redundancy, prioritizes by impact, predicts flakiness.
+| ID | Metric | Target | Validates |
+|---|---|---|---|
+| SM-1 | BA adoption | 4/5 BAs use MSI Forge weekly within 4 weeks | FR-17, FR-18 |
+| SM-2 | Time-to-impact-analysis | Under 5 minutes from feature request to completed analysis | FR-20 |
+| SM-3 | Test accuracy improvement | Tests generated with Baseline RD context have 20% fewer false failures than tests generated without | FR-39, FR-40 |
 
-### Previously Out-of-Scope, Now Planned
+### Secondary
 
-Several items from the original "Out of Scope" section are now planned:
+| ID | Metric | Target | Validates |
+|---|---|---|---|
+| SM-4 | Story acceptance rate | 70%+ AI-generated stories approved without major rewrites | FR-21 |
+| SM-5 | Knowledge Base accuracy | BAs rate Baseline RD "mostly/fully accurate" for 4/5 projects | FR-13 |
+| SM-6 | Cross-project coverage | 4/5 active projects onboarded within 6 weeks | FR-1, FR-4 |
+| SM-7 | Drift-to-regeneration turnaround | Time from KB re-sync to test regeneration suggestion under 2 minutes | FR-42 |
 
-- ~~Scheduled/cron test runs~~ → Issue 038 + ADR 0007
-- ~~Fully autonomous app exploration~~ → Issue 034 (Stagehand agent)
-- ~~Browser sandboxing and Docker isolation~~ → Phase 3 (Coolify containers)
-- ~~Video playback in the run detail UI~~ → Planned (video files captured, player deferred)
+### Counter-metrics (do not optimize)
 
-## Further Notes
+| ID | Metric | Why not |
+|---|---|---|
+| SM-C1 | Chat message volume | High count could mean excessive back-and-forth, not quality |
+| SM-C2 | Baseline RD length | Longer doesn't mean better |
+| SM-C3 | Test count | More tests doesn't mean better coverage |
 
-- The project currently consists of 7 static HTML mockup files that define the visual direction. These will be consolidated and rebuilt as Next.js pages using the Airtable-inspired blue design system, rebranded from "TestPulse" to "MSITest".
-- The AI Provider Module uses `@convex-dev/agent` with the AI SDK's `createOpenAI({ baseURL, apiKey })` which supports GLM, OpenAI, DeepSeek, Mistral, Ollama, and any OpenAI-compatible provider without code changes — only the workspace config differs.
-- Test Execution is the most operationally risky module. The separate Runner architecture isolates this risk. Local Playwright execution is acceptable for MVP but will need sandboxing (Docker containers or a browser-as-a-service provider like Browserbase) before onboarding real users who need isolation and scale.
-- The Runner lives in the same repo under `runner/` and starts alongside Next.js via `concurrently`. Single `npm install`, single `npm run dev`.
-- The Exploration Module's "render and capture" approach (Runner renders pages, AI infers flows from structure) is a deliberate MVP simplification. This handles SPAs without the complexity of AI-driven navigation, and gives users control over coverage scope through scenario selection.
-- Key architectural decisions are documented as ADRs in `docs/adr/`.
+## 9. Open Questions
+
+1. What is the Z.AI API endpoint URL and model name for the OpenAI-compatible API?
+2. Does Coolify have specific requirements for deploying Next.js + Convex, or can it run any Docker container?
+3. For projects with multiple GitHub repositories (frontend + backend separate), should the system support connecting multiple repos to a single project?
+4. What is the maximum project codebase size to support? (Affects ingestion time and token budget.)
+5. Should there be a limit on chat threads per project?
+
+## 10. Assumptions
+
+1. Z.AI provides an OpenAI-compatible API. If the API differs significantly, integration code needs adjustment.
+2. GitHub PAT tokens grant sufficient access to private repos. Organization SSO policies may restrict this.
+3. Small-to-medium repos can be fully read in a single ingestion run within GitHub API rate limits.
+4. Convex vector store provides sufficient similarity search quality for RAG. If insufficient, an external vector DB may be needed.
+5. Old RD formats are roughly similar across projects but not identical. AI adapts per project.
+6. Pilot scope: ~5 users (BAs + developers) and ~5 projects.
+7. Code analysis quality from LLM is sufficient for accurate impact analysis. May need prompt iteration.

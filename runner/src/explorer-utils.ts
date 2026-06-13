@@ -4,7 +4,7 @@ import type { CapturedPage, ExplorationWorkItem } from "./types";
 export type Stagehand = import("@browserbasehq/stagehand").Stagehand;
 
 export const NAVIGATION_TIMEOUT_MS = 30_000;
-export const HYDRATION_WAIT_MS = 2_000;
+export const HYDRATION_WAIT_MS = 3_000;
 
 export function normalizeUrl(raw: string): string | null {
   try {

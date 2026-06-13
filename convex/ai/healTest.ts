@@ -21,6 +21,24 @@ type HealPageContext = {
   hasLiveSnapshot: boolean;
 };
 
+async function resolveCapturedPagesForHeal(
+  ctx: ActionCtx,
+  projectId: Id<"projects">,
+): Promise<Array<{ url: string; title?: string }>> {
+  try {
+    const explorations = await ctx.runQuery(api.explorations.queries.getExplorationsByProject, {
+      project_id: projectId,
+    });
+    if (explorations.length === 0) return [];
+    return (explorations[0].captured_pages ?? []).map((p: { url: string; title?: string }) => ({
+      url: p.url,
+      title: p.title,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function resolveHealPageContext(
   ctx: ActionCtx,
   testCode: string,
@@ -89,6 +107,8 @@ export const healTest = action({
 async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error_message?: string; user_hint?: string }): Promise<{ testId: string; newName: string }> {
     const { test, suite, project, aiConfig } = await resolveTestContext(ctx, args.test_id);
 
+    const capturedPagesForAuth = await resolveCapturedPagesForHeal(ctx, suite.project_id);
+
     let errorMessage = args.error_message;
     if (!errorMessage) {
       const failure = await ctx.runQuery(api.runs.queries.getLatestFailureForTest, {
@@ -123,7 +143,7 @@ async function healTestInner(ctx: ActionCtx, args: { test_id: Id<"tests">; error
 
 Project: ${project.name}
 URL: ${project.app_url}
-${buildAuthPromptContext(project)}
+${buildAuthPromptContext(project, undefined, undefined, capturedPagesForAuth)}
 
 Test name: ${test.name}
 
@@ -218,6 +238,9 @@ export const healAllFailed = action({
         });
         healed.push({ testId: healedResult.testId, testName: result.test_name, success: true });
       } catch (err) {
+        await ctx.runMutation(internal.tests.mutations.setTestDraft, {
+          test_id: result.test_id as Id<"tests">,
+        });
         healed.push({
           testId: result.test_id,
           testName: result.test_name,

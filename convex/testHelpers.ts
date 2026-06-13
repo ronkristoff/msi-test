@@ -132,6 +132,11 @@ export async function seedKnowledgeBase(
     error_message: string;
     total_files: number;
     total_size_bytes: number;
+    architecture_summary: string;
+    tech_stack: string[];
+    folder_structure: string;
+    architecture_type: string;
+    last_synced_at: number;
   }>,
 ) {
   return t.run(async (ctx) => {
@@ -143,6 +148,36 @@ export async function seedKnowledgeBase(
       error_message: overrides?.error_message,
       total_files: overrides?.total_files,
       total_size_bytes: overrides?.total_size_bytes,
+      architecture_summary: overrides?.architecture_summary,
+      tech_stack: overrides?.tech_stack,
+      folder_structure: overrides?.folder_structure,
+      architecture_type: overrides?.architecture_type,
+      last_synced_at: overrides?.last_synced_at,
+    });
+  });
+}
+
+export async function seedModule(
+  t: TestCtx,
+  workspaceId: string,
+  knowledgeBaseId: string,
+  overrides?: Partial<{
+    name: string;
+    description: string;
+    file_count: number;
+    files: string[];
+    dependencies: string[];
+  }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("kb_modules", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      knowledge_base_id: knowledgeBaseId as Id<"knowledge_bases">,
+      name: overrides?.name ?? "Test Module",
+      description: overrides?.description,
+      file_count: overrides?.file_count,
+      files: overrides?.files,
+      dependencies: overrides?.dependencies,
     });
   });
 }

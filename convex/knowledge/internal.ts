@@ -309,3 +309,118 @@ export const _handleIngestionComplete = internalMutation({
     });
   },
 });
+
+export const _storeArchitectureSummary = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+    architecture_summary: v.string(),
+    tech_stack: v.array(v.string()),
+    folder_structure: v.string(),
+    architecture_type: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.knowledge_base_id, {
+      architecture_summary: args.architecture_summary,
+      tech_stack: args.tech_stack,
+      folder_structure: args.folder_structure,
+      architecture_type: args.architecture_type,
+    });
+  },
+});
+
+export const _storeModules = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+    workspace_id: v.id("workspaces"),
+    modules: v.array(
+      v.object({
+        name: v.string(),
+        description: v.optional(v.string()),
+        file_count: v.optional(v.number()),
+        files: v.optional(v.array(v.string())),
+        apis: v.optional(v.any()),
+        data_models: v.optional(v.any()),
+        user_flows: v.optional(v.any()),
+        dependencies: v.optional(v.array(v.string())),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const ids: Id<"kb_modules">[] = [];
+    for (const mod of args.modules) {
+      const id = await ctx.db.insert("kb_modules", {
+        knowledge_base_id: args.knowledge_base_id,
+        workspace_id: args.workspace_id,
+        ...mod,
+      });
+      ids.push(id);
+    }
+    return ids;
+  },
+});
+
+export const _deleteModulesByKb = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    let deletedCount = 0;
+    const BATCH_SIZE = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const modules = await ctx.db
+        .query("kb_modules")
+        .withIndex("by_knowledge_base_id", (q) =>
+          q.eq("knowledge_base_id", args.knowledge_base_id),
+        )
+        .take(BATCH_SIZE);
+
+      if (modules.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const mod of modules) {
+        await ctx.db.delete(mod._id);
+        deletedCount++;
+      }
+
+      if (modules.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+
+    return deletedCount;
+  },
+});
+
+export const _getChunksForExtraction = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    const chunks = await ctx.db
+      .query("code_chunks")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.knowledge_base_id),
+      )
+      .take(MAX_EMBEDDING_CHUNKS);
+
+    const seen = new Set<string>();
+    return chunks.filter((c) => {
+      if (seen.has(c.file_path)) return false;
+      seen.add(c.file_path);
+      return true;
+    });
+  },
+});
+
+export const _getKbForExtraction = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.knowledge_base_id);
+  },
+});
