@@ -167,6 +167,9 @@ export async function seedModule(
     file_count: number;
     files: string[];
     dependencies: string[];
+    apis: unknown;
+    data_models: unknown;
+    user_flows: unknown;
   }>,
 ) {
   return t.run(async (ctx) => {
@@ -178,6 +181,9 @@ export async function seedModule(
       file_count: overrides?.file_count,
       files: overrides?.files,
       dependencies: overrides?.dependencies,
+      apis: overrides?.apis,
+      data_models: overrides?.data_models,
+      user_flows: overrides?.user_flows,
     });
   });
 }

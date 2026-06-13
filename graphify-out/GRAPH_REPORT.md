@@ -1,16 +1,16 @@
 # Graph Report - msi-test  (2026-06-13)
 
 ## Corpus Check
-- 1346 files · ~1,526,807 words
+- 1352 files · ~1,533,629 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 23517 nodes · 24926 edges · 1292 communities (1202 shown, 90 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 184 edges (avg confidence: 0.79)
+- 23602 nodes · 25040 edges · 1305 communities (1207 shown, 98 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 185 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a26975ab`
+- Built from commit: `ad67e42d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1272,6 +1272,8 @@
 - [[_COMMUNITY_Community 1272|Community 1272]]
 - [[_COMMUNITY_Community 1273|Community 1273]]
 - [[_COMMUNITY_Community 1274|Community 1274]]
+- [[_COMMUNITY_Community 1275|Community 1275]]
+- [[_COMMUNITY_Community 1276|Community 1276]]
 - [[_COMMUNITY_Community 1277|Community 1277]]
 - [[_COMMUNITY_Community 1278|Community 1278]]
 - [[_COMMUNITY_Community 1279|Community 1279]]
@@ -1289,18 +1291,29 @@
 - [[_COMMUNITY_Community 1291|Community 1291]]
 - [[_COMMUNITY_Community 1292|Community 1292]]
 - [[_COMMUNITY_Community 1293|Community 1293]]
+- [[_COMMUNITY_Community 1294|Community 1294]]
+- [[_COMMUNITY_Community 1295|Community 1295]]
+- [[_COMMUNITY_Community 1296|Community 1296]]
+- [[_COMMUNITY_Community 1297|Community 1297]]
+- [[_COMMUNITY_Community 1298|Community 1298]]
+- [[_COMMUNITY_Community 1299|Community 1299]]
+- [[_COMMUNITY_Community 1300|Community 1300]]
+- [[_COMMUNITY_Community 1301|Community 1301]]
+- [[_COMMUNITY_Community 1303|Community 1303]]
+- [[_COMMUNITY_Community 1304|Community 1304]]
+- [[_COMMUNITY_Community 1305|Community 1305]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `path` - 81 edges
-2. `api` - 70 edges
-3. `sorted` - 39 edges
-4. `seedWorkspace()` - 39 edges
-5. `asId()` - 36 edges
-6. `Button` - 33 edges
+2. `api` - 71 edges
+3. `seedWorkspace()` - 40 edges
+4. `sorted` - 39 edges
+5. `asId()` - 38 edges
+6. `Button` - 34 edges
 7. `internal` - 33 edges
 8. `RunnerConvexClient` - 30 edges
-9. `seedProject()` - 29 edges
-10. `useErrorLogger()` - 27 edges
+9. `seedProject()` - 30 edges
+10. `useErrorLogger()` - 29 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `path`  [INFERRED]
@@ -1355,27 +1368,27 @@
 - **he_chunk13_1** — public-file-svg, public-globe-svg, public-next-svg, public-vercel-svg, public-window-svg [INFERRED 0.60]
 - **he_chunk13_2** — prototypes-suite-detail, proto-code-editor, prototypes-suites, proto-suite-card, runner-test-page-fixture [INFERRED 0.50]
 
-## Communities (1292 total, 90 thin omitted)
+## Communities (1305 total, 98 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (44): ClusterAnnotation, ClusterAnnotationsProps, RunDetailPage(), InsightType, TABS, TYPE_LABEL, asId(), RunDetail (+36 more)
+Cohesion: 0.09
+Nodes (17): EnrichedRun, getActiveRunForSuite, getConsoleLogUrl, getHealingHistory, getLatestFailureForTest, getPendingWork, getResultArtifactUrls, getRunDetail (+9 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
 Nodes (43): Phase, PhaseIndicator(), PhaseIndicatorProps, AreaGroup, FeatureMapGraph(), FeatureMapGraphProps, addNode, areaElements (+35 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.05
-Nodes (43): AIConfigForm(), AIConfigFormProps, MembersTab(), useAutoDismissMessage(), EnvItem, ScheduleData, ScheduleModalProps, SuiteItem (+35 more)
+Cohesion: 0.04
+Nodes (72): AIConfigForm(), AIConfigFormProps, Logo(), MembersTab(), useAutoDismissMessage(), ACCEPTED_TYPES, PRDInput(), PRDInputProps (+64 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.05
 Nodes (42): Acceptance Criteria, Agent Model Used, Architecture: BYOK Embedding Model, Architecture: Embedding Action (`"use node"`), Architecture: Error Handling Strategy, Architecture: Namespace and Key Strategy, Architecture: RAG Component Installation, Architecture: Workflow Extension (+34 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.10
-Nodes (26): ClusterAnnotations(), buildCsvContent(), downloadCsv(), FilterBar(), FilterBarProps, FilterMode, filters, HeatmapGrid() (+18 more)
+Cohesion: 0.08
+Nodes (30): ClusterAnnotation, ClusterAnnotations(), ClusterAnnotationsProps, buildCsvContent(), downloadCsv(), FilterBar(), FilterBarProps, FilterMode (+22 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.08
@@ -1386,16 +1399,16 @@ Cohesion: 0.04
 Nodes (48): Classification Decisions, code:yaml (user: { user_name }), code:yaml (user: { user_name }), code:block3 (teach-me-testing/), code:block4 (teach-me-testing/), code:bash (cp -r {external-project-root}/_bmad-output/bmb-creations/wor), Complete Flow Overview, CREATE Mode (12 step files) (+40 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.06
-Nodes (64): AgentAction, buildInstruction(), buildReauthInstruction(), buildSuggestedLocator(), buildVariables(), deduplicateFlows(), executeAutonomousExploration(), extractFlowsFromActions() (+56 more)
+Cohesion: 0.08
+Nodes (54): AgentAction, buildInstruction(), buildReauthInstruction(), buildVariables(), deduplicateFlows(), executeAutonomousExploration(), extractFlowsFromActions(), extractInteractiveElements() (+46 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.06
-Nodes (38): ScheduleModal(), DiffItem, MonitoringDetailPage(), RunRow, ScheduleDetail, KnowledgeBuilding(), KnowledgeBuildingProps, KnowledgeError() (+30 more)
+Cohesion: 0.10
+Nodes (30): AuthLayout(), PAGE_META, SIDEBARLESS_ROUTES, AddToListModal(), AddToListModalProps, ConfirmDialog(), ConfirmDialogProps, SuiteBannerData (+22 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.08
-Nodes (20): extractDuplicateTextPatterns(), extractInteractiveElements(), PageWithEval, FeedbackAction, createSnapshotApiServer(), discoverFeedbackRequestSchema, handleDiscoverFeedback(), handleSnapshot() (+12 more)
+Cohesion: 0.15
+Nodes (13): Architecture: Backend Query — `getModule`, Architecture: Dependencies Display, code:typescript (export const getModule = query({), Dev Notes, Existing Code to Modify, Git Intelligence, Key Dependencies, New Files to Create (+5 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.06
@@ -1418,8 +1431,8 @@ Cohesion: 0.06
 Nodes (32): computedHash, computedHash, skillPath, source, sourceType, computedHash, skillPath, source (+24 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.10
-Nodes (16): ActiveRuns(), RunCard(), runs, PassRateChart(), TooltipPayload, RecentFailures(), failures, SectionHeaderProps (+8 more)
+Cohesion: 0.08
+Nodes (21): ActiveRuns(), RunCard(), runs, PassRateChart(), TooltipPayload, RecentFailures(), failures, SectionHeaderProps (+13 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.12
@@ -1522,8 +1535,8 @@ Cohesion: 0.13
 Nodes (18): AI Insight Card, Anchor Blue, Blue-Tint Shadow Rule, Code Boundary Rule, @convex-dev/agent, Vercel AI SDK, Better Auth, Convex (+10 more)
 
 ### Community 42 - "Community 42"
-Cohesion: 0.05
-Nodes (38): internalMutation, _clearOldRd, _clearProjectRepo, _createKnowledgeBase, _deleteChunksByKb, _deleteModulesByKb, _getChunksForEmbedding, _getChunksForExtraction (+30 more)
+Cohesion: 0.09
+Nodes (21): _clearOldRd, _clearProjectRepo, _createKnowledgeBase, _deleteChunksByKb, _deleteModulesByKb, _getChunksForEmbedding, _getChunksForExtraction, _getKbForExtraction (+13 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.04
@@ -1614,8 +1627,8 @@ Cohesion: 0.06
 Nodes (34): Acceptance Criteria, Agent Model Used, Architecture: Code Chunks Table, Architecture: GitHub API Integration, Architecture: PAT Decryption Flow, Architecture: "use node" File Strategy, Architecture: Workflow Pattern, Change Log (+26 more)
 
 ### Community 65 - "Community 65"
-Cohesion: 0.18
-Nodes (15): copy_references(), copy_scripts(), discover_capabilities(), generate_capabilities_md(), main(), parse_frontmatter(), parse_yaml_config(), Scan references/ for capability prompt files with frontmatter. (+7 more)
+Cohesion: 0.23
+Nodes (12): cleanup_legacy_csvs(), extract_module_codes(), filter_rows(), main(), parse_args(), Remove all rows matching the given module code., Write header + rows to CSV file, creating parent dirs as needed., Delete legacy per-module module-help.csv files for this module and core only. (+4 more)
 
 ### Community 66 - "Community 66"
 Cohesion: 0.12
@@ -1734,12 +1747,12 @@ Cohesion: 0.33
 Nodes (5): ActionCtx, DatabaseReader, DatabaseWriter, MutationCtx, QueryCtx
 
 ### Community 95 - "Community 95"
-Cohesion: 0.08
-Nodes (23): buildingKb, errorKb, mockModuleList, mockTriggerIngestion, moduleLink, readyKb, settingsLink, setup() (+15 more)
+Cohesion: 0.06
+Nodes (32): buildingKb, errorKb, mockModuleList, mockTriggerIngestion, moduleLink, readyKb, settingsLink, setup() (+24 more)
 
 ### Community 96 - "Community 96"
 Cohesion: 0.07
-Nodes (46): AuthLayout(), PAGE_META, SIDEBARLESS_ROUTES, AddToListModal(), AddToListModalProps, ConfirmDialog(), ConfirmDialogProps, Logo() (+38 more)
+Nodes (40): GeneratePrdTestsPage(), api, RunDetailPage(), AllTableNames, asId(), RunDetail, RunEnvironment, RunResultItem (+32 more)
 
 ### Community 97 - "Community 97"
 Cohesion: 0.33
@@ -1778,8 +1791,8 @@ Cohesion: 0.40
 Nodes (5): warn, canonical, displayName, role, tonalRamp
 
 ### Community 106 - "Community 106"
-Cohesion: 0.09
-Nodes (17): EnrichedRun, getActiveRunForSuite, getConsoleLogUrl, getHealingHistory, getLatestFailureForTest, getPendingWork, getResultArtifactUrls, getRunDetail (+9 more)
+Cohesion: 0.06
+Nodes (40): ScheduleModal(), DiffItem, MonitoringDetailPage(), RunRow, ScheduleDetail, KnowledgeBuilding(), KnowledgeBuildingProps, KnowledgeError() (+32 more)
 
 ### Community 107 - "Community 107"
 Cohesion: 0.40
@@ -2530,8 +2543,8 @@ Cohesion: 0.06
 Nodes (34): Anti-Patterns, API Reference, code:typescript (import { test } from '@seontechnologies/playwright-utils/int), code:typescript (// Vanilla Playwright - complex predicate), code:typescript (await page.goto('/dashboard'); // Navigation starts), code:typescript (const usersCall = interceptNetworkCall({ url: '**/api/users'), code:typescript (interceptNetworkCall({ url: '**/api/users' }); // Not awaite), code:typescript (const usersCall = interceptNetworkCall({ url: '**/api/users') (+26 more)
 
 ### Community 369 - "Community 369"
-Cohesion: 0.06
-Nodes (51): cleanup_directories(), count_files(), find_skill_dirs(), main(), parse_args(), Count all files recursively in a directory., Remove specified directories under bmad_dir.      Returns:         (removed, not, Find directories that contain a SKILL.md file.      Walks the directory tree and (+43 more)
+Cohesion: 0.07
+Nodes (41): cleanup_directories(), count_files(), find_skill_dirs(), main(), parse_args(), Count all files recursively in a directory., Remove specified directories under bmad_dir.      Returns:         (removed, not, Find directories that contain a SKILL.md file.      Walks the directory tree and (+33 more)
 
 ### Community 370 - "Community 370"
 Cohesion: 0.06
@@ -3558,8 +3571,8 @@ Cohesion: 0.09
 Nodes (21): Analysis Principles, code:bash (python3 scripts/scan-path-standards.py {skill-path} -o {qual), code:bash (# Spawn as background task — does not block step 4), code:bash (python3 scripts/generate-html-report.py {quality-report-dir}), Execution, Headless Mode, Lint Scripts (Deterministic — Run First), LLM Scanners (Judgment-Based — Run After Scripts) (+13 more)
 
 ### Community 626 - "Community 626"
-Cohesion: 0.15
-Nodes (21): _find_npx(), _find_uv(), lint_node_biome(), lint_python_ruff(), lint_shell_shellcheck(), main(), Run shellcheck on a shell script via uv. Returns lint findings., Run biome on a JS/TS file via npx. Returns lint findings. (+13 more)
+Cohesion: 0.10
+Nodes (17): internalMutation, resolveRegressionTestIds(), resolveSuiteTestIds(), claimRun, clearStaleTestLocks, completeRun, createAutoHealRerun, forceCompleteRun (+9 more)
 
 ### Community 627 - "Community 627"
 Cohesion: 0.10
@@ -4138,8 +4151,8 @@ Cohesion: 0.11
 Nodes (17): code:typescript (// risk-scoring.ts - Risk classification and scoring system), code:typescript (// gate-decision-engine.ts), code:typescript (// Example: Running gate check before deployment), code:typescript (// risk-mitigation.ts), code:typescript (const tracker = new RiskMitigationTracker();), code:typescript (// coverage-traceability.ts), code:typescript (// Define acceptance criteria), Example 1: Risk Scoring Matrix with Automated Classification (TypeScript) (+9 more)
 
 ### Community 772 - "Community 772"
-Cohesion: 0.17
-Nodes (17): check_prompt_basics(), check_required_sections(), cross_reference_stages(), detect_workflow_type(), extract_sections(), find_template_artifacts(), main(), parse_frontmatter() (+9 more)
+Cohesion: 0.29
+Nodes (7): Agent Model Used, Change Log, Completion Notes List, Debug Log References, Dev Agent Record, File List, Review Findings
 
 ### Community 773 - "Community 773"
 Cohesion: 0.12
@@ -5034,8 +5047,8 @@ Cohesion: 0.17
 Nodes (11): Agent Type Guidance, Autonomous Agent, code:toml ([agents.creative-muse]), Customization Surface by Archetype, Edge Cases, First-Breath-Named Agents, How to Surface the Decision, Memory Agent (+3 more)
 
 ### Community 996 - "Community 996"
-Cohesion: 0.07
-Nodes (25): modules, result, snapshot, snapshots, t, day, modules, month (+17 more)
+Cohesion: 0.08
+Nodes (24): day, modules, month, now, t, modules, notValidated, t (+16 more)
 
 ### Community 997 - "Community 997"
 Cohesion: 0.17
@@ -5862,8 +5875,8 @@ Cohesion: 0.50
 Nodes (4): Example Quality Issues, Quality Assessment, Tests Passing Quality Gates, Tests with Issues
 
 ### Community 1203 - "Community 1203"
-Cohesion: 0.08
-Nodes (23): createFailureAnalysisAgent(), failureAnalysisSchema, AgentModel, AiConfig, getWorkspaceAiConfigQuery, generateUploadUrl, runnerGenerateUploadUrl, analyzeFlakinessClusters (+15 more)
+Cohesion: 0.15
+Nodes (21): _find_npx(), _find_uv(), lint_node_biome(), lint_python_ruff(), lint_shell_shellcheck(), main(), Run shellcheck on a shell script via uv. Returns lint findings., Run biome on a JS/TS file via npx. Returns lint findings. (+13 more)
 
 ### Community 1211 - "Community 1211"
 Cohesion: 0.67
@@ -5886,8 +5899,8 @@ Cohesion: 0.18
 Nodes (15): count_fenced_blocks(), count_tables(), extract_overview_size(), main(), scan_file_patterns(), scan_prompt_metrics(), detect_wall_of_text(), parse_prompt_frontmatter() (+7 more)
 
 ### Community 1233 - "Community 1233"
-Cohesion: 0.09
-Nodes (31): buffer, pdfBuffer, zip, chunkFile(), CodeChunk, detectLanguage(), EXTENSION_LANGUAGE_MAP, findNearestNewline() (+23 more)
+Cohesion: 0.08
+Nodes (33): buffer, pdfBuffer, zip, chunkFile(), CodeChunk, detectLanguage(), EXTENSION_LANGUAGE_MAP, findNearestNewline() (+25 more)
 
 ### Community 1234 - "Community 1234"
 Cohesion: 0.18
@@ -5895,7 +5908,7 @@ Nodes (11): scripts, build, dev, dev:convex, dev:next, dev:runner, lint, start (
 
 ### Community 1235 - "Community 1235"
 Cohesion: 0.40
-Nodes (4): name, packageManager, private, version
+Nodes (4): Acceptance Criteria, Story, Story 1.7: Module Detail View, Tasks / Subtasks
 
 ### Community 1236 - "Community 1236"
 Cohesion: 0.18
@@ -5914,36 +5927,36 @@ Cohesion: 0.22
 Nodes (8): code:ts (export { api } from "../../convex/_generated/api";), Core Convex Types, Data Models — Frontend (Next.js), Domain Types (`src/lib/`), Form Types (zod-inferred from `src/lib/schemas.ts`), Key Frontend Types, Overview, Patterns
 
 ### Community 1240 - "Community 1240"
-Cohesion: 0.10
-Nodes (28): detect_cycles(), find_parallel_groups(), find_transitive_redundancy(), main(), scan_execution_deps(), scan_sequential_patterns(), copy_references(), copy_scripts() (+20 more)
+Cohesion: 0.18
+Nodes (15): copy_references(), copy_scripts(), discover_capabilities(), generate_capabilities_md(), main(), parse_frontmatter(), parse_yaml_config(), Scan references/ for capability prompt files with frontmatter. (+7 more)
 
 ### Community 1241 - "Community 1241"
 Cohesion: 0.25
 Nodes (7): cases, chunks, content, parts, pyChunks, reassembled, tsChunks
 
 ### Community 1242 - "Community 1242"
-Cohesion: 0.03
-Nodes (75): authComponent, createAuth(), crons, getComputeFlakinessPct(), http, EMPTY_STATS, getActiveRuns, getDashboardStats (+67 more)
+Cohesion: 0.10
+Nodes (16): modules, result, snapshot, snapshots, t, modules, results, t (+8 more)
 
 ### Community 1243 - "Community 1243"
 Cohesion: 0.05
-Nodes (47): Chunk, chunks, sampled, summary, tree, buildEmbeddingErrorMessage(), ChunkData, embedChunks (+39 more)
+Nodes (48): Chunk, chunks, sampled, summary, tree, buildEmbeddingErrorMessage(), ChunkData, embedChunks (+40 more)
 
 ### Community 1244 - "Community 1244"
-Cohesion: 0.12
-Nodes (20): ACCEPTED_TYPES, PRDInput(), PRDInputProps, TestDataSection(), projectSettingsSchema, ProjectSettingsValues, projectStep1Schema, ProjectStep1Values (+12 more)
+Cohesion: 0.09
+Nodes (20): agent, AiErrorData, code, error, model, modules, result, t (+12 more)
 
 ### Community 1245 - "Community 1245"
-Cohesion: 0.10
-Nodes (19): 1. Deploy Convex Backend, 2. Deploy Next.js Frontend, 3. Deploy Runner, Architecture Overview, Backend (Convex), CI/CD Integration, code:bash (npx convex deploy), code:bash (pnpm build) (+11 more)
+Cohesion: 0.11
+Nodes (18): 1. Deploy Convex Backend, 2. Deploy Next.js Frontend, 3. Deploy Runner, Architecture Overview, Backend (Convex), CI/CD Integration, code:bash (npx convex deploy), code:bash (pnpm build) (+10 more)
 
 ### Community 1246 - "Community 1246"
-Cohesion: 0.08
-Nodes (21): seedFlakinessSetup(), modules, msg, t, modules, t, asStorageId, longText (+13 more)
+Cohesion: 0.40
+Nodes (5): code:typescript ("use client";), code:tsx (if (moduleData === undefined) return <PageSkeleton />;), code:tsx (<div className="bg-[var(--surface)] border border-[var(--bor), code:typescript (vi.mock("convex/react", () => ({), Existing Code Patterns to Follow
 
 ### Community 1247 - "Community 1247"
-Cohesion: 0.07
-Nodes (47): createHealAgent(), createRefineAgent(), deriveTestName(), extractPlaywrightCode(), aiMaxRetries, AuthFields, buildAuthPromptContext(), buildNavMenuContext() (+39 more)
+Cohesion: 0.04
+Nodes (99): AgentModel, buildNlFormatRetryPrompt(), buildNlGenerationPrompt(), buildPrdFormatRetryPrompt(), buildPrdGenerationPrompt(), createExplorationAnalysisAgent(), createFailureAnalysisAgent(), createHealAgent() (+91 more)
 
 ### Community 1248 - "Community 1248"
 Cohesion: 0.07
@@ -5970,96 +5983,100 @@ Cohesion: 0.17
 Nodes (11): Architecture Pattern, Architecture — Runner (Playwright), code:block1 (Startup → Poll loop (2s) → Find work → Claim → Execute → Rep), Convex Contract, Data Models, Execution Modes, Executive Summary, Lifecycle (+3 more)
 
 ### Community 1254 - "Community 1254"
-Cohesion: 0.20
-Nodes (9): agent, AiErrorData, code, error, model, modules, result, t (+1 more)
+Cohesion: 0.27
+Nodes (10): cleanup_directories(), count_files(), find_skill_dirs(), main(), parse_args(), Count all files recursively in a directory., Remove specified directories under bmad_dir.      Returns:         (removed, not, Find directories that contain a SKILL.md file.      Walks the directory tree and (+2 more)
 
 ### Community 1255 - "Community 1255"
 Cohesion: 0.29
 Nodes (7): 3. Key User Journeys, UJ-1: BA onboards a new project, UJ-2: BA analyzes a feature request, UJ-3: BA answers an urgent client question, UJ-4: Developer generates context-aware tests, UJ-5: Developer runs tests and analyzes failures, UJ-6: Drift triggers test regeneration
 
 ### Community 1256 - "Community 1256"
-Cohesion: 0.09
-Nodes (20): generateNlTests, generatePrdTests, internalQuery, getLastCapturedPage, ResolvedTestSource, resolveTestSource(), addTestsToList, addTestToList (+12 more)
+Cohesion: 0.08
+Nodes (19): modules, msg, t, modules, t, asStorageId, longText, modules (+11 more)
 
 ### Community 1257 - "Community 1257"
-Cohesion: 0.07
-Nodes (24): fakeId, modules, msg, t, modules, t, asUser, asUser1 (+16 more)
+Cohesion: 0.05
+Nodes (53): runnerClaimExploration, runnerCompleteDiscovery, runnerCompleteExploration, runnerFailExploration, runnerGetExplorationStatus, runnerUpdateExplorationProgress, claimExploration, completeDiscovery (+45 more)
 
 ### Community 1258 - "Community 1258"
-Cohesion: 0.09
-Nodes (24): convex-test, modules, t, modules, t, active, archived, modules (+16 more)
+Cohesion: 0.67
+Nodes (3): Architecture: Safe Rendering of `v.any()` Data, code:tsx (type ApiItem = { path?: string; method?: string; description), code:tsx (const apis = Array.isArray(module.apis) ? module.apis : [];)
 
 ### Community 1259 - "Community 1259"
-Cohesion: 0.03
-Nodes (80): createEnvironment, deleteEnvironment, updateEnvironment, runnerClaimExploration, runnerCompleteDiscovery, runnerCompleteExploration, runnerFailExploration, runnerGetExplorationStatus (+72 more)
+Cohesion: 0.04
+Nodes (71): authComponent, createAuth(), http, createEnvironment, deleteEnvironment, updateEnvironment, getEnvironment, getEnvironments (+63 more)
 
 ### Community 1260 - "Community 1260"
-Cohesion: 0.50
-Nodes (4): 4. Glossary, Analyst, Shared, Test
+Cohesion: 0.11
+Nodes (17): modules, t, modules, t, seedFlakinessSetup(), branches, envRuns, mainRuns (+9 more)
 
 ### Community 1261 - "Community 1261"
 Cohesion: 0.27
 Nodes (9): buildFlowName(), classifyComplexity(), discoverFlows(), extractPathName(), PageNode, flows, linkGraph, pages (+1 more)
 
 ### Community 1262 - "Community 1262"
-Cohesion: 0.24
-Nodes (9): CadenceLabel, DiffEntry, EnrichedSchedule, enrichSchedule(), findLatestRunForSchedule(), getSchedule, getScheduleRunDiff, getScheduleRuns (+1 more)
+Cohesion: 0.10
+Nodes (16): day, modules, month, now, t, convex-test, modules, names (+8 more)
 
 ### Community 1263 - "Community 1263"
-Cohesion: 0.15
-Nodes (12): branches, envRuns, mainRuns, modules, names, seedSuiteRun(), t, modules (+4 more)
+Cohesion: 0.08
+Nodes (34): copy_references(), copy_scripts(), discover_capabilities(), generate_capabilities_md(), main(), parse_frontmatter(), parse_yaml_config(), Scan references/ for capability prompt files with frontmatter. (+26 more)
 
 ### Community 1264 - "Community 1264"
 Cohesion: 0.10
 Nodes (15): ChatMessage, ChatMessagePart, initStagehand(), initStagehandConfig(), StagehandInstance, BASE_CONFIG, config, lastStagehandArgs (+7 more)
 
 ### Community 1265 - "Community 1265"
-Cohesion: 0.23
-Nodes (12): cleanup_legacy_csvs(), extract_module_codes(), filter_rows(), main(), parse_args(), Remove all rows matching the given module code., Write header + rows to CSV file, creating parent dirs as needed., Delete legacy per-module module-help.csv files for this module and core only. (+4 more)
+Cohesion: 0.22
+Nodes (10): Agent Tool, AI Agent, Discovered Flow, Exploration, Feature Map, NL Chat Refinement, Thread, Tool Logic (+2 more)
 
 ### Community 1266 - "Community 1266"
 Cohesion: 0.12
 Nodes (16): decrypted, enc1, enc2, encrypted, key, key1, key2, parts (+8 more)
 
 ### Community 1267 - "Community 1267"
-Cohesion: 0.05
-Nodes (63): AgentModel, buildNlFormatRetryPrompt(), buildNlGenerationPrompt(), buildPrdFormatRetryPrompt(), buildPrdGenerationPrompt(), createExplorationAnalysisAgent(), createHybridTestGenerationAgent(), createTestGenerationAgent() (+55 more)
+Cohesion: 0.09
+Nodes (29): formatElementLine(), FormattableElement, FormatMode, FormattablePage, cancelGeneration, nlTestGenerationWorkflow, cancelPrdGeneration, prdTestGenerationWorkflow (+21 more)
 
 ### Community 1268 - "Community 1268"
 Cohesion: 0.24
 Nodes (11): detect_cycles(), find_parallel_groups(), find_transitive_redundancy(), main(), scan_execution_deps(), scan_sequential_patterns(), Detect sequential operation patterns that could be parallel., Run all deterministic execution efficiency checks. (+3 more)
 
-### Community 1269 - "Community 1269"
-Cohesion: 0.14
-Nodes (11): count, flaky, modules, rootCause, seedInsightFixtures(), t, modules, t (+3 more)
-
 ### Community 1270 - "Community 1270"
-Cohesion: 0.15
-Nodes (11): capturedPages, discoveredFlows, modules, scenarios, t, asUser, asUser1, modules (+3 more)
+Cohesion: 0.10
+Nodes (18): count, flaky, modules, rootCause, seedInsightFixtures(), t, modules, t (+10 more)
 
 ### Community 1271 - "Community 1271"
 Cohesion: 0.15
 Nodes (13): Architecture: StatusPill Variants for KB Status, code:typescript (// bmad_detected is undefined on all KB docs until Story 1.9), Critical: BMAD Forward-Compatibility, Dev Notes, Existing Code to Modify, Git Intelligence, Key Dependencies, New Files to Create (+5 more)
 
 ### Community 1272 - "Community 1272"
-Cohesion: 0.28
-Nodes (7): counts, getIsFlaky(), modules, run, seedCompletedRun(), seedMultiple(), t
+Cohesion: 0.09
+Nodes (19): fakeId, modules, msg, t, modules, t, asUser, asUser1 (+11 more)
 
 ### Community 1274 - "Community 1274"
-Cohesion: 0.10
-Nodes (19): agent, input, model, modules, result, schema, steps, t (+11 more)
+Cohesion: 0.15
+Nodes (11): capturedPages, discoveredFlows, modules, scenarios, t, asUser, asUser1, modules (+3 more)
+
+### Community 1275 - "Community 1275"
+Cohesion: 0.04
+Nodes (55): getComputeFlakinessPct(), EMPTY_STATS, getActiveRuns, getDashboardStats, RecentFailure, TrendPoint, ACTIVE_STATUSES, getExploration (+47 more)
+
+### Community 1276 - "Community 1276"
+Cohesion: 0.08
+Nodes (20): Runner, extractDuplicateTextPatterns(), PageWithEval, FeedbackAction, createSnapshotApiServer(), discoverFeedbackRequestSchema, handleDiscoverFeedback(), handleSnapshot() (+12 more)
 
 ### Community 1277 - "Community 1277"
 Cohesion: 0.25
 Nodes (7): code:typescript ("use client";), code:typescript (import { useErrorLogger } from "@/lib/error-logger";), code:typescript (const msg = err instanceof Error), code:tsx (<div className="bg-[var(--surface)] border border-[var(--bor), code:tsx (if (kb === undefined) return <PageSkeleton />;), code:typescript (vi.mock("convex/react", () => ({), Existing Code Patterns to Follow
 
 ### Community 1278 - "Community 1278"
-Cohesion: 0.33
-Nodes (5): Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13), Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, initial), Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, re-review), Deferred from: code review of 1-5-ai-architecture-module-extraction (2026-06-13), Deferred from: code review of 1-6-knowledge-base-viewer-ui (2026-06-13)
+Cohesion: 0.29
+Nodes (6): Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13), Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, initial), Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, re-review), Deferred from: code review of 1-5-ai-architecture-module-extraction (2026-06-13), Deferred from: code review of 1-6-knowledge-base-viewer-ui (2026-06-13), Deferred from: code review of 1-7-module-detail-view (2026-06-13)
 
 ### Community 1279 - "Community 1279"
-Cohesion: 0.33
-Nodes (4): modules, names, t, ws1Names
+Cohesion: 0.28
+Nodes (7): counts, getIsFlaky(), modules, run, seedCompletedRun(), seedMultiple(), t
 
 ### Community 1280 - "Community 1280"
 Cohesion: 0.29
@@ -6070,20 +6087,20 @@ Cohesion: 0.40
 Nodes (5): Agent Model Used, Completion Notes List, Debug Log References, Dev Agent Record, File List
 
 ### Community 1282 - "Community 1282"
-Cohesion: 0.22
-Nodes (10): Agent Tool, AI Agent, Discovered Flow, Exploration, Feature Map, NL Chat Refinement, Thread, Tool Logic (+2 more)
+Cohesion: 0.15
+Nodes (11): buildSuggestedLocator(), actions, capturedPages, flows, instruction, longPrd, pages, prdMatch (+3 more)
 
 ### Community 1284 - "Community 1284"
-Cohesion: 0.22
-Nodes (11): ChangeDetectionResult, checkUrlReachability, detectPageChanges, ExtractionResult, extractPageInfo, ReachabilityResult, requireStagehand(), createStagehand() (+3 more)
+Cohesion: 0.50
+Nodes (4): 4. Glossary, Analyst, Shared, Test
 
 ### Community 1285 - "Community 1285"
 Cohesion: 0.50
 Nodes (4): scan_level, description, enum, type
 
 ### Community 1286 - "Community 1286"
-Cohesion: 0.33
-Nodes (5): day, modules, month, now, t
+Cohesion: 0.11
+Nodes (19): generateNlTests, generatePrdTests, markSuiteReady(), crons, components, internal, cancelIngestion, ingestionWorkflow (+11 more)
 
 ### Community 1287 - "Community 1287"
 Cohesion: 0.67
@@ -6093,25 +6110,41 @@ Nodes (3): Architecture: Query Patterns, code:typescript (export const getKnowle
 Cohesion: 0.67
 Nodes (3): code:typescript (status: v.union(v.literal("building"), v.literal("ready"), v), code:typescript (name: v.string(),), Schema Fields Available (No Changes Needed)
 
+### Community 1294 - "Community 1294"
+Cohesion: 0.24
+Nodes (11): detect_cycles(), find_parallel_groups(), find_transitive_redundancy(), main(), scan_execution_deps(), scan_sequential_patterns(), Detect sequential operation patterns that could be parallel., Run all deterministic execution efficiency checks. (+3 more)
+
+### Community 1297 - "Community 1297"
+Cohesion: 0.18
+Nodes (15): ApiItem, DataModelItem, isValidItem(), ModuleDetail(), ModuleDetailProps, ModuleSummary, renderApiItem(), renderDataModelItem() (+7 more)
+
+### Community 1303 - "Community 1303"
+Cohesion: 0.20
+Nodes (9): after, before, fakeId, filters, modules, ns1, ns2, rag (+1 more)
+
+### Community 1304 - "Community 1304"
+Cohesion: 0.40
+Nodes (4): name, packageManager, private, version
+
 ## Knowledge Gaps
-- **14292 isolated node(s):** `version`, `source`, `sourceType`, `skillPath`, `computedHash` (+14287 more)
+- **14346 isolated node(s):** `version`, `source`, `sourceType`, `skillPath`, `computedHash` (+14341 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **90 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **98 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `sorted` connect `Community 1240` to `Community 772`, `Community 926`, `Community 927`, `Community 935`, `Community 812`, `Community 65`, `Community 961`, `Community 1232`, `Community 1016`, `Community 604`, `Community 95`, `Community 744`, `Community 369`, `Community 1265`, `Community 1011`, `Community 1268`, `Community 626`, `Community 1272`, `Community 250`?**
+- **Why does `sorted` connect `Community 1263` to `Community 1294`, `Community 926`, `Community 927`, `Community 935`, `Community 812`, `Community 1203`, `Community 65`, `Community 961`, `Community 1232`, `Community 1240`, `Community 604`, `Community 95`, `Community 1254`, `Community 744`, `Community 369`, `Community 1011`, `Community 1268`, `Community 1016`, `Community 250`, `Community 1279`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `api` connect `Community 96` to `Community 0`, `Community 1`, `Community 2`, `Community 1284`, `Community 4`, `Community 7`, `Community 8`, `Community 10`, `Community 15`, `Community 22`, `Community 23`, `Community 1203`, `Community 57`, `Community 1244`, `Community 1246`, `Community 1247`, `Community 996`, `Community 1258`, `Community 1267`, `Community 1269`, `Community 1270`, `Community 1274`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `path` connect `Community 369` to `Community 960`, `Community 65`, `Community 962`, `Community 935`, `Community 615`, `Community 616`, `Community 812`, `Community 1101`, `Community 1265`, `Community 1010`, `Community 692`, `Community 1016`, `Community 250`, `Community 571`, `Community 348`, `Community 605`, `Community 926`, `Community 1240`?**
+- **Why does `api` connect `Community 96` to `Community 1`, `Community 2`, `Community 4`, `Community 1286`, `Community 7`, `Community 8`, `Community 10`, `Community 15`, `Community 1297`, `Community 22`, `Community 23`, `Community 57`, `Community 1242`, `Community 1244`, `Community 1247`, `Community 996`, `Community 1256`, `Community 106`, `Community 1260`, `Community 1262`, `Community 1270`, `Community 1274`?**
+  _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Why does `path` connect `Community 369` to `Community 926`, `Community 935`, `Community 812`, `Community 692`, `Community 571`, `Community 960`, `Community 65`, `Community 962`, `Community 1101`, `Community 1240`, `Community 348`, `Community 605`, `Community 1254`, `Community 615`, `Community 616`, `Community 1263`, `Community 1010`, `Community 1016`, `Community 250`?**
   _High betweenness centrality (0.003) - this node is a cross-community bridge._
 - **Are the 80 inferred relationships involving `path` (e.g. with `main()` and `main()`) actually correct?**
   _`path` has 80 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 38 inferred relationships involving `sorted` (e.g. with `scan_skills()` and `main()`) actually correct?**
   _`sorted` has 38 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `version`, `source`, `sourceType` to the rest of the system?**
-  _14508 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _14562 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.06101190476190476 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08695652173913043 - nodes in this community are weakly interconnected._

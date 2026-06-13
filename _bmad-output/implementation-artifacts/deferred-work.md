@@ -23,6 +23,14 @@
 - Monorepo config files can consume char budget [convex/knowledge/extractionContext.ts:82-122] — Priority sorting puts config files first. 40+ package.json/tsconfig files in a monorepo could consume the 80K char budget before any source code. Edge case quality concern.
 - Truncated modules leave dangling dependencies [convex/knowledge/extractionActions.ts:144] — .slice(0, EXTRACTION_MAX_MODULES) can cut modules whose names appear in other modules' dependencies arrays. Rare (50-module repos), minor downstream impact.
 
+## Deferred from: code review of 1-7-module-detail-view (2026-06-13)
+
+- Query errors show infinite loading skeleton [page.tsx:19-25] — `useQuery` error state never inspected. `undefined` (loading) and `null` (not found) handled, but query errors leave user stuck on skeleton. Pre-existing pattern across all pages in the codebase.
+- useState(hasItems) stale on data refetch [ModuleSection.tsx:13] — `open` initialized from `hasItems` at mount only. If real-time subscription updates items from empty→populated, section stays collapsed. Minimal practical impact since route navigation causes remount.
+- Cross-project module access within same workspace [queries.ts:160-168] — `getModule` checks workspace_id but not project_id. User can access P2's module via P1's route URL. Pre-existing workspace model scope.
+- getOptionalMemberWorkspace returns first membership [requireAuth.ts] — Multi-workspace users limited to whichever workspace sorts first. Pre-existing auth pattern not introduced by this story.
+- Empty string name renders empty heading [schema.ts] — Schema defines `name: v.string()` with no minimum length. `name: ""` renders empty `<h2>`. Pre-existing schema issue.
+
 ## Deferred from: code review of 1-6-knowledge-base-viewer-ui (2026-06-13)
 
 - getKnowledgeBase returns full document while getModules whitelists fields [convex/knowledge/queries.ts:125-148] — Spec mandates returning the raw KB document for bmad_detected forward-compatible access. Future sensitive fields added to knowledge_bases would auto-leak to the client with no review gate. Consider whitelisting the projection when Story 1.9 lands.

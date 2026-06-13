@@ -153,6 +153,22 @@ export const getModules = query({
   },
 });
 
+export const getModule = query({
+  args: {
+    module_id: v.id("kb_modules"),
+  },
+  handler: async (ctx, args) => {
+    const memberWorkspace = await getOptionalMemberWorkspace(ctx);
+    if (!memberWorkspace) return null;
+
+    const mod = await ctx.db.get(args.module_id);
+    if (!mod) return null;
+    if (mod.workspace_id !== memberWorkspace.workspace._id) return null;
+
+    return mod;
+  },
+});
+
 export const _getProjectWorkspaceForSearch = internalQuery({
   args: {
     project_id: v.id("projects"),
