@@ -31,6 +31,23 @@ export async function seedProject(t: TestCtx, workspaceId: string) {
   });
 }
 
+export async function seedProjectWithRepo(
+  t: TestCtx,
+  workspaceId: string,
+  overrides?: { repo_url?: string; encrypted_pat?: string; kb_status?: string },
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("projects", {
+      workspace_id: workspaceId,
+      name: "Test Project",
+      app_url: "https://example.com",
+      repo_url: overrides?.repo_url,
+      encrypted_pat: overrides?.encrypted_pat,
+      kb_status: overrides?.kb_status as "none" | "building" | "ready" | "error" | undefined,
+    });
+  });
+}
+
 export async function seedSuite(t: TestCtx, workspaceId: string, overrides?: { name?: string; status?: "generating" | "ready" | "failed"; triggered_by?: string; generation_error?: string; source_type?: "manual" | "prd" | "natural_language" | "url_exploration" }) {
   return t.run(async (ctx) => {
     const projectId = await ctx.db.insert("projects", {
@@ -101,6 +118,31 @@ export async function seedEnvironment(
       project_id: projectId as Id<"projects">,
       name: overrides?.name ?? "Staging",
       base_url: overrides?.base_url ?? "https://staging.example.com",
+    });
+  });
+}
+
+export async function seedKnowledgeBase(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  overrides?: Partial<{
+    status: "building" | "ready" | "error";
+    progress_message: string;
+    error_message: string;
+    total_files: number;
+    total_size_bytes: number;
+  }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("knowledge_bases", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      status: overrides?.status ?? "building",
+      progress_message: overrides?.progress_message,
+      error_message: overrides?.error_message,
+      total_files: overrides?.total_files,
+      total_size_bytes: overrides?.total_size_bytes,
     });
   });
 }

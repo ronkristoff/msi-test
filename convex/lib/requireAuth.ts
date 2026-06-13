@@ -5,10 +5,18 @@ import type { TableNames, Id, Doc } from "../_generated/dataModel";
 
 export async function getOptionalAuthUser(ctx: QueryCtx | MutationCtx) {
   try {
-    return await authComponent.getAuthUser(ctx);
+    const user = await authComponent.getAuthUser(ctx);
+    if (user) return user;
   } catch {
-    return null;
+    // Better Auth not available (e.g. test environment)
   }
+
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity) {
+    return { _id: identity.subject };
+  }
+
+  return null;
 }
 
 export async function requireAuth(ctx: QueryCtx | MutationCtx) {

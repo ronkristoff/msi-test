@@ -55,6 +55,11 @@ export default defineSchema({
     explore_cookie_value: v.optional(v.string()),
     test_data: v.optional(v.record(v.string(), v.string())),
     status: v.optional(v.union(v.literal("active"), v.literal("archived"))),
+    repo_url: v.optional(v.string()),
+    encrypted_pat: v.optional(v.string()),
+    old_rd_extracted_text: v.optional(v.string()),
+    old_rd_file_id: v.optional(v.id("_storage")),
+    kb_status: v.optional(v.union(v.literal("none"), v.literal("building"), v.literal("ready"), v.literal("error"))),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_workspace_id_and_name", ["workspace_id", "name"]),
@@ -85,6 +90,7 @@ export default defineSchema({
     locked_reason: v.optional(v.union(v.literal("running"), v.literal("generating"))),
     exploration_id: v.optional(v.id("explorations")),
     area: v.optional(v.string()),
+    failed_scenarios: v.optional(v.array(v.string())),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
@@ -154,6 +160,7 @@ export default defineSchema({
     fail_count: v.optional(v.number()),
     skip_count: v.optional(v.number()),
     healed_count: v.optional(v.number()),
+    auto_heal_attempted: v.optional(v.boolean()),
     error_message: v.optional(v.string()),
   })
     .index("by_workspace_id", ["workspace_id"])
@@ -365,5 +372,52 @@ export default defineSchema({
     run_id: v.optional(v.id("runs")),
   })
     .index("by_test_id", ["test_id"])
+    .index("by_workspace_id", ["workspace_id"]),
+
+  knowledge_bases: defineTable({
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    status: v.union(v.literal("building"), v.literal("ready"), v.literal("error")),
+    progress_message: v.optional(v.string()),
+    architecture_summary: v.optional(v.string()),
+    tech_stack: v.optional(v.array(v.string())),
+    folder_structure: v.optional(v.string()),
+    architecture_type: v.optional(v.string()),
+    total_files: v.optional(v.number()),
+    total_size_bytes: v.optional(v.number()),
+    error_message: v.optional(v.string()),
+    last_synced_at: v.optional(v.number()),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_project_id", ["project_id"]),
+
+  kb_modules: defineTable({
+    workspace_id: v.id("workspaces"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    file_count: v.optional(v.number()),
+    files: v.optional(v.array(v.string())),
+    apis: v.optional(v.any()),
+    data_models: v.optional(v.any()),
+    user_flows: v.optional(v.any()),
+    dependencies: v.optional(v.array(v.string())),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_knowledge_base_id", ["knowledge_base_id"]),
+
+  code_chunks: defineTable({
+    workspace_id: v.id("workspaces"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    project_id: v.id("projects"),
+    file_path: v.string(),
+    directory: v.string(),
+    content: v.string(),
+    chunk_index: v.number(),
+    language: v.optional(v.string()),
+    char_count: v.number(),
+  })
+    .index("by_knowledge_base_id", ["knowledge_base_id"])
+    .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"]),
 });
