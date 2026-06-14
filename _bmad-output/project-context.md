@@ -102,6 +102,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Error logging**: UI code calls `logError()` from `src/lib/error-logger.ts` in all catch blocks. Never silently swallow errors.
 - **Convex error logging**: `convex/logs/mutations.ts` has `logError` (public, no auth, auto-truncates). Set up via `setGlobalErrorLogger()` + `initGlobalErrorHandlers()` in root layout.
 - **PR workflow**: Full commit history analysis → summary → test plan → push with `-u`.
+- **Review gate (mandatory before `sprint-status → done`)**: Every story's `done` transition requires (a) a `### Review Findings` section in the story file with the 3-layer review outcome, and (b) the story file's `Status:` header matching `sprint-status.yaml`. Story 2.3 shipped `done` in sprint-status but `review` in its file with no Review Findings section — a reviewed story looked unreviewed. This is an enforced gate, not an aspiration (Epic 2 retro action B1).
 
 ### Critical Don't-Miss Rules
 
@@ -116,6 +117,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Never use `dangerouslySetInnerHTML` with untrusted input.
 - Never use raw `useState` + manual validation for forms — always `useForm` + `zodResolver`.
 - Never inline auth/ownership checks — use `requireAuth()` / `getOptionalOwnedEntity()`.
+- Never write a public action/mutation that accepts an `Id` (e.g. `project_id`, `rd_id`, `thread_id`) without a workspace-ownership check. Bare ID lookups that fetch by raw `_id` then act are the Epic 2 IDOR surface (Story 2.1 `triggerBaselineRd` CRITICAL — any authenticated user could archive/generate against another workspace's project). Pattern: resolve the entity, then assert `project.workspace_id !== membership.workspace_id` → throw `ConvexError("Project not found")`. Use `getOwnedEntity` for single-entity mutations or `getOptionalMemberWorkspace` for collection queries (Epic 2 retro action B3). Applies to all Epic 3+ endpoints.
 - Never put AI API calls in Runner — API keys stay in Convex only.
 
 **Convex Gotchas**

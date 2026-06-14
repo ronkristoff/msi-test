@@ -1,4 +1,15 @@
-## Deferred from: code review of 2-4-baseline-rd-drift-export (2026-06-14)
+## Epic 3 Triage (2026-06-14, from Epic 2 retrospective)
+
+Items promoted to blocking / prerequisite status for Epic 3 (AI Chat). Full detail in the per-review sections below; this section is the index.
+
+- **[BLOCKING — Story 3.2 prerequisite] `searchProjectRag` has no rate limiting** (line 16). Chat is the highest-volume AI surface — every message embeds the query via the workspace's API key. `@convex-dev/rate-limiter` (^0.3.2) is already installed but unused; `aiRateLimit.ts` is only a delay/retry helper. Wire the rate-limiter component to `searchProjectRag` before Story 3.2 ships.
+- **[Story 3.2] `_getProjectWorkspaceForSearch` uses `.first()` without ordering** (line 17). Same search path; fix alongside the rate-limit work.
+- **[Story 3.1 + 3.2] IDOR / cross-project scoping** (line 36 pattern + retro B3). `searchProjectRag` resolves the workspace from `project_id` via an internal query with no caller-membership check. Chat endpoints (thread creation, RAG namespace scoping) must enforce `project.workspace_id !== membership.workspace_id` from the first commit. Worst case is cross-project data leak via RAG.
+- **[Epic 3] No `*-free` model guard** (line 71, retro B4 promoted to High). Chat amplifies cost/quality cliffs faster than batch generation.
+
+Items accepted at current scale (no action for Epic 3): the O(n²) read-amplification items, the `.first()` ordering on non-search paths, the test-quality gaps.
+
+
 
 - useErrorLogger mock returns a fresh vi.fn() per call — logError invocations cannot be asserted [src/app/(auth)/projects/[id]/baseline/ExportBaselineRd.test.tsx, drift/ExportDriftReport.test.tsx] — The `useErrorLogger` mock factory creates a new `vi.fn()` on every render, so no test can assert the catch-block `logError` was called on failure. Hoist the mock via `vi.hoisted` and reuse a single fn instance. Test-quality only; no production bug.
 - groupByDimension return order is implicit — drift markdown output order relies on helper's insertion order with no explicit sort [src/app/(auth)/projects/[id]/baseline/exportFormatters.ts — buildDriftReportMarkdown] — `buildDriftReportMarkdown` iterates `groupByDimension(report.items)` and emits `## {dimension}` sections in whatever order the helper returns. The test asserts `## Old RD vs Code` before `## Architecture Decision Drift`, but nothing in the formatter sorts groups by a canonical dimension order. If `groupByDimension` is refactored (e.g. to Map iteration), the test breaks for the wrong reason. Robustness concern, not a current bug.
@@ -13,8 +24,8 @@
 
 ## Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, re-review)
 
-- searchProjectRag has no rate limiting — cost abuse vector [convex/knowledge/queries.ts] — Every search call embeds the query via the workspace's API key. No per-user throttle. Malicious client can incur unbounded embedding costs. Cross-cutting concern not specific to this story's ACs; follows existing query pattern in the codebase.
-- _getProjectWorkspaceForSearch uses .first() without ordering [convex/knowledge/queries.ts:107-110] — If a project has multiple knowledge bases (from re-ingestion), .first() returns oldest by default. Should use .order("desc").first() like getIngestionProgress does. Multiple KBs per project is story 1-8 scope.
+- **[PROMOTED — Story 3.2 prerequisite, Epic 2 retro]** searchProjectRag has no rate limiting — cost abuse vector [convex/knowledge/queries.ts] — Every search call embeds the query via the workspace's API key. No per-user throttle. Malicious client can incur unbounded embedding costs. `@convex-dev/rate-limiter` (^0.3.2) is installed but unused — wire it here before Epic 3 chat ships. Cross-cutting concern not specific to this story's ACs; follows existing query pattern in the codebase.
+- **[PROMOTED — Story 3.2, same search path]** _getProjectWorkspaceForSearch uses .first() without ordering [convex/knowledge/queries.ts:107-110] — If a project has multiple knowledge bases (from re-ingestion), .first() returns oldest by default. Should use .order("desc").first() like getIngestionProgress does. Multiple KBs per project is story 1-8 scope.
 - Sequential embedding, not batched — EMBEDDING_BATCH_SIZE only controls progress [convex/knowledge/embeddingActions.ts] — Each rag.add() is awaited sequentially. The RAG component likely supports batch insertion. For 10k chunks this is 10k sequential awaits. Performance concern only, not correctness.
 - Separate mutations for ready+synced — partial failure [convex/knowledge/ingestionWorkflow.ts] — "ready" status and last_synced_at are in two separate step.runMutation calls. If first succeeds but second fails, workflow retries and re-runs embedChunks from scratch. Cost concern; key-based upsert ensures correctness.
 - 429 ignores Retry-After header [convex/knowledge/embeddingActions.ts:78] — Uses fixed 30s instead of server-provided backoff. Requires extracting Retry-After from AI SDK error responseHeaders. Blocked by the 429 statusCode property fix (patch finding #2).
