@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-14T19:30:00Z
+last_updated: 2026-06-14T21:00:00Z
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -54,12 +54,12 @@ development_status:
   1-9-bmad-artifact-detection-parsing: done
   epic-1-retrospective: done
 
-  epic-2: in-progress
+  epic-2: done
   2-1-baseline-rd-generation: done
   2-2-drift-report-generation: done
   2-3-baseline-rd-viewer-inline-editor: done
   2-4-baseline-rd-drift-export: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-analyst-chat-agent-thread-management: backlog

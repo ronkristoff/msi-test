@@ -4,7 +4,7 @@ baseline_commit: 4a8dfcd6c967928b3d088a7f93d79da34630a514
 
 # Story 2.3: Baseline RD Viewer & Inline Editor
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -473,3 +473,22 @@ glm-5.2 (zai-coding-plan/glm-5.2)
 
 - 2026-06-14: Story 2.3 created — Baseline RD Viewer & Inline Editor (no schema changes; one mutation mirroring `updateTestCode`; frontend page mirroring drift page pattern; opportunistic drift staleness detection from Story 2.2 deferred work).
 - 2026-06-14: Story 2.3 implementation complete — all 11 tasks done, 42 new tests added (17 backend + 25 frontend), 0 lint errors, all existing tests pass.
+
+### Review Findings
+
+_Source: bmad-code-review (3-layer: Blind Hunter + Edge Case Hunter + Acceptance Auditor), re-review commissioned by Epic 2 retrospective, 2026-06-14. Conducted in-session after parallel subagents were cancelled._
+
+#### Decision-needed
+
+- [x] [Review][Decision→Patch] **Drift staleness banner shows the wrong version number** — RESOLVED (option 2): added `baseline_rd_version: v.optional(v.number())` to `drift_reports` schema, populated from `baseline_rd.version` in `generateDriftReport`, exposed via `getDriftReport`, banner now renders `baseline_rd_version` with a graceful fallback for legacy reports. ✅ Applied + tested.
+
+#### Patch
+
+- [x] [Review][Patch] **Empty-content save silently no-ops** — Fixed: `if (!rdId || localContent === null) return;`. Empty section content now saves correctly. ✅ Applied + tested (`Save succeeds when textarea is cleared to empty content`). [src/app/(auth)/projects/[id]/baseline/BaselineRdSection.tsx — handleSave]
+- [x] [Review][Patch] **`transitionError` rendered as a plain `<div>` with no `role="alert"`** — Fixed: added `role="alert"`. ✅ Applied. [src/app/(auth)/projects/[id]/baseline/BaselineRdViewer.tsx — transitionError block]
+
+#### Dismissed (3)
+
+- Duplicate `section_updates` IDs coalesce via `Map` (last write wins) — benign, deterministic, not a defect.
+- No optimistic state after `triggerBaselineRd` success (brief flash back to "No RD" card before subscription propagates) — consistent with the existing drift-page pattern, not introduced incorrectly.
+- Staleness banner uses `role="alert"` for a warning present on load (assertive live region) — debatable a11y nuance, low value.
