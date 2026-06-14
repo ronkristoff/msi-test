@@ -9,12 +9,14 @@ const mockTriggerBaselineRd = vi.fn(() =>
 
 let mockBaselineRd: unknown = undefined;
 let mockKb: unknown = undefined;
+let mockBmadMetadata: unknown = undefined;
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn((queryRef: unknown) => {
     const key = typeof queryRef === "string" ? queryRef : String(queryRef);
     if (key.includes("getBaselineRd")) return mockBaselineRd;
     if (key.includes("getKnowledgeBase")) return mockKb;
+    if (key.includes("getBmadMetadata")) return mockBmadMetadata;
     return undefined;
   }),
   useAction: vi.fn(() => mockTriggerBaselineRd),
@@ -31,6 +33,7 @@ vi.mock("@/lib/convex", () => ({
       queries: {
         getBaselineRd: "knowledge.queries.getBaselineRd",
         getKnowledgeBase: "knowledge.queries.getKnowledgeBase",
+        getBmadMetadata: "knowledge.queries.getBmadMetadata",
       },
       triggerIngestion: {
         triggerBaselineRd: "knowledge.triggerIngestion.triggerBaselineRd",
@@ -201,6 +204,39 @@ describe("BaselineRdPage — approve / mark-as-draft", () => {
   it("does not show Mark as Draft when status is draft", async () => {
     await setup();
     expect(screen.queryByRole("button", { name: /Mark as Draft/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("BaselineRdPage — export control visibility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockKb = readyKb;
+    mockBmadMetadata = null;
+  });
+
+  it("does not render an Export button when RD is draft", async () => {
+    mockBaselineRd = draftRd;
+    await setup();
+    expect(screen.queryByRole("button", { name: /^Export$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows BMAD PRD export option when bmad_detected is true and RD is approved", async () => {
+    const user = userEvent.setup();
+    mockBaselineRd = { ...draftRd, status: "approved" };
+    mockKb = { ...readyKb, bmad_detected: true };
+    mockBmadMetadata = { adrs: [], prd_sections: [], conventions: [], domain_terms: [] };
+    await setup();
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    expect(screen.getByRole("menuitem", { name: /BMAD PRD/i })).toBeInTheDocument();
+  });
+
+  it("does not show BMAD PRD option when bmad_detected is false", async () => {
+    const user = userEvent.setup();
+    mockBaselineRd = { ...draftRd, status: "approved" };
+    mockKb = { ...readyKb, bmad_detected: false };
+    await setup();
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    expect(screen.queryByRole("menuitem", { name: /BMAD PRD/i })).not.toBeInTheDocument();
   });
 });
 

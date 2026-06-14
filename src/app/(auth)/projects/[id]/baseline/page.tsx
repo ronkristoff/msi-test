@@ -126,7 +126,7 @@ export default function BaselineRdPage() {
         </div>
       )}
 
-      {baselineRd !== null && <BaselineRdViewer rd={baselineRd} />}
+      {baselineRd !== null && <BaselineRdViewer rd={baselineRd} bmadDetected={kb?.bmad_detected === true} />}
     </div>
   );
 }

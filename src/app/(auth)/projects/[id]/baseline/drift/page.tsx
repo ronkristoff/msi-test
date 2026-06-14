@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/Alert";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useErrorLogger } from "@/lib/error-logger";
 import { DriftReportViewer } from "./DriftReportViewer";
+import { ExportDriftReport } from "./ExportDriftReport";
 
 export default function DriftReportPage() {
   const params = useParams<{ id: string }>();
@@ -172,7 +173,8 @@ export default function DriftReportPage() {
               Regenerate to compare against the current RD (v{baselineRd?.version}).
             </div>
           )}
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end mb-4 gap-2">
+            <ExportDriftReport report={driftReport} baselineRdVersion={baselineRd?.version} />
             <Button onClick={handleRegenerate} disabled={isRegenerating || !kbReady} variant="secondary" size="sm">
               {isRegenerating ? (
                 <>

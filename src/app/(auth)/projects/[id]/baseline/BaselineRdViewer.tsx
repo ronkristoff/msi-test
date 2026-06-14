@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { useErrorLogger } from "@/lib/error-logger";
 import { BaselineRdSection } from "./BaselineRdSection";
+import { ExportBaselineRd } from "./ExportBaselineRd";
 
 type BaselineRdViewerProps = {
   rd: Doc<"baseline_rds">;
+  bmadDetected: boolean;
 };
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
-export function BaselineRdViewer({ rd }: BaselineRdViewerProps) {
+export function BaselineRdViewer({ rd, bmadDetected }: BaselineRdViewerProps) {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingDirty, setEditingDirty] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function BaselineRdViewer({ rd }: BaselineRdViewerProps) {
             {rd.status === "approved" ? "Approved" : "Draft"}
           </StatusPill>
           <div className="ml-auto flex items-center gap-2">
+            <ExportBaselineRd rd={rd} bmadDetected={bmadDetected} />
             {rd.status === "draft" && (
               <Button
                 variant="primary"
