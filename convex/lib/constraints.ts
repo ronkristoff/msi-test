@@ -44,6 +44,11 @@ export const BASELINE_RD_MAX_CONTEXT_CHARS = 80000;
 export const RD_ERROR_MESSAGE_MAX_LENGTH = 2000;
 export const RD_SECTION_CONTENT_MAX_LENGTH = 50000;
 
+export const DRIFT_MAX_CONTEXT_CHARS = 80000;
+export const DRIFT_OLD_RD_MAX_CHARS = 40000;
+export const DRIFT_ERROR_MESSAGE_MAX_LENGTH = 2000;
+export const MAX_DRIFT_ITEMS = 100;
+
 export function prependScheme(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return "";

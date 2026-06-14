@@ -190,6 +190,45 @@ export const getBaselineRd = query({
   },
 });
 
+export const getDriftReport = query({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const memberWorkspace = await getOptionalMemberWorkspace(ctx);
+    if (!memberWorkspace) return null;
+
+    const project = await ctx.db.get(args.project_id);
+    if (!project) return null;
+    if (project.workspace_id !== memberWorkspace.workspace._id) return null;
+
+    const reports = await ctx.db
+      .query("drift_reports")
+      .withIndex("by_project_id_and_version", (q) =>
+        q.eq("project_id", args.project_id),
+      )
+      .order("desc")
+      .take(10);
+
+    const report = reports.find((r) => r.status !== "archived");
+    if (!report) return null;
+
+    return {
+      _id: report._id,
+      _creationTime: report._creationTime,
+      project_id: report.project_id,
+      knowledge_base_id: report.knowledge_base_id,
+      baseline_rd_id: report.baseline_rd_id,
+      version: report.version,
+      status: report.status,
+      items: report.items,
+      bmad_detected: report.bmad_detected,
+      generation_error: report.generation_error,
+      generated_at: report.generated_at,
+    };
+  },
+});
+
 export const getModule = query({
   args: {
     module_id: v.id("kb_modules"),

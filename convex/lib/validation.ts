@@ -161,3 +161,27 @@ export const rdSectionValidator = v.object({
     }),
   ),
 });
+
+export const driftItemValidator = v.object({
+  dimension: v.union(
+    v.literal("old-rd-vs-code"),
+    v.literal("bmad-prd-vs-code"),
+    v.literal("bmad-conventions-vs-code"),
+    v.literal("adr-drift"),
+  ),
+  category: v.union(
+    v.literal("added"),
+    v.literal("removed"),
+    v.literal("changed"),
+  ),
+  severity: v.union(
+    v.literal("breaking"),
+    v.literal("significant"),
+    v.literal("incremental"),
+  ),
+  title: v.string(),
+  description: v.string(),
+  rd_section_id: v.optional(v.string()),
+  evidence: v.optional(v.string()),
+  old_rd_reference: v.optional(v.string()),
+});

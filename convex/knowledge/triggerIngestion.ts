@@ -134,6 +134,10 @@ export const resyncKnowledgeBase = action({
       project_id: args.project_id,
     });
 
+    await ctx.runMutation(internal.knowledge.internal._archiveDriftReport, {
+      project_id: args.project_id,
+    });
+
     await ctx.runMutation(internal.knowledge.internal._resetKbForResync, {
       knowledge_base_id: existingKb._id,
     });
@@ -244,6 +248,85 @@ export const triggerBaselineRd = action({
         project_id: args.project_id,
         knowledge_base_id: kb._id,
         workspace_id: project.workspace_id,
+      },
+    );
+
+    return result;
+  },
+});
+
+export const triggerDriftReport = action({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
+    const userId = getOwnerId(user);
+
+    const membership = await ctx.runQuery(
+      internal.knowledge.internal._getMembershipForUser,
+      { user_id: userId },
+    );
+    if (!membership) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const project = await ctx.runQuery(
+      internal.knowledge.internal._getProjectForIngestion,
+      { project_id: args.project_id },
+    );
+
+    if (!project) {
+      throw new ConvexError("Project not found");
+    }
+
+    if (project.workspace_id !== membership.workspace_id) {
+      throw new ConvexError("Project not found");
+    }
+
+    if (project.kb_status !== "ready") {
+      throw new ConvexError(
+        "Knowledge Base must be in 'ready' state to (re)generate the Drift Report.",
+      );
+    }
+
+    if (!project.old_rd_extracted_text) {
+      throw new ConvexError(
+        "Drift Report requires an Old RD. Upload one in project settings.",
+      );
+    }
+
+    const kb = await ctx.runQuery(
+      internal.knowledge.internal._getKnowledgeBaseForProject,
+      { project_id: args.project_id },
+    );
+
+    if (!kb) {
+      throw new ConvexError("No Knowledge Base found for this project.");
+    }
+
+    const latestBaselineRd = await ctx.runQuery(
+      internal.knowledge.internal._getLatestBaselineRdForDrift,
+      { project_id: args.project_id },
+    );
+
+    if (!latestBaselineRd) {
+      throw new ConvexError(
+        "Drift Report requires a Baseline RD. Generate one first.",
+      );
+    }
+
+    await ctx.runMutation(internal.knowledge.internal._archiveDriftReport, {
+      project_id: args.project_id,
+    });
+
+    const result = await ctx.runAction(
+      internal.knowledge.driftActions.generateDriftReportWithLogging,
+      {
+        project_id: args.project_id,
+        knowledge_base_id: kb._id,
+        workspace_id: project.workspace_id,
+        baseline_rd_id: latestBaselineRd._id,
       },
     );
 

@@ -7,6 +7,7 @@ const mockResyncKnowledgeBase = vi.fn();
 let mockKb: unknown = undefined;
 let mockModules: unknown = undefined;
 let mockBmadMetadata: unknown = undefined;
+let mockOldRd: unknown = undefined;
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn((_queryRef: unknown, args: unknown) => {
@@ -14,6 +15,7 @@ vi.mock("convex/react", () => ({
     if (key.includes("getKnowledgeBase")) return mockKb;
     if (key.includes("getModules")) return mockModules;
     if (key.includes("getBmadMetadata")) return mockBmadMetadata;
+    if (key.includes("getOldRd")) return mockOldRd;
     return undefined;
   }),
   useAction: vi.fn((_actionRef: unknown) => {
@@ -108,6 +110,7 @@ describe("KnowledgePage", () => {
     mockKb = undefined;
     mockModules = undefined;
     mockBmadMetadata = undefined;
+    mockOldRd = undefined;
     mockTriggerIngestion.mockResolvedValue(undefined);
     mockResyncKnowledgeBase.mockResolvedValue(undefined);
   });

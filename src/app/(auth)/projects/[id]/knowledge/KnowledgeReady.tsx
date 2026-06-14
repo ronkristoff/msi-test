@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
 import { formatBytes, formatTime } from "@/lib/format";
@@ -12,12 +13,20 @@ type KnowledgeReadyProps = {
   projectId: string;
   onResync: () => Promise<void>;
   isResyncing: boolean;
+  hasOldRd?: boolean;
 };
 
-export function KnowledgeReady({ kb, modules, projectId, onResync, isResyncing }: KnowledgeReadyProps) {
+export function KnowledgeReady({ kb, modules, projectId, onResync, isResyncing, hasOldRd }: KnowledgeReadyProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {hasOldRd && (
+          <Link href={`/projects/${projectId}/baseline/drift`}>
+            <Button variant="secondary" size="sm">
+              View Drift Report
+            </Button>
+          </Link>
+        )}
         <Button onClick={onResync} disabled={isResyncing} variant="secondary" size="sm">
           {isResyncing ? (
             <>

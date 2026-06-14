@@ -29,6 +29,10 @@ export default function KnowledgePage() {
     api.knowledge.queries.getModules,
     kb && kb.status === "ready" ? { knowledge_base_id: kb._id } : "skip",
   );
+  const oldRd = useQuery(api.knowledge.queries.getOldRd, {
+    project_id: projectId,
+  });
+  const hasOldRd = oldRd?.has_old_rd === true;
   const bmadDetected = kb?.bmad_detected;
   const bmadMetadata = useQuery(
     api.knowledge.queries.getBmadMetadata,
@@ -164,6 +168,7 @@ export default function KnowledgePage() {
             projectId={params.id}
             onResync={handleResync}
             isResyncing={isResyncing}
+            hasOldRd={hasOldRd}
           />
         </>
       )}

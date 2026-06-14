@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, prdCoverageItemValidator, rdSectionValidator, testStepValidator } from "./lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, driftItemValidator, prdCoverageItemValidator, rdSectionValidator, testStepValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -460,4 +460,25 @@ export default defineSchema({
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
     .index("by_project_id_and_version", ["project_id", "version"]),
+
+  drift_reports: defineTable({
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    baseline_rd_id: v.id("baseline_rds"),
+    version: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("archived"),
+      v.literal("failed"),
+    ),
+    items: v.array(driftItemValidator),
+    bmad_detected: v.boolean(),
+    generation_error: v.optional(v.string()),
+    generated_at: v.number(),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_project_id", ["project_id"])
+    .index("by_project_id_and_version", ["project_id", "version"])
+    .index("by_baseline_rd_id", ["baseline_rd_id"]),
 });

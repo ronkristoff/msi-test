@@ -143,7 +143,11 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
     knowledge_base_id: args.knowledge_base_id,
   });
 
-  await step.runAction(
+  const baselineResult: {
+    baselineRdId: string | null;
+    version: number;
+    error?: string;
+  } = await step.runAction(
     internal.knowledge.baselineActions.generateBaselineRdWithLogging,
     {
       project_id: args.project_id,
@@ -151,6 +155,18 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
       workspace_id: project.workspace_id,
     },
   );
+
+  if (baselineResult.baselineRdId) {
+    await step.runAction(
+      internal.knowledge.driftActions.generateDriftReportWithLogging,
+      {
+        project_id: args.project_id,
+        knowledge_base_id: args.knowledge_base_id,
+        workspace_id: project.workspace_id,
+        baseline_rd_id: baselineResult.baselineRdId,
+      },
+    );
+  }
 
   return { success: true, chunkCount: chunkResult.chunkCount };
 });

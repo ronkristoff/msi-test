@@ -238,6 +238,59 @@ export async function seedBaselineRd(
   });
 }
 
+type DriftReportOverrides = Partial<{
+  version: number;
+  status: "draft" | "archived" | "failed";
+  items: Array<{
+    dimension: "old-rd-vs-code" | "bmad-prd-vs-code" | "bmad-conventions-vs-code" | "adr-drift";
+    category: "added" | "removed" | "changed";
+    severity: "breaking" | "significant" | "incremental";
+    title: string;
+    description: string;
+    rd_section_id?: string;
+    evidence?: string;
+    old_rd_reference?: string;
+  }>;
+  bmad_detected: boolean;
+  generation_error: string;
+  generated_at: number;
+}>;
+
+const DEFAULT_DRIFT_ITEMS = [
+  {
+    dimension: "old-rd-vs-code" as const,
+    category: "added" as const,
+    severity: "incremental" as const,
+    title: "Default drift item",
+    description: "Default drift description.",
+    rd_section_id: "overview",
+  },
+];
+
+export async function seedDriftReport(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  knowledgeBaseId: string,
+  baselineRdId: string,
+  overrides?: DriftReportOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("drift_reports", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      knowledge_base_id: knowledgeBaseId as Id<"knowledge_bases">,
+      baseline_rd_id: baselineRdId as Id<"baseline_rds">,
+      version: overrides?.version ?? 1,
+      status: overrides?.status ?? "draft",
+      items: overrides?.items ?? DEFAULT_DRIFT_ITEMS,
+      bmad_detected: overrides?.bmad_detected ?? false,
+      generation_error: overrides?.generation_error,
+      generated_at: overrides?.generated_at ?? Date.now(),
+    });
+  });
+}
+
 export async function seedBmadMetadata(
   t: TestCtx,
   workspaceId: string,
