@@ -26,6 +26,9 @@ export default function DriftReportPage() {
   const kb = useQuery(api.knowledge.queries.getKnowledgeBase, {
     project_id: projectId,
   });
+  const baselineRd = useQuery(api.knowledge.queries.getBaselineRd, {
+    project_id: projectId,
+  });
   const triggerDriftReport = useAction(
     api.knowledge.triggerIngestion.triggerDriftReport,
   );
@@ -58,11 +61,17 @@ export default function DriftReportPage() {
     }
   };
 
-  if (driftReport === undefined || oldRd === undefined || kb === undefined) {
+  if (driftReport === undefined || oldRd === undefined || kb === undefined || baselineRd === undefined) {
     return <PageSkeleton />;
   }
 
   const isFailedReport = driftReport !== null && driftReport.status === "failed";
+  const isStale =
+    hasOldRd &&
+    driftReport !== null &&
+    !isFailedReport &&
+    baselineRd !== null &&
+    driftReport.baseline_rd_id !== baselineRd._id;
 
   return (
     <div className="max-w-[1080px]">
@@ -154,6 +163,15 @@ export default function DriftReportPage() {
 
       {hasOldRd && driftReport !== null && !isFailedReport && (
         <>
+          {isStale && (
+            <div
+              role="alert"
+              className="p-3 rounded-[var(--radius-sm)] border text-sm bg-[rgba(234,179,8,0.06)] border-[rgba(234,179,8,0.2)] text-[var(--warn-text)] mb-4"
+            >
+              This Drift Report is based on an older version of the Baseline RD (v{driftReport.version}).
+              Regenerate to compare against the current RD (v{baselineRd?.version}).
+            </div>
+          )}
           <div className="flex justify-end mb-4">
             <Button onClick={handleRegenerate} disabled={isRegenerating || !kbReady} variant="secondary" size="sm">
               {isRegenerating ? (

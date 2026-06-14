@@ -6,6 +6,7 @@ const mockTriggerDriftReport = vi.fn();
 let mockDriftReport: unknown = undefined;
 let mockOldRd: unknown = undefined;
 let mockKb: unknown = undefined;
+let mockBaselineRd: unknown = undefined;
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn((queryRef: unknown) => {
@@ -13,6 +14,7 @@ vi.mock("convex/react", () => ({
     if (key.includes("getDriftReport")) return mockDriftReport;
     if (key.includes("getOldRd")) return mockOldRd;
     if (key.includes("getKnowledgeBase")) return mockKb;
+    if (key.includes("getBaselineRd")) return mockBaselineRd;
     return undefined;
   }),
   useAction: vi.fn(() => mockTriggerDriftReport),
@@ -29,6 +31,7 @@ vi.mock("@/lib/convex", () => ({
         getDriftReport: "knowledge.queries.getDriftReport",
         getOldRd: "knowledge.queries.getOldRd",
         getKnowledgeBase: "knowledge.queries.getKnowledgeBase",
+        getBaselineRd: "knowledge.queries.getBaselineRd",
       },
       triggerIngestion: {
         triggerDriftReport: "knowledge.triggerIngestion.triggerDriftReport",
@@ -98,6 +101,7 @@ describe("DriftReportPage", () => {
     mockDriftReport = undefined;
     mockOldRd = undefined;
     mockKb = readyKb;
+    mockBaselineRd = { _id: "rd1", version: 1, status: "draft", sections: [] };
     mockTriggerDriftReport.mockResolvedValue({ driftReportId: "dr2", version: 2 });
   });
 
@@ -204,5 +208,24 @@ describe("DriftReportPage", () => {
     expect(screen.getByText(/Drift Report generation failed/i)).toBeInTheDocument();
     expect(screen.getByText(/AI provider timeout/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Regenerate/i })).toBeInTheDocument();
+  });
+
+  it("renders staleness banner when drift report references an older Baseline RD", async () => {
+    mockOldRd = { has_old_rd: true };
+    mockDriftReport = reportWithItems;
+    mockBaselineRd = { _id: "rd-newer", version: 2, status: "draft", sections: [] };
+    await setup();
+
+    expect(screen.getByText(/older version of the Baseline RD/i)).toBeInTheDocument();
+    expect(screen.getByText(/Regenerate to compare/i)).toBeInTheDocument();
+  });
+
+  it("does not render staleness banner when drift report references the current RD", async () => {
+    mockOldRd = { has_old_rd: true };
+    mockDriftReport = reportWithItems;
+    mockBaselineRd = { _id: "rd1", version: 1, status: "draft", sections: [] };
+    await setup();
+
+    expect(screen.queryByText(/older version of the Baseline RD/i)).not.toBeInTheDocument();
   });
 });

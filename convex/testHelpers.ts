@@ -192,7 +192,7 @@ export async function seedModule(
 
 type BaselineRdOverrides = Partial<{
   version: number;
-  status: "draft" | "approved" | "archived";
+  status: "draft" | "approved" | "archived" | "failed";
   sections: Array<{
     id: string;
     title: string;
@@ -206,6 +206,7 @@ type BaselineRdOverrides = Partial<{
   }>;
   rd_generation_error: string;
   generated_at: number;
+  updated_at: number;
 }>;
 
 const DEFAULT_BASELINE_RD_SECTIONS = [
@@ -234,6 +235,7 @@ export async function seedBaselineRd(
       sections: overrides?.sections ?? DEFAULT_BASELINE_RD_SECTIONS,
       rd_generation_error: overrides?.rd_generation_error,
       generated_at: overrides?.generated_at ?? Date.now(),
+      updated_at: overrides?.updated_at,
     });
   });
 }
