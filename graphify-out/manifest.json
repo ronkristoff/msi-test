@@ -165,8 +165,8 @@
     "semantic_hash": "9d6ea7c18241733ef133b308f01213aa"
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/schema.ts": {
-    "mtime": 1781409281.4070954,
-    "ast_hash": "3259f5922b22e74233a5880dc2dc46a1",
+    "mtime": 1781434313.358604,
+    "ast_hash": "1295716c5aa703ef14f07d7dccb38f28",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/stagehand.test.ts": {
@@ -250,8 +250,8 @@
     "semantic_hash": "c4e1f7a441079865499ddf820416a474"
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/testHelpers.ts": {
-    "mtime": 1781419322.6646533,
-    "ast_hash": "f2db7d96107350774d9f2ae3465b62ee",
+    "mtime": 1781434341.16468,
+    "ast_hash": "96d60e9ecd17c393a896addc99aac190",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/environments.queries.test.ts": {
@@ -6815,13 +6815,13 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/queries.ts": {
-    "mtime": 1781416044.3188844,
-    "ast_hash": "bd3ab0256a1b65b86f2f7380d6248c3e",
+    "mtime": 1781434335.82874,
+    "ast_hash": "ddbc51038cfb72a265d34723015eb2e6",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/internal.ts": {
-    "mtime": 1781413478.9092343,
-    "ast_hash": "401d746aefa6dd22da4233df92ef3fb4",
+    "mtime": 1781434320.736791,
+    "ast_hash": "81660fdd88e0c531201b9267d1eaf313",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.queries.test.ts": {
@@ -6845,8 +6845,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/sprint-status.yaml": {
-    "mtime": 1781429320.3062568,
-    "ast_hash": "f171abbe5838e6cc39073f691f8dfc99",
+    "mtime": 1781434552.5260634,
+    "ast_hash": "7cf9dae678bca558955e2af4db541627",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/1-2-old-rd-upload-text-extraction.md": {
@@ -6875,8 +6875,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/project-context.md": {
-    "mtime": 1781339598.1840062,
-    "ast_hash": "655e1e6048e1294432a1ab71f71155f2",
+    "mtime": 1781435063.1421838,
+    "ast_hash": "dbc87ec156a1027502f1c6ec368ee93d",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/1-3-code-ingestion-pipeline-github-read-chunk.md": {
@@ -6945,8 +6945,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/deferred-work.md": {
-    "mtime": 1781428642.6230633,
-    "ast_hash": "02cc60b32b6eef002b5d993cc39f669c",
+    "mtime": 1781435037.8786857,
+    "ast_hash": "8b443ee18495b202413eab50adaf3ad2",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.embeddingActions.test.ts": {
@@ -7115,8 +7115,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.baselineRd.test.ts": {
-    "mtime": 1781407913.085098,
-    "ast_hash": "0987b9184c98fd901a054350e9139546",
+    "mtime": 1781430241.7049074,
+    "ast_hash": "a0d03f3e080fe12af7510556d1cd033f",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/baselinePrompts.ts": {
@@ -7140,8 +7140,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/driftActions.ts": {
-    "mtime": 1781416332.180112,
-    "ast_hash": "12387ebb7316d5682005e9d7b4b4266a",
+    "mtime": 1781434328.2764122,
+    "ast_hash": "65ec1281fb9383223df1d6e3ecc9408c",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/drift/DriftDimensions.tsx": {
@@ -7155,23 +7155,23 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/drift/page.tsx": {
-    "mtime": 1781429077.6368537,
-    "ast_hash": "636941d53bb78983b06abf441f401da1",
+    "mtime": 1781434362.7327752,
+    "ast_hash": "e809935c2ccff66b06b45c6a2604d29f",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.driftReport.test.ts": {
-    "mtime": 1781416342.6441896,
-    "ast_hash": "b2789b46e3e8b964aa0c5900cd3eb22f",
+    "mtime": 1781434420.2225013,
+    "ast_hash": "c7433f30c01a519942d1ecbf712d65a1",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/drift/DriftReportViewer.test.tsx": {
-    "mtime": 1781419322.7251925,
-    "ast_hash": "ed0971caa672f5f132c356ce8757d5e6",
+    "mtime": 1781434448.3419359,
+    "ast_hash": "5a149acfa6814761a4f3fa68cc81956e",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/2-3-baseline-rd-viewer-inline-editor.md": {
-    "mtime": 1781418629.5422695,
-    "ast_hash": "881f297793c737c9f80b14adb35e23b0",
+    "mtime": 1781434544.251617,
+    "ast_hash": "1e27a1aa29f6e6395414140b661e44e6",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.baselineRdEditor.test.ts": {
@@ -7190,13 +7190,13 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/BaselineRdSection.test.tsx": {
-    "mtime": 1781419230.0904384,
-    "ast_hash": "467ba5ac85ad70cc3c2eb34534975924",
+    "mtime": 1781434470.633742,
+    "ast_hash": "730cb2f10b724dd2dbc24d140a292c3a",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/BaselineRdSection.tsx": {
-    "mtime": 1781419156.9358435,
-    "ast_hash": "cf4d9d46bab683b8111a1329a8c3d852",
+    "mtime": 1781434368.4105835,
+    "ast_hash": "462b06d4e4536deabbbb924764347fc3",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/BaselineRdViewer.test.tsx": {
@@ -7205,8 +7205,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/BaselineRdViewer.tsx": {
-    "mtime": 1781421584.3678575,
-    "ast_hash": "37492d8da0fc076bc221d7f487cb9873",
+    "mtime": 1781434377.8074636,
+    "ast_hash": "9d14d55b0079401a3a7c25200b8a7a94",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/page.tsx": {
@@ -7252,6 +7252,16 @@
   "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/baseline/drift/ExportDriftReport.tsx": {
     "mtime": 1781429077.6303506,
     "ast_hash": "a437b8196f51391c3122d711bae45569",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/epic-2-retrospective.md": {
+    "mtime": 1781430841.9119055,
+    "ast_hash": "19cbb0a2dc1a309f0c05c98d7ca9f215",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/planning-artifacts/spike-3.1-streaming-chat.md": {
+    "mtime": 1781436306.5838299,
+    "ast_hash": "f26520ccf3c0238a51cba8f1f8bfb826",
     "semantic_hash": ""
   }
 }
