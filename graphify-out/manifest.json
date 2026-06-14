@@ -690,8 +690,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/lib/constraints.ts": {
-    "mtime": 1781416076.6166391,
-    "ast_hash": "cc05b8c5a67af8479037fe44a1f3ccde",
+    "mtime": 1781444815.0886035,
+    "ast_hash": "b0064a00b4125ea1a90fa2f16b42ed25",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/lib/locking.ts": {
@@ -6815,8 +6815,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/queries.ts": {
-    "mtime": 1781434335.82874,
-    "ast_hash": "ddbc51038cfb72a265d34723015eb2e6",
+    "mtime": 1781444815.0543375,
+    "ast_hash": "19126c4185c0e748bec581dc7c61b297",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge/internal.ts": {
@@ -6845,8 +6845,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/sprint-status.yaml": {
-    "mtime": 1781442214.8123841,
-    "ast_hash": "6c1bfdde69453d5f52a408e3341ee16d",
+    "mtime": 1781447455.3736637,
+    "ast_hash": "3489810312e3aacf6ca72ba2cc34c24b",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/1-2-old-rd-upload-text-extraction.md": {
@@ -6940,13 +6940,13 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.rag.test.ts": {
-    "mtime": 1781348453.8284044,
-    "ast_hash": "fa283a1e814f34cbc77f2079e74939c9",
+    "mtime": 1781446391.9794984,
+    "ast_hash": "2f303061b582caa54a57e7e7521f675c",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/deferred-work.md": {
-    "mtime": 1781440744.3349767,
-    "ast_hash": "9802dce59de13d399d3872a4f68ae814",
+    "mtime": 1781446022.2362368,
+    "ast_hash": "c4c27e072720f3fd5291ee2498be63ba",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.embeddingActions.test.ts": {
@@ -7270,8 +7270,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat/agents.ts": {
-    "mtime": 1781439400.2732286,
-    "ast_hash": "c6dbf603a08ed95875c10fff4a8bc53a",
+    "mtime": 1781444815.0390391,
+    "ast_hash": "bfdcdefb18ccbed1121399b6a89d3d4c",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat/internal.ts": {
@@ -7285,8 +7285,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat/chatActions.ts": {
-    "mtime": 1781441664.7083685,
-    "ast_hash": "253bab936c348ce6aef39a78eb9d5d1b",
+    "mtime": 1781446320.9684517,
+    "ast_hash": "113de99fdab8d7b9aa6025a7161352db",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat/queries.ts": {
@@ -7295,8 +7295,33 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat.test.ts": {
-    "mtime": 1781442093.4665263,
-    "ast_hash": "ad1921cc726b2125b17a52021bed9f13",
+    "mtime": 1781446361.3609815,
+    "ast_hash": "0f43943ae4cc7853f32ca4df46047f6c",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/3-2-rag-grounded-responses.md": {
+    "mtime": 1781446510.5784688,
+    "ast_hash": "3f72df93c63edcea577a8c7d70d422c7",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/convex/chat/ragContext.test.ts": {
+    "mtime": 1781443266.7151043,
+    "ast_hash": "12a49ba67752083c0b08e0a52f6be78e",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/convex/chat/ragContext.ts": {
+    "mtime": 1781443323.1253073,
+    "ast_hash": "f93123ab4afb4f561da7c1045b8c7d7d",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/convex/chat/agents.test.ts": {
+    "mtime": 1781443398.972542,
+    "ast_hash": "df07f85dffdc9061b284a7583c63f3b0",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/3-3-chat-thread-list-navigation.md": {
+    "mtime": 1781447438.6817207,
+    "ast_hash": "80282e533a8a1a9ab266c19655c3703e",
     "semantic_hash": ""
   }
 }
