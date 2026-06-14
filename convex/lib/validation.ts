@@ -143,3 +143,21 @@ export const prdCoverageItemValidator = v.object({
   found: v.boolean(),
   evidence: v.optional(v.string()),
 });
+
+export const rdSectionValidator = v.object({
+  id: v.string(),
+  title: v.string(),
+  content: v.string(),
+  confidence: v.number(),
+  divergence_note: v.optional(v.string()),
+  bmad_alignment: v.optional(
+    v.object({
+      prd_section_title: v.string(),
+      agreement: v.union(
+        v.literal("agree"),
+        v.literal("diverge"),
+        v.literal("partial"),
+      ),
+    }),
+  ),
+});

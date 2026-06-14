@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, prdCoverageItemValidator, testStepValidator } from "./lib/validation";
+import { capturedPageValidator, discoveredFlowValidator, discoveredPageValidator, prdCoverageItemValidator, rdSectionValidator, testStepValidator } from "./lib/validation";
 
 export default defineSchema({
   workspaces: defineTable({
@@ -440,4 +440,24 @@ export default defineSchema({
     .index("by_knowledge_base_id", ["knowledge_base_id"])
     .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"]),
+
+  baseline_rds: defineTable({
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    version: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("approved"),
+      v.literal("archived"),
+      v.literal("failed"),
+    ),
+    sections: v.array(rdSectionValidator),
+    rd_generation_error: v.optional(v.string()),
+    generated_at: v.number(),
+    updated_at: v.optional(v.number()),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_project_id", ["project_id"])
+    .index("by_project_id_and_version", ["project_id", "version"]),
 });

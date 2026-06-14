@@ -153,6 +153,43 @@ export const getModules = query({
   },
 });
 
+export const getBaselineRd = query({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const memberWorkspace = await getOptionalMemberWorkspace(ctx);
+    if (!memberWorkspace) return null;
+
+    const project = await ctx.db.get(args.project_id);
+    if (!project) return null;
+    if (project.workspace_id !== memberWorkspace.workspace._id) return null;
+
+    const rds = await ctx.db
+      .query("baseline_rds")
+      .withIndex("by_project_id_and_version", (q) =>
+        q.eq("project_id", args.project_id),
+      )
+      .order("desc")
+      .take(10);
+
+    const rd = rds.find((r) => r.status !== "archived" && r.status !== "failed");
+    if (!rd) return null;
+
+    return {
+      _id: rd._id,
+      _creationTime: rd._creationTime,
+      project_id: rd.project_id,
+      knowledge_base_id: rd.knowledge_base_id,
+      version: rd.version,
+      status: rd.status,
+      sections: rd.sections,
+      generated_at: rd.generated_at,
+      updated_at: rd.updated_at,
+    };
+  },
+});
+
 export const getModule = query({
   args: {
     module_id: v.id("kb_modules"),

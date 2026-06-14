@@ -130,8 +130,9 @@ export const resyncKnowledgeBase = action({
       throw new ConvexError("No Knowledge Base found to re-sync.");
     }
 
-    // TODO(Epic 2): Archive previous Baseline RD (version increment)
-    // when baseline_rds table exists.
+    await ctx.runMutation(internal.knowledge.internal._archiveBaselineRd, {
+      project_id: args.project_id,
+    });
 
     await ctx.runMutation(internal.knowledge.internal._resetKbForResync, {
       knowledge_base_id: existingKb._id,
@@ -186,5 +187,66 @@ export const resyncKnowledgeBase = action({
     }
 
     return { knowledgeBaseId: existingKb._id, workflowId };
+  },
+});
+
+export const triggerBaselineRd = action({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
+    const userId = getOwnerId(user);
+
+    const membership = await ctx.runQuery(
+      internal.knowledge.internal._getMembershipForUser,
+      { user_id: userId },
+    );
+    if (!membership) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const project = await ctx.runQuery(
+      internal.knowledge.internal._getProjectForIngestion,
+      { project_id: args.project_id },
+    );
+
+    if (!project) {
+      throw new ConvexError("Project not found");
+    }
+
+    if (project.workspace_id !== membership.workspace_id) {
+      throw new ConvexError("Project not found");
+    }
+
+    if (project.kb_status !== "ready") {
+      throw new ConvexError(
+        "Knowledge Base must be in 'ready' state to (re)generate the Baseline RD.",
+      );
+    }
+
+    const kb = await ctx.runQuery(
+      internal.knowledge.internal._getKnowledgeBaseForProject,
+      { project_id: args.project_id },
+    );
+
+    if (!kb) {
+      throw new ConvexError("No Knowledge Base found for this project.");
+    }
+
+    await ctx.runMutation(internal.knowledge.internal._archiveBaselineRd, {
+      project_id: args.project_id,
+    });
+
+    const result = await ctx.runAction(
+      internal.knowledge.baselineActions.generateBaselineRdWithLogging,
+      {
+        project_id: args.project_id,
+        knowledge_base_id: kb._id,
+        workspace_id: project.workspace_id,
+      },
+    );
+
+    return result;
   },
 });

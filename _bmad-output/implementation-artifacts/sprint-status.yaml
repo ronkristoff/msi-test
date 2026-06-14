@@ -1,5 +1,5 @@
 # generated: 2026-06-13
-# last_updated: 2026-06-13
+# last_updated: 2026-06-14
 # project: msi-test
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-14
+last_updated: 2026-06-14T11:35:00Z
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -54,8 +54,8 @@ development_status:
   1-9-bmad-artifact-detection-parsing: done
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-baseline-rd-generation: backlog
+  epic-2: in-progress
+  2-1-baseline-rd-generation: done
   2-2-drift-report-generation: backlog
   2-3-baseline-rd-viewer-inline-editor: backlog
   2-4-baseline-rd-drift-export: backlog

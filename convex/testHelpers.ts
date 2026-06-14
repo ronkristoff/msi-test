@@ -137,6 +137,7 @@ export async function seedKnowledgeBase(
     folder_structure: string;
     architecture_type: string;
     last_synced_at: number;
+    bmad_detected: boolean;
   }>,
 ) {
   return t.run(async (ctx) => {
@@ -153,6 +154,7 @@ export async function seedKnowledgeBase(
       folder_structure: overrides?.folder_structure,
       architecture_type: overrides?.architecture_type,
       last_synced_at: overrides?.last_synced_at,
+      bmad_detected: overrides?.bmad_detected,
     });
   });
 }
@@ -184,6 +186,54 @@ export async function seedModule(
       apis: overrides?.apis,
       data_models: overrides?.data_models,
       user_flows: overrides?.user_flows,
+    });
+  });
+}
+
+type BaselineRdOverrides = Partial<{
+  version: number;
+  status: "draft" | "approved" | "archived";
+  sections: Array<{
+    id: string;
+    title: string;
+    content: string;
+    confidence: number;
+    divergence_note?: string;
+    bmad_alignment?: {
+      prd_section_title: string;
+      agreement: "agree" | "diverge" | "partial";
+    };
+  }>;
+  rd_generation_error: string;
+  generated_at: number;
+}>;
+
+const DEFAULT_BASELINE_RD_SECTIONS = [
+  { id: "overview", title: "Overview", content: "Default overview.", confidence: 0.7 },
+  { id: "tech-stack", title: "Tech Stack", content: "Default tech stack.", confidence: 0.7 },
+  { id: "modules", title: "Modules", content: "Default modules.", confidence: 0.7 },
+  { id: "api-surface", title: "API Surface", content: "Default API surface.", confidence: 0.7 },
+  { id: "data-model", title: "Data Model", content: "Default data model.", confidence: 0.7 },
+  { id: "user-flows", title: "User Flows", content: "Default user flows.", confidence: 0.7 },
+];
+
+export async function seedBaselineRd(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  knowledgeBaseId: string,
+  overrides?: BaselineRdOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("baseline_rds", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      knowledge_base_id: knowledgeBaseId as Id<"knowledge_bases">,
+      version: overrides?.version ?? 1,
+      status: overrides?.status ?? "draft",
+      sections: overrides?.sections ?? DEFAULT_BASELINE_RD_SECTIONS,
+      rd_generation_error: overrides?.rd_generation_error,
+      generated_at: overrides?.generated_at ?? Date.now(),
     });
   });
 }

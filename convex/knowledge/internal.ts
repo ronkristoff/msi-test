@@ -3,7 +3,8 @@ import { v } from "convex/values";
 import { getOwnedEntity } from "../lib/requireAuth";
 import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
-import { MAX_EMBEDDING_CHUNKS } from "../lib/constraints";
+import { MAX_EMBEDDING_CHUNKS, RD_ERROR_MESSAGE_MAX_LENGTH } from "../lib/constraints";
+import { rdSectionValidator } from "../lib/validation";
 
 export const _patchProjectRepo = internalMutation({
   args: {
@@ -572,5 +573,155 @@ export const _getBmadMetadataForExtraction = internalQuery({
     }
 
     return { detected: true, prdSections, adrs };
+  },
+});
+
+export const _storeBaselineRd = internalMutation({
+  args: {
+    project_id: v.id("projects"),
+    workspace_id: v.id("workspaces"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    sections: v.array(rdSectionValidator),
+  },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("baseline_rds")
+      .withIndex("by_project_id_and_version", (q) =>
+        q.eq("project_id", args.project_id),
+      )
+      .order("desc")
+      .first();
+    const version = (latest?.version ?? 0) + 1;
+    const _id = await ctx.db.insert("baseline_rds", {
+      workspace_id: args.workspace_id,
+      project_id: args.project_id,
+      knowledge_base_id: args.knowledge_base_id,
+      version,
+      status: "draft",
+      sections: args.sections,
+      generated_at: Date.now(),
+    });
+    return { _id, version };
+  },
+});
+
+export const _archiveBaselineRd = internalMutation({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    let archivedCount = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const rds = await ctx.db
+        .query("baseline_rds")
+        .withIndex("by_project_id", (q) =>
+          q.eq("project_id", args.project_id),
+        )
+        .take(100);
+
+      if (rds.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const rd of rds) {
+        if (rd.status !== "archived") {
+          await ctx.db.patch(rd._id, { status: "archived" });
+          archivedCount++;
+        }
+      }
+
+      hasMore = rds.length === 100;
+    }
+    return archivedCount;
+  },
+});
+
+export const _getLatestRdVersion = internalQuery({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("baseline_rds")
+      .withIndex("by_project_id_and_version", (q) =>
+        q.eq("project_id", args.project_id),
+      )
+      .order("desc")
+      .first();
+
+    return latest?.version ?? 0;
+  },
+});
+
+export const _getKbForBaselineRd = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    const kb = await ctx.db.get(args.knowledge_base_id);
+    if (!kb) return null;
+
+    const project = await ctx.db.get(kb.project_id);
+
+    const modules = await ctx.db
+      .query("kb_modules")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.knowledge_base_id),
+      )
+      .take(200);
+
+    return {
+      knowledge_base_id: kb._id,
+      workspace_id: kb.workspace_id,
+      project_id: kb.project_id,
+      architecture_summary: kb.architecture_summary ?? null,
+      tech_stack: kb.tech_stack ?? null,
+      architecture_type: kb.architecture_type ?? null,
+      folder_structure: kb.folder_structure ?? null,
+      bmad_detected: kb.bmad_detected ?? false,
+      total_files: kb.total_files ?? 0,
+      total_size_bytes: kb.total_size_bytes ?? 0,
+      old_rd_extracted_text: project?.old_rd_extracted_text ?? null,
+      modules: modules.map((m) => ({
+        name: m.name,
+        description: m.description,
+        apis: m.apis,
+        data_models: m.data_models,
+        user_flows: m.user_flows,
+      })),
+    };
+  },
+});
+
+export const _logBaselineRdFailure = internalMutation({
+  args: {
+    project_id: v.id("projects"),
+    workspace_id: v.id("workspaces"),
+    knowledge_base_id: v.id("knowledge_bases"),
+    error_message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const truncated = args.error_message.slice(0, RD_ERROR_MESSAGE_MAX_LENGTH);
+    const latest = await ctx.db
+      .query("baseline_rds")
+      .withIndex("by_project_id_and_version", (q) =>
+        q.eq("project_id", args.project_id),
+      )
+      .order("desc")
+      .first();
+    const version = (latest?.version ?? 0) + 1;
+    const _id = await ctx.db.insert("baseline_rds", {
+      workspace_id: args.workspace_id,
+      project_id: args.project_id,
+      knowledge_base_id: args.knowledge_base_id,
+      version,
+      status: "failed",
+      sections: [],
+      rd_generation_error: truncated,
+      generated_at: Date.now(),
+    });
+    return { _id, version };
   },
 });

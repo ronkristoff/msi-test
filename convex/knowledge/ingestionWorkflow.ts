@@ -143,6 +143,15 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
     knowledge_base_id: args.knowledge_base_id,
   });
 
+  await step.runAction(
+    internal.knowledge.baselineActions.generateBaselineRdWithLogging,
+    {
+      project_id: args.project_id,
+      knowledge_base_id: args.knowledge_base_id,
+      workspace_id: project.workspace_id,
+    },
+  );
+
   return { success: true, chunkCount: chunkResult.chunkCount };
 });
 
