@@ -51,7 +51,7 @@ development_status:
   1-6-knowledge-base-viewer-ui: done
   1-7-module-detail-view: done
   1-8-knowledge-base-re-sync: done
-  1-9-bmad-artifact-detection-parsing: backlog
+  1-9-bmad-artifact-detection-parsing: done
   epic-1-retrospective: optional
 
   epic-2: backlog

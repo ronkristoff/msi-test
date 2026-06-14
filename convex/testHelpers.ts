@@ -188,6 +188,36 @@ export async function seedModule(
   });
 }
 
+export async function seedBmadMetadata(
+  t: TestCtx,
+  workspaceId: string,
+  kbId: string,
+  entries: Array<{
+    type: "prd_section" | "adr" | "convention" | "domain_term";
+    key: string;
+    content: string;
+    source_path: string;
+    metadata?: unknown;
+  }>,
+) {
+  const ids: string[] = [];
+  for (const entry of entries) {
+    const id = await t.run(async (ctx) => {
+      return ctx.db.insert("kb_bmad_metadata", {
+        workspace_id: workspaceId as Id<"workspaces">,
+        kb_id: kbId as Id<"knowledge_bases">,
+        type: entry.type,
+        key: entry.key,
+        content: entry.content,
+        source_path: entry.source_path,
+        metadata: entry.metadata ?? null,
+      });
+    });
+    ids.push(id);
+  }
+  return ids;
+}
+
 export async function seedSchedule(
   t: TestCtx,
   workspaceId: string,

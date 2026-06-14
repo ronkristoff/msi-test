@@ -12,6 +12,7 @@ import {
   fetchFileContent,
 } from "./github";
 import { chunkFile } from "./chunking";
+import { detectBmadFiles } from "./bmadParsing";
 import {
   GITHUB_DEFAULT_BRANCH,
   GITHUB_FILE_BATCH_SIZE,
@@ -35,6 +36,12 @@ export const decryptAndFetchTree = internalAction({
     const { owner, repo } = parseOwnerRepo(args.repo_url);
 
     const { tree, truncated } = await fetchFileTree(owner, repo, pat, GITHUB_DEFAULT_BRANCH);
+
+    const bmadFiles = detectBmadFiles(tree).map((entry) => ({
+      path: entry.path,
+      size: entry.size,
+    }));
+
     const filtered = filterFiles(tree);
 
     const files = filtered.map((entry) => ({
@@ -42,7 +49,7 @@ export const decryptAndFetchTree = internalAction({
       size: entry.size ?? 0,
     }));
 
-    return { files, truncated };
+    return { files, truncated, bmadFiles };
   },
 });
 

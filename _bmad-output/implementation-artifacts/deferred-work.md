@@ -53,3 +53,9 @@
 - `clearRagNamespace` pagination loop has no max iteration guard [convex/knowledge/embeddingActions.ts:191-203] — extremely large namespaces could exceed Convex action wall-clock limit. Defensive coding concern only.
 - Test uses `setTimeout` for creation-time ordering [convex/knowledge.resync.test.ts:72] — relies on 10ms wall-clock gap for distinct `_creationTime` values. Could be flaky on slow CI.
 - AI config existence check insufficient [convex/knowledge/embeddingActions.ts:173-175] — checks only `ai_config` truthiness, not `endpoint_url`/`api_key` validity. Pre-existing pattern shared with `embedChunks`.
+
+## Deferred from: code review of 1-9-bmad-artifact-detection-parsing (2026-06-14)
+
+- Delete-then-store not atomic [convex/knowledge/bmadActions.ts:104-112] — Three separate mutations (delete→store→flag). If `_storeBmadMetadata` fails after delete, old metadata is gone and new isn't stored. Mitigated by workflow `retry: true` (idempotent: delete-then-store runs again) and `_setBmadDetected` called last (KB won't show "detected" until full success). Brief inconsistency window acceptable for retry-safe workflow.
+- 200 sequential DB inserts in `_storeBmadMetadata` [convex/knowledge/internal.ts:489-498] — Sequential `await` in for-loop for up to 200 entries. Same pattern as `_storeModules`. No parallelism. Performance concern only, not correctness. Convex handles this within transaction limits for reasonable entry sizes.
+- Re-sync deletes all data before workflow starts — no rollback [convex/knowledge/triggerIngestion.ts:147-186] — Destructive cleanup (modules, BMAD metadata, chunks, RAG namespace) runs before `start()`. If `start()` throws, KB marked error with all data permanently gone. Pre-existing pattern from Story 1.8, BMAD deletion follows same sequence. No snapshot/archive mechanism.

@@ -147,6 +147,9 @@ export const resyncKnowledgeBase = action({
     await ctx.runMutation(internal.knowledge.internal._deleteModulesByKb, {
       knowledge_base_id: existingKb._id,
     });
+    await ctx.runMutation(internal.knowledge.internal._deleteBmadMetadataByKb, {
+      knowledge_base_id: existingKb._id,
+    });
     await ctx.runMutation(internal.knowledge.internal._deleteChunksByKb, {
       knowledge_base_id: existingKb._id,
     });

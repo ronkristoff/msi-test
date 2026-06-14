@@ -31,6 +31,7 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
   const treeResult: {
     files: { path: string; size: number }[];
     truncated: boolean;
+    bmadFiles: { path: string; size: number }[];
   } = await step.runAction(
     internal.knowledge.ingestionActions.decryptAndFetchTree,
     {
@@ -93,6 +94,26 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
     },
     { retry: true },
   );
+
+  if (treeResult.bmadFiles && treeResult.bmadFiles.length > 0) {
+    await step.runAction(
+      internal.knowledge.bmadActions.detectAndParseBmad,
+      {
+        project_id: args.project_id,
+        knowledge_base_id: args.knowledge_base_id,
+        workspace_id: project.workspace_id,
+        repo_url: project.repo_url,
+        encrypted_pat: project.encrypted_pat,
+        bmad_files: treeResult.bmadFiles,
+      },
+      { retry: true },
+    );
+  } else {
+    await step.runMutation(internal.knowledge.internal._setBmadDetected, {
+      knowledge_base_id: args.knowledge_base_id,
+      detected: false,
+    });
+  }
 
   await step.runMutation(internal.knowledge.internal._updateKbStatus, {
     knowledge_base_id: args.knowledge_base_id,

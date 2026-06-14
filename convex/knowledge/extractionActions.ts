@@ -70,10 +70,18 @@ export const extractArchitectureAndModules = internalAction({
       { knowledge_base_id: args.knowledge_base_id },
     );
 
-    const bmadContext: BmadContext | null = null;
-    if (kb && (kb as Record<string, unknown>).bmad_detected) {
-      // Forward-compatible: Story 1.9 will add _getBmadMetadata query and kb_bmad_metadata table.
-      // For now, bmad_detected is always undefined, so this path is never taken.
+    let bmadContext: BmadContext | null = null;
+    if (kb?.bmad_detected) {
+      const bmadData = await ctx.runQuery(
+        internal.knowledge.internal._getBmadMetadataForExtraction,
+        { knowledge_base_id: args.knowledge_base_id },
+      );
+      if (bmadData.detected && (bmadData.prdSections || bmadData.adrs)) {
+        bmadContext = {
+          prdSections: bmadData.prdSections,
+          adrs: bmadData.adrs,
+        };
+      }
     }
 
     const fileTree = buildFileTree(chunks);

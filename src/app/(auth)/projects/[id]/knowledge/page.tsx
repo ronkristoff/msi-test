@@ -14,6 +14,7 @@ import { useErrorLogger } from "@/lib/error-logger";
 import { KnowledgeBuilding } from "./KnowledgeBuilding";
 import { KnowledgeReady } from "./KnowledgeReady";
 import { KnowledgeError } from "./KnowledgeError";
+import { DeclaredIntent } from "./DeclaredIntent";
 import type { ModuleItem } from "./KnowledgeModuleList";
 
 export default function KnowledgePage() {
@@ -27,6 +28,13 @@ export default function KnowledgePage() {
   const modules = useQuery(
     api.knowledge.queries.getModules,
     kb && kb.status === "ready" ? { knowledge_base_id: kb._id } : "skip",
+  );
+  const bmadDetected = kb?.bmad_detected;
+  const bmadMetadata = useQuery(
+    api.knowledge.queries.getBmadMetadata,
+    bmadDetected && kb && kb.status === "ready"
+      ? { knowledge_base_id: kb._id }
+      : "skip",
   );
   const triggerIngestion = useAction(
     api.knowledge.triggerIngestion.triggerIngestion,
@@ -101,10 +109,6 @@ export default function KnowledgePage() {
     );
   }
 
-  const bmadDetected = (kb as Record<string, unknown>).bmad_detected as
-    | boolean
-    | undefined;
-
   const statusPillMap = {
     building: { variant: "running" as const, label: "Building" },
     ready: { variant: "success" as const, label: "Ready" },
@@ -120,7 +124,6 @@ export default function KnowledgePage() {
             Knowledge Base
           </h2>
           <StatusPill variant={pill.variant}>{pill.label}</StatusPill>
-          {/* TODO(Story 1.9): Add collapsible "Declared Intent" section when bmad_detected is truthy */}
           {bmadDetected && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-[var(--radius-pill)] bg-[var(--accent)]/10 text-[var(--accent)] font-[var(--font-mono)] text-xs font-semibold">
               BMAD Detected
@@ -149,6 +152,11 @@ export default function KnowledgePage() {
             <Alert variant="error" className="mb-4">
               {resyncError}
             </Alert>
+          )}
+          {bmadDetected && bmadMetadata && (
+            <div className="mb-4">
+              <DeclaredIntent metadata={bmadMetadata} />
+            </div>
           )}
           <KnowledgeReady
             kb={kb}

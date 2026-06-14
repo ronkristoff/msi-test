@@ -50,6 +50,8 @@ import type * as flakiness_actions from "../flakiness/actions.js";
 import type * as flakiness_queries from "../flakiness/queries.js";
 import type * as http from "../http.js";
 import type * as insights_queries from "../insights/queries.js";
+import type * as knowledge_bmadActions from "../knowledge/bmadActions.js";
+import type * as knowledge_bmadParsing from "../knowledge/bmadParsing.js";
 import type * as knowledge_chunking from "../knowledge/chunking.js";
 import type * as knowledge_crypto from "../knowledge/crypto.js";
 import type * as knowledge_embeddingActions from "../knowledge/embeddingActions.js";
@@ -149,6 +151,8 @@ declare const fullApi: ApiFromModules<{
   "flakiness/queries": typeof flakiness_queries;
   http: typeof http;
   "insights/queries": typeof insights_queries;
+  "knowledge/bmadActions": typeof knowledge_bmadActions;
+  "knowledge/bmadParsing": typeof knowledge_bmadParsing;
   "knowledge/chunking": typeof knowledge_chunking;
   "knowledge/crypto": typeof knowledge_crypto;
   "knowledge/embeddingActions": typeof knowledge_embeddingActions;

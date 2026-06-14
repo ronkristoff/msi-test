@@ -410,6 +410,8 @@ export const _resetKbForResync = internalMutation({
       total_size_bytes: undefined,
       error_message: undefined,
       progress_message: undefined,
+      bmad_detected: undefined,
+      bmad_parsed_at: undefined,
     });
   },
 });
@@ -441,5 +443,134 @@ export const _getKbForExtraction = internalQuery({
   },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.knowledge_base_id);
+  },
+});
+
+export const _storeBmadMetadata = internalMutation({
+  args: {
+    kb_id: v.id("knowledge_bases"),
+    workspace_id: v.id("workspaces"),
+    entries: v.array(
+      v.object({
+        type: v.union(
+          v.literal("prd_section"),
+          v.literal("adr"),
+          v.literal("convention"),
+          v.literal("domain_term"),
+        ),
+        key: v.string(),
+        content: v.string(),
+        source_path: v.string(),
+        metadata: v.optional(v.any()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const ids: Id<"kb_bmad_metadata">[] = [];
+    for (const entry of args.entries) {
+      const id = await ctx.db.insert("kb_bmad_metadata", {
+        kb_id: args.kb_id,
+        workspace_id: args.workspace_id,
+        ...entry,
+      });
+      ids.push(id);
+    }
+    return ids;
+  },
+});
+
+export const _deleteBmadMetadataByKb = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    let deletedCount = 0;
+    const BATCH_SIZE = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const items = await ctx.db
+        .query("kb_bmad_metadata")
+        .withIndex("by_kb_id", (q) => q.eq("kb_id", args.knowledge_base_id))
+        .take(BATCH_SIZE);
+
+      if (items.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const item of items) {
+        await ctx.db.delete(item._id);
+        deletedCount++;
+      }
+
+      if (items.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+
+    return deletedCount;
+  },
+});
+
+export const _setBmadDetected = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+    detected: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, unknown> = {
+      bmad_detected: args.detected,
+    };
+    if (args.detected) {
+      patch.bmad_parsed_at = Date.now();
+    } else {
+      patch.bmad_parsed_at = undefined;
+    }
+    await ctx.db.patch(args.knowledge_base_id, patch);
+  },
+});
+
+export const _getBmadMetadataForExtraction = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    const kb = await ctx.db.get(args.knowledge_base_id);
+    if (!kb || !kb.bmad_detected) {
+      return { detected: false, prdSections: "", adrs: "" };
+    }
+
+    const prdEntries = await ctx.db
+      .query("kb_bmad_metadata")
+      .withIndex("by_kb_id_and_type", (q) =>
+        q.eq("kb_id", args.knowledge_base_id).eq("type", "prd_section"),
+      )
+      .collect();
+
+    const adrEntries = await ctx.db
+      .query("kb_bmad_metadata")
+      .withIndex("by_kb_id_and_type", (q) =>
+        q.eq("kb_id", args.knowledge_base_id).eq("type", "adr"),
+      )
+      .collect();
+
+    const MAX_CONTEXT_CHARS = 20000;
+    let prdSections = "";
+    for (const e of prdEntries) {
+      const chunk = `### ${e.key}\n${e.content}`;
+      if ((prdSections + chunk).length > MAX_CONTEXT_CHARS) break;
+      prdSections += (prdSections ? "\n\n" : "") + chunk;
+    }
+
+    let adrs = "";
+    for (const e of adrEntries) {
+      const meta = e.metadata as { title?: string; status?: string };
+      const chunk = `- **${e.key}**: ${meta?.title ?? e.key} (${meta?.status ?? "Unknown"})\n${e.content}`;
+      if ((adrs + chunk).length > MAX_CONTEXT_CHARS) break;
+      adrs += (adrs ? "\n\n" : "") + chunk;
+    }
+
+    return { detected: true, prdSections, adrs };
   },
 });

@@ -22,6 +22,7 @@ export const INGESTION_INCLUDE_EXTENSIONS = [
 export const INGESTION_EXCLUDE_DIRS = [
   "node_modules", ".git", "dist", "build", "__pycache__",
   ".next", "vendor", "target", ".cache",
+  "_bmad-output", "_bmad",
 ];
 export const MAX_FILE_SIZE_BYTES = 100 * 1024;
 export const CHUNK_SIZE = 2000;

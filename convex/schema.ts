@@ -386,10 +386,30 @@ export default defineSchema({
     total_files: v.optional(v.number()),
     total_size_bytes: v.optional(v.number()),
     error_message: v.optional(v.string()),
+    bmad_detected: v.optional(v.boolean()),
+    bmad_parsed_at: v.optional(v.number()),
     last_synced_at: v.optional(v.number()),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"]),
+
+  kb_bmad_metadata: defineTable({
+    kb_id: v.id("knowledge_bases"),
+    workspace_id: v.id("workspaces"),
+    type: v.union(
+      v.literal("prd_section"),
+      v.literal("adr"),
+      v.literal("convention"),
+      v.literal("domain_term"),
+    ),
+    key: v.string(),
+    content: v.string(),
+    source_path: v.string(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_kb_id", ["kb_id"])
+    .index("by_kb_id_and_type", ["kb_id", "type"])
+    .index("by_workspace_id", ["workspace_id"]),
 
   kb_modules: defineTable({
     workspace_id: v.id("workspaces"),

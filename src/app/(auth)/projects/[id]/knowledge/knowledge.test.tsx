@@ -6,12 +6,14 @@ const mockTriggerIngestion = vi.fn();
 const mockResyncKnowledgeBase = vi.fn();
 let mockKb: unknown = undefined;
 let mockModules: unknown = undefined;
+let mockBmadMetadata: unknown = undefined;
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn((_queryRef: unknown, args: unknown) => {
     const key = typeof _queryRef === "string" ? _queryRef : String(_queryRef);
     if (key.includes("getKnowledgeBase")) return mockKb;
     if (key.includes("getModules")) return mockModules;
+    if (key.includes("getBmadMetadata")) return mockBmadMetadata;
     return undefined;
   }),
   useAction: vi.fn((_actionRef: unknown) => {
@@ -32,6 +34,7 @@ vi.mock("@/lib/convex", () => ({
       queries: {
         getKnowledgeBase: "knowledge.queries.getKnowledgeBase",
         getModules: "knowledge.queries.getModules",
+        getBmadMetadata: "knowledge.queries.getBmadMetadata",
       },
       triggerIngestion: {
         triggerIngestion: "knowledge.triggerIngestion.triggerIngestion",
@@ -104,6 +107,7 @@ describe("KnowledgePage", () => {
     vi.restoreAllMocks();
     mockKb = undefined;
     mockModules = undefined;
+    mockBmadMetadata = undefined;
     mockTriggerIngestion.mockResolvedValue(undefined);
     mockResyncKnowledgeBase.mockResolvedValue(undefined);
   });
@@ -251,6 +255,92 @@ describe("KnowledgePage", () => {
       await setup();
       await user.click(screen.getByRole("button", { name: /re-sync/i }));
       expect(screen.getByText(/must be in 'ready' state/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Declared Intent section", () => {
+    const bmadMetadataMock = {
+      prd_sections: [
+        { _id: "b1", key: "Overview", content: "Overview content", source_path: "prd.md" },
+        { _id: "b2", key: "Goals", content: "Goals content", source_path: "prd.md" },
+      ],
+      adrs: [
+        { _id: "b3", key: "ADR-0001", content: "Decision", source_path: "a.md", metadata: { title: "Test Runner", status: "Accepted" } },
+      ],
+      conventions: [
+        { _id: "b4", key: "Naming", content: "Use PascalCase", source_path: "pc.md" },
+        { _id: "b5", key: "Testing", content: "TDD required", source_path: "pc.md" },
+        { _id: "b6", key: "Security", content: "No secrets", source_path: "pc.md" },
+      ],
+      domain_terms: [
+        { _id: "b7", key: "Workspace", content: "Container", source_path: "CONTEXT.md" },
+      ],
+    };
+
+    it("shows Declared Intent section when bmad_detected is true and KB ready", async () => {
+      mockKb = { ...readyKb, bmad_detected: true };
+      mockModules = mockModuleList;
+      mockBmadMetadata = bmadMetadataMock;
+      await setup();
+      expect(screen.getByText("Declared Intent")).toBeInTheDocument();
+    });
+
+    it("hides Declared Intent section when bmad_detected is falsy", async () => {
+      mockKb = readyKb;
+      mockModules = mockModuleList;
+      mockBmadMetadata = bmadMetadataMock;
+      await setup();
+      expect(screen.queryByText("Declared Intent")).not.toBeInTheDocument();
+    });
+
+    it("hides Declared Intent section when bmad_detected is true but metadata is undefined", async () => {
+      mockKb = { ...readyKb, bmad_detected: true };
+      mockModules = mockModuleList;
+      mockBmadMetadata = undefined;
+      await setup();
+      expect(screen.queryByText("Declared Intent")).not.toBeInTheDocument();
+    });
+
+    it("expands on click to show metadata details", async () => {
+      const user = userEvent.setup();
+      mockKb = { ...readyKb, bmad_detected: true };
+      mockModules = mockModuleList;
+      mockBmadMetadata = bmadMetadataMock;
+      await setup();
+
+      const toggleBtn = screen.getByText("Declared Intent").closest("button")!;
+      await user.click(toggleBtn);
+
+      expect(screen.getByText("PRD Outline")).toBeInTheDocument();
+      expect(screen.getByText("Architectural Decisions (1)")).toBeInTheDocument();
+      expect(screen.getByText("Conventions (3)")).toBeInTheDocument();
+      expect(screen.getByText("Domain Terms (1)")).toBeInTheDocument();
+    });
+
+    it("shows correct PRD section count in collapsed summary", async () => {
+      mockKb = { ...readyKb, bmad_detected: true };
+      mockModules = mockModuleList;
+      mockBmadMetadata = bmadMetadataMock;
+      await setup();
+      expect(screen.getByText(/2 PRD sections/)).toBeInTheDocument();
+      expect(screen.getByText(/1 ADRs/)).toBeInTheDocument();
+      expect(screen.getByText(/3 conventions/)).toBeInTheDocument();
+      expect(screen.getByText(/1 domain terms/)).toBeInTheDocument();
+    });
+
+    it("collapses back on second click", async () => {
+      const user = userEvent.setup();
+      mockKb = { ...readyKb, bmad_detected: true };
+      mockModules = mockModuleList;
+      mockBmadMetadata = bmadMetadataMock;
+      await setup();
+
+      const toggleBtn = screen.getByText("Declared Intent").closest("button")!;
+      await user.click(toggleBtn);
+      expect(screen.getByText("PRD Outline")).toBeInTheDocument();
+
+      await user.click(toggleBtn);
+      expect(screen.queryByText("PRD Outline")).not.toBeInTheDocument();
     });
   });
 });
