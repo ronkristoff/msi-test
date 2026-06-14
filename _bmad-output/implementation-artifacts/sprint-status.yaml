@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-13T23:50:00Z
+last_updated: 2026-06-14
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,7 @@ development_status:
   1-5-ai-architecture-module-extraction: done
   1-6-knowledge-base-viewer-ui: done
   1-7-module-detail-view: done
-  1-8-knowledge-base-re-sync: backlog
+  1-8-knowledge-base-re-sync: done
   1-9-bmad-artifact-detection-parsing: backlog
   epic-1-retrospective: optional
 

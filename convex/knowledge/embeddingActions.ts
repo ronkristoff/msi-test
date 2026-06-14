@@ -158,3 +158,54 @@ export const embedChunks = internalAction({
     return { totalEmbedded, totalSkipped };
   },
 });
+
+export const clearRagNamespace = internalAction({
+  args: {
+    project_id: v.id("projects"),
+    workspace_id: v.id("workspaces"),
+  },
+  handler: async (ctx, args) => {
+    const workspace = await ctx.runQuery(
+      internal.knowledge.internal._getWorkspaceAiConfig,
+      { workspace_id: args.workspace_id },
+    );
+
+    if (!workspace?.ai_config) {
+      return { deletedCount: 0 };
+    }
+
+    const rag = createProjectRag({
+      endpoint_url: workspace.ai_config.endpoint_url,
+      api_key: workspace.ai_config.api_key,
+    });
+    const namespace = getProjectNamespace(args.project_id);
+
+    const ns = await rag.getNamespace(ctx, { namespace });
+    if (!ns) {
+      return { deletedCount: 0 };
+    }
+
+    let deletedCount = 0;
+    let cursor: string | null = null;
+
+    do {
+      const result = await rag.list(ctx, {
+        namespaceId: ns.namespaceId,
+        paginationOpts: { cursor: cursor ?? undefined, numItems: 100 },
+      });
+
+      for (const entry of result.page) {
+        try {
+          await rag.deleteAsync(ctx, { entryId: entry.entryId });
+          deletedCount++;
+        } catch {
+          // Entry may have been deleted by a background process
+        }
+      }
+
+      cursor = result.isDone ? null : result.continueCursor;
+    } while (cursor);
+
+    return { deletedCount };
+  },
+});

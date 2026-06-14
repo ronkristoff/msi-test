@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockTriggerIngestion = vi.fn();
+const mockResyncKnowledgeBase = vi.fn();
 let mockKb: unknown = undefined;
 let mockModules: unknown = undefined;
 
@@ -13,7 +14,11 @@ vi.mock("convex/react", () => ({
     if (key.includes("getModules")) return mockModules;
     return undefined;
   }),
-  useAction: vi.fn(() => mockTriggerIngestion),
+  useAction: vi.fn((_actionRef: unknown) => {
+    const key = typeof _actionRef === "string" ? _actionRef : String(_actionRef);
+    if (key.includes("resyncKnowledgeBase")) return mockResyncKnowledgeBase;
+    return mockTriggerIngestion;
+  }),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -30,6 +35,7 @@ vi.mock("@/lib/convex", () => ({
       },
       triggerIngestion: {
         triggerIngestion: "knowledge.triggerIngestion.triggerIngestion",
+        resyncKnowledgeBase: "knowledge.triggerIngestion.resyncKnowledgeBase",
       },
     },
   },
@@ -95,9 +101,11 @@ async function setup() {
 describe("KnowledgePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     mockKb = undefined;
     mockModules = undefined;
     mockTriggerIngestion.mockResolvedValue(undefined);
+    mockResyncKnowledgeBase.mockResolvedValue(undefined);
   });
 
   it("renders loading skeleton when KB is undefined", async () => {
@@ -185,5 +193,64 @@ describe("KnowledgePage", () => {
     mockModules = mockModuleList;
     await setup();
     expect(screen.getByText(/bmad detected/i)).toBeInTheDocument();
+  });
+
+  describe("Re-sync button", () => {
+    it("renders Re-sync button when kb.status === ready", async () => {
+      mockKb = readyKb;
+      mockModules = mockModuleList;
+      await setup();
+      expect(screen.getByRole("button", { name: /re-sync/i })).toBeInTheDocument();
+    });
+
+    it("does not render Re-sync button when kb.status === building", async () => {
+      mockKb = buildingKb;
+      await setup();
+      expect(screen.queryByRole("button", { name: /re-sync/i })).not.toBeInTheDocument();
+    });
+
+    it("does not render Re-sync button when kb.status === error", async () => {
+      mockKb = errorKb;
+      await setup();
+      expect(screen.queryByRole("button", { name: /re-sync/i })).not.toBeInTheDocument();
+    });
+
+    it("calls window.confirm and resyncKnowledgeBase when clicked", async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+      mockKb = readyKb;
+      mockModules = mockModuleList;
+      await setup();
+      await user.click(screen.getByRole("button", { name: /re-sync/i }));
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Re-syncing will replace"),
+      );
+      expect(mockResyncKnowledgeBase).toHaveBeenCalledWith({
+        project_id: "proj1",
+      });
+    });
+
+    it("does not call resyncKnowledgeBase when confirm is cancelled", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      mockKb = readyKb;
+      mockModules = mockModuleList;
+      await setup();
+      await user.click(screen.getByRole("button", { name: /re-sync/i }));
+      expect(mockResyncKnowledgeBase).not.toHaveBeenCalled();
+    });
+
+    it("shows error alert when resync action fails", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      mockResyncKnowledgeBase.mockRejectedValue(
+        new Error("Uncaught ConvexError: Knowledge Base must be in 'ready' state"),
+      );
+      mockKb = readyKb;
+      mockModules = mockModuleList;
+      await setup();
+      await user.click(screen.getByRole("button", { name: /re-sync/i }));
+      expect(screen.getByText(/must be in 'ready' state/i)).toBeInTheDocument();
+    });
   });
 });

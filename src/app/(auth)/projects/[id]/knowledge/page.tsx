@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useAction } from "convex/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -7,6 +8,7 @@ import { api, asId } from "@/lib/convex";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Alert } from "@/components/ui/Alert";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useErrorLogger } from "@/lib/error-logger";
 import { KnowledgeBuilding } from "./KnowledgeBuilding";
@@ -29,6 +31,11 @@ export default function KnowledgePage() {
   const triggerIngestion = useAction(
     api.knowledge.triggerIngestion.triggerIngestion,
   );
+  const resyncKnowledgeBase = useAction(
+    api.knowledge.triggerIngestion.resyncKnowledgeBase,
+  );
+  const [isResyncing, setIsResyncing] = useState(false);
+  const [resyncError, setResyncError] = useState<string | null>(null);
 
   const handleRetry = async () => {
     try {
@@ -42,6 +49,30 @@ export default function KnowledgePage() {
         context: { source: "KnowledgePage.handleRetry" },
       });
       throw err;
+    }
+  };
+
+  const handleResync = async () => {
+    const confirmed = window.confirm(
+      "Re-syncing will replace all current Knowledge Base data. Continue?",
+    );
+    if (!confirmed) return;
+
+    setResyncError(null);
+    setIsResyncing(true);
+    try {
+      await resyncKnowledgeBase({ project_id: projectId });
+    } catch (err) {
+      const msg = err instanceof Error
+        ? err.message.replace(/^Uncaught ConvexError:\s*/, "")
+        : "Failed to start re-sync";
+      setResyncError(msg);
+      logError(msg, {
+        severity: "error",
+        context: { source: "KnowledgePage.handleResync" },
+      });
+    } finally {
+      setIsResyncing(false);
     }
   };
 
@@ -113,11 +144,20 @@ export default function KnowledgePage() {
       )}
 
       {kb.status === "ready" && Array.isArray(modules) && (
-        <KnowledgeReady
-          kb={kb}
-          modules={modules as ModuleItem[]}
-          projectId={params.id}
-        />
+        <>
+          {resyncError && (
+            <Alert variant="error" className="mb-4">
+              {resyncError}
+            </Alert>
+          )}
+          <KnowledgeReady
+            kb={kb}
+            modules={modules as ModuleItem[]}
+            projectId={params.id}
+            onResync={handleResync}
+            isResyncing={isResyncing}
+          />
+        </>
       )}
 
       {kb.status === "ready" && !Array.isArray(modules) && <PageSkeleton />}

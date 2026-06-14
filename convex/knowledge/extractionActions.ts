@@ -145,6 +145,11 @@ export const extractArchitectureAndModules = internalAction({
 
     if (modules.length > 0) {
       await ctx.runMutation(
+        internal.knowledge.internal._deleteModulesByKb,
+        { knowledge_base_id: args.knowledge_base_id },
+      );
+
+      await ctx.runMutation(
         internal.knowledge.internal._storeModules,
         {
           knowledge_base_id: args.knowledge_base_id,

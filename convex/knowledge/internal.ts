@@ -208,6 +208,7 @@ export const _getKnowledgeBaseForProject = internalQuery({
     const kb = await ctx.db
       .query("knowledge_bases")
       .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .order("desc")
       .first();
     return kb;
   },
@@ -392,6 +393,24 @@ export const _deleteModulesByKb = internalMutation({
     }
 
     return deletedCount;
+  },
+});
+
+export const _resetKbForResync = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.knowledge_base_id, {
+      architecture_summary: undefined,
+      tech_stack: undefined,
+      folder_structure: undefined,
+      architecture_type: undefined,
+      total_files: undefined,
+      total_size_bytes: undefined,
+      error_message: undefined,
+      progress_message: undefined,
+    });
   },
 });
 
