@@ -7,9 +7,11 @@ import {
   EMBEDDING_MAX_QUERY_LENGTH,
   EMBEDDING_SEARCH_MIN_LIMIT,
   EMBEDDING_SEARCH_MAX_LIMIT,
+  CHAT_RAG_RATE_LIMIT_PER_MINUTE,
 } from "../lib/constraints";
 import { createProjectRag, getProjectNamespace } from "./rag";
-import { internal } from "../_generated/api";
+import { components, internal } from "../_generated/api";
+import { RateLimiter, MINUTE } from "@convex-dev/rate-limiter";
 
 type FileMetadata = {
   _id: string;
@@ -18,6 +20,14 @@ type FileMetadata = {
   sha256: string;
   size: number;
 };
+
+const rateLimiter = new RateLimiter(components.rateLimiter, {
+  ragSearchPerWorkspace: {
+    kind: "fixed window",
+    rate: CHAT_RAG_RATE_LIMIT_PER_MINUTE,
+    period: MINUTE,
+  },
+});
 
 export const getProjectRepo = query({
   args: {
@@ -344,6 +354,11 @@ export const searchProjectRag = action({
     if (!workspace?.ai_config) {
       return null;
     }
+
+    await rateLimiter.limit(ctx, "ragSearchPerWorkspace", {
+      key: projectInfo.workspace_id,
+      throws: true,
+    });
 
     const rag = createProjectRag({
       endpoint_url: workspace.ai_config.endpoint_url,

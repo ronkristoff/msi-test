@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
@@ -19,9 +19,25 @@ vi.mock("./ai/model", async () => {
   };
 });
 
+const { chatRagSearchMock } = vi.hoisted(() => ({
+  chatRagSearchMock: vi.fn(),
+}));
+
+vi.mock("./knowledge/rag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./knowledge/rag")>();
+  return {
+    ...actual,
+    createProjectRag: () => ({
+      add: vi.fn(),
+      search: chatRagSearchMock,
+    }),
+  };
+});
+
 import { convexTest } from "convex-test";
 import schema from "./schema";
-import { seedWorkspace, seedProject, seedChatThread } from "./testHelpers";
+import { seedWorkspace, seedProject, seedChatThread, seedKnowledgeBase } from "./testHelpers";
+import { CHAT_RAG_RATE_LIMIT_PER_MINUTE } from "./lib/constraints";
 import { generateText } from "ai";
 import type { Id } from "./_generated/dataModel";
 
@@ -30,12 +46,21 @@ const agentSchema = (await import("../node_modules/@convex-dev/agent/dist/compon
 const agentModules = import.meta.glob(
   "../node_modules/@convex-dev/agent/dist/component/**/*.js",
 );
+const rateLimiterSchema = (await import("../node_modules/@convex-dev/rate-limiter/dist/component/schema.js")).default;
+const rateLimiterModules = import.meta.glob(
+  "../node_modules/@convex-dev/rate-limiter/dist/component/**/*.js",
+);
 
 function chatTest() {
   const t = convexTest(schema, modules);
   t.registerComponent("agent", agentSchema, agentModules);
+  t.registerComponent("rateLimiter", rateLimiterSchema, rateLimiterModules);
   return t;
 }
+
+beforeEach(() => {
+  chatRagSearchMock.mockReset();
+});
 
 describe("chat: createThread + ownership", () => {
   it("createThread rejects unauthenticated user", async () => {
@@ -557,10 +582,11 @@ describe("chat: agent factory + prompt", () => {
     expect(ANALYST_CHAT_PROMPT.length).toBeGreaterThan(0);
   });
 
-  it("prompt is honest about no code citations in v1", async () => {
+  it("prompt supports dual-mode (grounded + fallback)", async () => {
     const { ANALYST_CHAT_PROMPT } = await import("./chat/agents");
-    expect(ANALYST_CHAT_PROMPT.toLowerCase()).toContain("conversation context");
-    expect(ANALYST_CHAT_PROMPT.toLowerCase()).toContain("do not fabricate");
+    expect(ANALYST_CHAT_PROMPT).toContain("Retrieved Codebase Context");
+    expect(ANALYST_CHAT_PROMPT.toLowerCase()).toContain("fabricate");
+    expect(ANALYST_CHAT_PROMPT).toContain("Knowledge Base does not contain");
   });
 
   it("createAnalystChatAgent returns agent with streamText defined", async () => {
@@ -577,5 +603,126 @@ describe("chat: agent factory + prompt", () => {
     expect(agent).toBeDefined();
     expect(typeof agent.streamText).toBe("function");
     expect(agent.options.name).toBe("Analyst Chat");
+  });
+});
+
+describe("chat: streamMessage RAG integration", () => {
+  async function seedReadyProject(t: ReturnType<typeof chatTest>, ownerId: string) {
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, { status: "ready" });
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+    const { threadId } = await asUser.mutation(api.chat.mutations.createThread, {
+      project_id: projectId,
+    });
+    return { workspaceId, projectId, threadId, asUser };
+  }
+
+  it("succeeds when RAG search returns text (grounded response path)", async () => {
+    chatRagSearchMock.mockResolvedValue({
+      results: [],
+      text: "FAKE RAG: convex/foo.ts implements bar()",
+      entries: [],
+      usage: {},
+    });
+
+    const t = chatTest();
+    const { threadId, asUser } = await seedReadyProject(t, "rag-text-user");
+    const { api } = await import("./_generated/api");
+
+    const result = await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "What does bar() do?",
+    });
+
+    expect(result).toEqual({ threadId });
+    expect(chatRagSearchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("succeeds when RAG search returns empty text (graceful degradation)", async () => {
+    chatRagSearchMock.mockResolvedValue({
+      results: [],
+      text: "",
+      entries: [],
+      usage: {},
+    });
+
+    const t = chatTest();
+    const { threadId, asUser } = await seedReadyProject(t, "rag-empty-user");
+    const { api } = await import("./_generated/api");
+
+    const result = await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "Tell me about the architecture",
+    });
+
+    expect(result).toEqual({ threadId });
+    expect(chatRagSearchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("succeeds when RAG search throws (error swallowed, logged)", async () => {
+    chatRagSearchMock.mockRejectedValue(new Error("Embedding API down"));
+
+    const t = chatTest();
+    const { threadId, asUser } = await seedReadyProject(t, "rag-throw-user");
+    const { api } = await import("./_generated/api");
+
+    const result = await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "What does this project do?",
+    });
+
+    expect(result).toEqual({ threadId });
+    expect(chatRagSearchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("succeeds when KB is not ready (searchProjectRag returns null, no RAG)", async () => {
+    const t = chatTest();
+    const ownerId = "rag-no-kb-user";
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, { status: "building" });
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+    const { threadId } = await asUser.mutation(api.chat.mutations.createThread, {
+      project_id: projectId,
+    });
+
+    const result = await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "What does this project do?",
+    });
+
+    expect(result).toEqual({ threadId });
+    expect(chatRagSearchMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates rate-limit errors instead of swallowing them", async () => {
+    chatRagSearchMock.mockResolvedValue({
+      results: [],
+      text: "FAKE RAG",
+      entries: [],
+      usage: {},
+    });
+
+    const t = chatTest();
+    const { projectId, threadId, asUser } = await seedReadyProject(t, "rag-ratelimit-user");
+    const { api } = await import("./_generated/api");
+
+    for (let i = 0; i < CHAT_RAG_RATE_LIMIT_PER_MINUTE; i++) {
+      await asUser.action(api.knowledge.queries.searchProjectRag, {
+        project_id: projectId,
+        query_string: "fill the bucket",
+      });
+    }
+
+    await expect(
+      asUser.action(api.chat.chatActions.streamMessage, {
+        threadId,
+        prompt: "one more message",
+      }),
+    ).rejects.toThrow(/quickly|slow/i);
   });
 });

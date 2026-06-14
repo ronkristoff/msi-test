@@ -3,10 +3,13 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { internal } from "../_generated/api";
+import { internal, api } from "../_generated/api";
 import { generateText } from "ai";
 import { getWorkspaceModel } from "../ai/model";
 import { createAnalystChatAgent } from "./agents";
+import { buildRagSystemPrompt } from "./ragContext";
+import { CHAT_RAG_RESULT_LIMIT } from "../lib/constraints";
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import {
   getErrorStatusCode,
   getErrorMessage,
@@ -74,6 +77,28 @@ export const streamMessage = action({
       );
     }
 
+    let ragText: string | null = null;
+    try {
+      const ragResult = await ctx.runAction(
+        api.knowledge.queries.searchProjectRag,
+        {
+          project_id: ownership.project_id,
+          query_string: prompt,
+          limit: CHAT_RAG_RESULT_LIMIT,
+        },
+      );
+      ragText = ragResult?.text ?? null;
+    } catch (error: unknown) {
+      if (isRateLimitError(error)) {
+        throw new ConvexError(
+          "You're sending messages too quickly. Please wait a moment and try again.",
+        );
+      }
+      console.error("Chat RAG search error:", error);
+    }
+
+    const system = buildRagSystemPrompt(ragText);
+
     const model = getWorkspaceModel(configResult.ai_config);
     const agent = createAnalystChatAgent(model);
 
@@ -87,7 +112,7 @@ export const streamMessage = action({
     try {
       await thread.streamText(
         { prompt },
-        { saveStreamDeltas: true },
+        { ...(system ? { system } : {}), saveStreamDeltas: true },
       );
     } catch (error: unknown) {
       console.error("Chat streamText error:", error);

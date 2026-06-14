@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "./schema";
 import {
@@ -7,8 +7,39 @@ import {
   seedProject,
   seedKnowledgeBase,
 } from "./testHelpers";
+import { CHAT_RAG_RATE_LIMIT_PER_MINUTE } from "./lib/constraints";
+
+const { ragSearchMock } = vi.hoisted(() => ({
+  ragSearchMock: vi.fn(),
+}));
+
+vi.mock("./knowledge/rag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./knowledge/rag")>();
+  return {
+    ...actual,
+    createProjectRag: () => ({
+      add: vi.fn(),
+      search: ragSearchMock,
+    }),
+  };
+});
 
 const modules = import.meta.glob("./**/*.ts");
+const rateLimiterSchema = (await import("../node_modules/@convex-dev/rate-limiter/dist/component/schema.js")).default;
+const rateLimiterModules = import.meta.glob(
+  "../node_modules/@convex-dev/rate-limiter/dist/component/**/*.js",
+);
+
+function ragTest() {
+  const t = convexTest(schema, modules);
+  t.registerComponent("rateLimiter", rateLimiterSchema, rateLimiterModules);
+  return t;
+}
+
+beforeEach(() => {
+  ragSearchMock.mockReset();
+});
+
 
 describe("knowledge RAG: data layer", () => {
   describe("embedding constants", () => {
@@ -305,5 +336,185 @@ describe("knowledge RAG: data layer", () => {
       expect(data.kb_status).toBe("ready");
       expect(data.kb_exists).toBe(true);
     });
+  });
+});
+
+describe("knowledge RAG: _getProjectWorkspaceForSearch KB ordering (AC6)", () => {
+  it("returns the latest KB when multiple exist for a project", async () => {
+    const t = ragTest();
+    const ownerId = "kb-order-user";
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, {
+      status: "ready",
+      total_files: 10,
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    await seedKnowledgeBase(t, workspaceId, projectId, {
+      status: "ready",
+      total_files: 99,
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(projectId, { kb_status: "ready" });
+    });
+
+    const { internal } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+    const result = await asUser.query(
+      internal.knowledge.queries._getProjectWorkspaceForSearch,
+      { project_id: projectId },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.kb_status).toBe("ready");
+    expect(result!.workspace_id).toBe(workspaceId);
+
+    const latestKb = await t.run(async (ctx) => {
+      const kbs = await ctx.db
+        .query("knowledge_bases")
+        .withIndex("by_project_id", (q) => q.eq("project_id", projectId))
+        .order("desc")
+        .collect();
+      return kbs[0];
+    });
+    expect(latestKb!.total_files).toBe(99);
+  });
+
+  it("returns workspace info even when KB status is building", async () => {
+    const t = ragTest();
+    const ownerId = "kb-building-user";
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, { status: "building" });
+
+    const { internal } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+    const result = await asUser.query(
+      internal.knowledge.queries._getProjectWorkspaceForSearch,
+      { project_id: projectId },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.kb_status).toBe("building");
+  });
+});
+
+describe("knowledge RAG: searchProjectRag rate limiting (AC5)", () => {
+  it("allows up to CHAT_RAG_RATE_LIMIT_PER_MINUTE calls then throws", async () => {
+    ragSearchMock.mockResolvedValue({
+      results: [],
+      text: "FAKE RAG CONTEXT",
+      entries: [],
+      usage: {},
+    });
+
+    const t = ragTest();
+    const ownerId = "ratelimit-user";
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, { status: "ready" });
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+
+    for (let i = 0; i < CHAT_RAG_RATE_LIMIT_PER_MINUTE; i++) {
+      const result = await asUser.action(api.knowledge.queries.searchProjectRag, {
+        project_id: projectId,
+        query_string: "test query",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.text).toBe("FAKE RAG CONTEXT");
+    }
+
+    await expect(
+      asUser.action(api.knowledge.queries.searchProjectRag, {
+        project_id: projectId,
+        query_string: "over the limit",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rate limit is independent per workspace", async () => {
+    ragSearchMock.mockResolvedValue({
+      results: [],
+      text: "WS_A_CONTEXT",
+      entries: [],
+      usage: {},
+    });
+
+    const t = ragTest();
+    const wsA = await seedWorkspace(t, "wsA-owner");
+    const projA = await seedProject(t, wsA);
+    await seedKnowledgeBase(t, wsA, projA, { status: "ready" });
+
+    const wsB = await seedWorkspace(t, "wsB-owner");
+    const projB = await seedProject(t, wsB);
+    await seedKnowledgeBase(t, wsB, projB, { status: "ready" });
+
+    const { api } = await import("./_generated/api");
+
+    for (let i = 0; i < CHAT_RAG_RATE_LIMIT_PER_MINUTE; i++) {
+      await t
+        .withIdentity({ subject: "wsA-owner", issuer: "test" })
+        .action(api.knowledge.queries.searchProjectRag, {
+          project_id: projA,
+          query_string: "test",
+        });
+    }
+
+    const wsBResult = await t
+      .withIdentity({ subject: "wsB-owner", issuer: "test" })
+      .action(api.knowledge.queries.searchProjectRag, {
+        project_id: projB,
+        query_string: "test",
+      });
+    expect(wsBResult).not.toBeNull();
+  });
+
+  it("returns null when KB status is not ready (no rate token consumed)", async () => {
+    const t = ragTest();
+    const ownerId = "no-kb-user";
+    const workspaceId = await seedWorkspace(t, ownerId);
+    const projectId = await seedProject(t, workspaceId);
+    await seedKnowledgeBase(t, workspaceId, projectId, { status: "building" });
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: ownerId, issuer: "test" });
+
+    const result = await asUser.action(api.knowledge.queries.searchProjectRag, {
+      project_id: projectId,
+      query_string: "test",
+    });
+
+    expect(result).toBeNull();
+    expect(ragSearchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("knowledge RAG: cross-project isolation (AC7)", () => {
+  it("returns null when user searches another workspace's project", async () => {
+    ragSearchMock.mockResolvedValue({
+      results: [],
+      text: "SHOULD_NOT_LEAK",
+      entries: [],
+      usage: {},
+    });
+
+    const t = ragTest();
+    await seedWorkspace(t, "userA");
+    const wsB = await seedWorkspace(t, "userB");
+    const projB = await seedProject(t, wsB);
+    await seedKnowledgeBase(t, wsB, projB, { status: "ready" });
+
+    const { api } = await import("./_generated/api");
+    const asUserA = t.withIdentity({ subject: "userA", issuer: "test" });
+
+    const result = await asUserA.action(api.knowledge.queries.searchProjectRag, {
+      project_id: projB,
+      query_string: "what does project B do?",
+    });
+
+    expect(result).toBeNull();
+    expect(ragSearchMock).not.toHaveBeenCalled();
   });
 });
