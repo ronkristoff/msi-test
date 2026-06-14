@@ -728,6 +728,45 @@ describe("getDriftReport public query", () => {
     expect(result!.items[0].title).toBe("v3 drift");
   });
 
+  it("returns baseline_rd_version when set on the report", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+    const baselineRdId = await seedBaselineRd(t, workspaceId, projectId, kbId);
+
+    await seedDriftReport(t, workspaceId, projectId, kbId, baselineRdId, {
+      version: 1,
+      baseline_rd_version: 5,
+    });
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.knowledge.queries.getDriftReport, {
+      project_id: projectId as never,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.baseline_rd_version).toBe(5);
+  });
+
+  it("returns baseline_rd_version undefined when not set (legacy reports)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+    const baselineRdId = await seedBaselineRd(t, workspaceId, projectId, kbId);
+
+    await seedDriftReport(t, workspaceId, projectId, kbId, baselineRdId);
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.knowledge.queries.getDriftReport, {
+      project_id: projectId as never,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.baseline_rd_version).toBeUndefined();
+  });
+
   it("returns null when all reports are archived", async () => {
     const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
     const workspaceId = await seedWorkspace(t);

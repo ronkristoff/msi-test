@@ -59,7 +59,7 @@ export function BaselineRdSection({
   };
 
   const handleSave = async () => {
-    if (!rdId || !localContent) return;
+    if (!rdId || localContent === null) return;
     setSaveError(null);
     setIsSaving(true);
     try {

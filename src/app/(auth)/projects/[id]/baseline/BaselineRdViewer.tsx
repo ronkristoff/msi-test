@@ -106,7 +106,7 @@ export function BaselineRdViewer({ rd, bmadDetected }: BaselineRdViewerProps) {
           )}
         </div>
         {transitionError && (
-          <div className="mt-3 p-2 rounded-[var(--radius-sm)] border border-[rgba(220,38,38,0.2)] bg-[rgba(220,38,38,0.06)] text-[var(--danger)] text-sm">
+          <div role="alert" className="mt-3 p-2 rounded-[var(--radius-sm)] border border-[rgba(220,38,38,0.2)] bg-[rgba(220,38,38,0.06)] text-[var(--danger)] text-sm">
             {transitionError}
           </div>
         )}

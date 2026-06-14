@@ -466,6 +466,7 @@ export default defineSchema({
     project_id: v.id("projects"),
     knowledge_base_id: v.id("knowledge_bases"),
     baseline_rd_id: v.id("baseline_rds"),
+    baseline_rd_version: v.optional(v.number()),
     version: v.number(),
     status: v.union(
       v.literal("draft"),

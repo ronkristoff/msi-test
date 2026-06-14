@@ -219,6 +219,7 @@ export const getDriftReport = query({
       project_id: report.project_id,
       knowledge_base_id: report.knowledge_base_id,
       baseline_rd_id: report.baseline_rd_id,
+      baseline_rd_version: report.baseline_rd_version,
       version: report.version,
       status: report.status,
       items: report.items,

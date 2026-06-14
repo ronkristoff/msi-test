@@ -57,6 +57,7 @@ const reportWithItems = {
   project_id: "proj1",
   knowledge_base_id: "kb1",
   baseline_rd_id: "rd1",
+  baseline_rd_version: 1,
   version: 1,
   status: "draft",
   bmad_detected: false,
@@ -217,6 +218,8 @@ describe("DriftReportPage", () => {
     await setup();
 
     expect(screen.getByText(/older version of the Baseline RD/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(v1\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/current RD \(v2\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Regenerate to compare/i)).toBeInTheDocument();
   });
 

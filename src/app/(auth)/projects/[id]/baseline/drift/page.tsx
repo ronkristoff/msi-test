@@ -169,8 +169,11 @@ export default function DriftReportPage() {
               role="alert"
               className="p-3 rounded-[var(--radius-sm)] border text-sm bg-[rgba(234,179,8,0.06)] border-[rgba(234,179,8,0.2)] text-[var(--warn-text)] mb-4"
             >
-              This Drift Report is based on an older version of the Baseline RD (v{driftReport.version}).
-              Regenerate to compare against the current RD (v{baselineRd?.version}).
+              This Drift Report is based on an older version of the Baseline RD
+              {driftReport.baseline_rd_version !== undefined
+                ? ` (v${driftReport.baseline_rd_version}).`
+                : "."}
+              {" "}Regenerate to compare against the current RD (v{baselineRd?.version}).
             </div>
           )}
           <div className="flex justify-end mb-4 gap-2">

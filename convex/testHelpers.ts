@@ -242,6 +242,7 @@ export async function seedBaselineRd(
 
 type DriftReportOverrides = Partial<{
   version: number;
+  baseline_rd_version: number;
   status: "draft" | "archived" | "failed";
   items: Array<{
     dimension: "old-rd-vs-code" | "bmad-prd-vs-code" | "bmad-conventions-vs-code" | "adr-drift";
@@ -283,6 +284,7 @@ export async function seedDriftReport(
       project_id: projectId as Id<"projects">,
       knowledge_base_id: knowledgeBaseId as Id<"knowledge_bases">,
       baseline_rd_id: baselineRdId as Id<"baseline_rds">,
+      baseline_rd_version: overrides?.baseline_rd_version,
       version: overrides?.version ?? 1,
       status: overrides?.status ?? "draft",
       items: overrides?.items ?? DEFAULT_DRIFT_ITEMS,

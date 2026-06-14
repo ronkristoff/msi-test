@@ -138,6 +138,7 @@ export const generateDriftReport = internalAction({
         workspace_id: args.workspace_id,
         knowledge_base_id: args.knowledge_base_id,
         baseline_rd_id: args.baseline_rd_id,
+        baseline_rd_version: kb.baseline_rd.version,
         bmad_detected: hasBmadContext,
         items,
       },

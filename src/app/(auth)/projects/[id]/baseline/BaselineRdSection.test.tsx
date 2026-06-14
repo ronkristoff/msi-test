@@ -196,6 +196,35 @@ describe("BaselineRdSection — edit mode", () => {
     });
   });
 
+  it("Save succeeds when textarea is cleared to empty content", async () => {
+    const user = userEvent.setup();
+    const onExitEdit = vi.fn();
+    render(
+      <BaselineRdSection
+        section={baseSection}
+        rdId={"rd1" as never}
+        isEditing
+        onEnterEdit={() => {}}
+        onExitEdit={onExitEdit}
+      />,
+    );
+
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await user.clear(textarea);
+    expect(textarea.value).toBe("");
+    await user.click(screen.getByRole("button", { name: /Save/i }));
+
+    await vi.waitFor(() => {
+      expect(mockUpdateBaselineRd).toHaveBeenCalledWith({
+        rd_id: "rd1",
+        section_updates: [{ id: "overview", content: "" }],
+      });
+    });
+    await vi.waitFor(() => {
+      expect(onExitEdit).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("clicking Discard does not call the mutation and calls onExitEdit", async () => {
     const user = userEvent.setup();
     const onExitEdit = vi.fn();
