@@ -619,6 +619,7 @@ export const _archiveBaselineRd = internalMutation({
         .withIndex("by_project_id", (q) =>
           q.eq("project_id", args.project_id),
         )
+        .filter((q) => q.neq(q.field("status"), "archived"))
         .take(100);
 
       if (rds.length === 0) {
@@ -627,10 +628,8 @@ export const _archiveBaselineRd = internalMutation({
       }
 
       for (const rd of rds) {
-        if (rd.status !== "archived") {
-          await ctx.db.patch(rd._id, { status: "archived" });
-          archivedCount++;
-        }
+        await ctx.db.patch(rd._id, { status: "archived" });
+        archivedCount++;
       }
 
       hasMore = rds.length === 100;

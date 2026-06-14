@@ -548,6 +548,27 @@ describe("internal mutations: _archiveBaselineRd", () => {
     );
     expect(count).toBe(0);
   });
+
+  it("archives more than 100 rows via paginated loop (no infinite loop on already-archived rows)", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+
+    for (let i = 0; i < 105; i++) {
+      await seedBaselineRd(t, workspaceId, projectId, kbId, {
+        version: i + 1,
+        status: "draft",
+      });
+    }
+
+    const { internal } = await import("./_generated/api");
+    const count = await t.mutation(
+      internal.knowledge.internal._archiveBaselineRd,
+      { project_id: projectId },
+    );
+    expect(count).toBe(105);
+  });
 });
 
 describe("internal mutations: _getLatestRdVersion", () => {
