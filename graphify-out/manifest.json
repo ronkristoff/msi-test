@@ -6845,8 +6845,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/sprint-status.yaml": {
-    "mtime": 1781447455.3736637,
-    "ast_hash": "3489810312e3aacf6ca72ba2cc34c24b",
+    "mtime": 1781479285.6819234,
+    "ast_hash": "d8203d7a038a5365cb7da5d3cb808669",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/1-2-old-rd-upload-text-extraction.md": {
@@ -6945,8 +6945,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/deferred-work.md": {
-    "mtime": 1781446022.2362368,
-    "ast_hash": "c4c27e072720f3fd5291ee2498be63ba",
+    "mtime": 1781450536.5608773,
+    "ast_hash": "14f02a9348c1f022d7e14d2891cc214b",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.embeddingActions.test.ts": {
@@ -7290,13 +7290,13 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat/queries.ts": {
-    "mtime": 1781439400.274062,
-    "ast_hash": "52b592bce9d954c292dca839a4d45db7",
+    "mtime": 1781479175.4547083,
+    "ast_hash": "ee9c5c770d8a810f270b7bea4fbd9c3e",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/convex/chat.test.ts": {
-    "mtime": 1781446361.3609815,
-    "ast_hash": "0f43943ae4cc7853f32ca4df46047f6c",
+    "mtime": 1781479088.753125,
+    "ast_hash": "2b6e32a10aaa6bb7492f32f233b42e2c",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/3-2-rag-grounded-responses.md": {
@@ -7320,8 +7320,43 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/3-3-chat-thread-list-navigation.md": {
-    "mtime": 1781447438.6817207,
-    "ast_hash": "80282e533a8a1a9ab266c19655c3703e",
+    "mtime": 1781479269.7798595,
+    "ast_hash": "33effd3d9bc0480bb96db99aa76e2290",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/convex/chat/preview.test.ts": {
+    "mtime": 1781478939.7957861,
+    "ast_hash": "7bb1c073ace4f3486bb79a185eba2e46",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/convex/chat/preview.ts": {
+    "mtime": 1781478929.005822,
+    "ast_hash": "e9292d637eea92c90db18dc7c0a61afb",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/chat/chat.test.tsx": {
+    "mtime": 1781448423.9113197,
+    "ast_hash": "87ee5cddafbd3cb9552ad1e75e27f200",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/chat/page.tsx": {
+    "mtime": 1781478990.9195178,
+    "ast_hash": "a03e68422e956c11455d0e6ab42caeb0",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/src/components/chat/MessageBubble.tsx": {
+    "mtime": 1781478998.9339128,
+    "ast_hash": "9cf0d6c8fb695218da147e03a0a0a520",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/chat/[threadId]/thread-view.test.tsx": {
+    "mtime": 1781479117.3452363,
+    "ast_hash": "0074ee2915019abe846c56e772a4daab",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx": {
+    "mtime": 1781478981.4761698,
+    "ast_hash": "01d774e6bdb3eb6fe6cf7421f68bba27",
     "semantic_hash": ""
   }
 }
