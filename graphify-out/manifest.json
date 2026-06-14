@@ -6845,8 +6845,8 @@
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/sprint-status.yaml": {
-    "mtime": 1781401139.030139,
-    "ast_hash": "2ed3543244f133109128943b63ac14a1",
+    "mtime": 1781401760.2761602,
+    "ast_hash": "ca2c1ec0b801f5c6f2f899e1ef5f6b73",
     "semantic_hash": ""
   },
   "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/1-2-old-rd-upload-text-extraction.md": {
@@ -7102,6 +7102,11 @@
   "/Users/ron/Documents/msiprojects/msi-test/convex/knowledge.bmad.test.ts": {
     "mtime": 1781399849.4834425,
     "ast_hash": "848cd1576b09eff67bc542e04bedcd0b",
+    "semantic_hash": ""
+  },
+  "/Users/ron/Documents/msiprojects/msi-test/_bmad-output/implementation-artifacts/epic-1-retrospective.md": {
+    "mtime": 1781401754.3032265,
+    "ast_hash": "615b76d248aa3140c6f0c1d463394a8f",
     "semantic_hash": ""
   }
 }
