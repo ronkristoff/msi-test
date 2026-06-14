@@ -14,13 +14,14 @@ vi.mock("./ai/model", async () => {
   return {
     getWorkspaceModel: () =>
       mockModel({
-        content: [{ type: "text", text: "Mocked assistant response" }],
+        content: [{ type: "text", text: mockModelText.current }],
       }),
   };
 });
 
-const { chatRagSearchMock } = vi.hoisted(() => ({
+const { chatRagSearchMock, mockModelText } = vi.hoisted(() => ({
   chatRagSearchMock: vi.fn(),
+  mockModelText: { current: "Mocked assistant response" },
 }));
 
 vi.mock("./knowledge/rag", async (importOriginal) => {
@@ -60,6 +61,7 @@ function chatTest() {
 
 beforeEach(() => {
   chatRagSearchMock.mockReset();
+  mockModelText.current = "Mocked assistant response";
 });
 
 describe("chat: createThread + ownership", () => {
@@ -229,7 +231,7 @@ describe("chat: listThreads query", () => {
     expect(result!).toHaveLength(0);
   });
 
-  it("shape includes thread_id, title, last_message_at, _creationTime", async () => {
+  it("shape includes thread_id, title, last_message_at, _creationTime, last_message_preview", async () => {
     const t = convexTest(schema, modules);
     const workspaceId = await seedWorkspace(t);
     const projectId = await seedProject(t, workspaceId);
@@ -248,6 +250,171 @@ describe("chat: listThreads query", () => {
     expect(result![0]).toHaveProperty("title", "New Chat");
     expect(result![0]).toHaveProperty("last_message_at", 5000);
     expect(result![0]).toHaveProperty("_creationTime");
+    expect(result![0]).toHaveProperty("last_message_preview");
+    expect(result![0].last_message_preview).toBeNull();
+  });
+});
+
+describe("chat: listThreads last_message_preview", () => {
+  it("returns a non-null preview when the thread has messages", async () => {
+    const t = chatTest();
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const { api } = await import("./_generated/api");
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const { threadId } = await asUser.mutation(api.chat.mutations.createThread, {
+      project_id: projectId,
+    });
+    await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "What does the auth module do?",
+    });
+
+    const result = await asUser.query(api.chat.queries.listThreads, {
+      project_id: projectId,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!).toHaveLength(1);
+    expect(result![0].last_message_preview).not.toBeNull();
+    expect(typeof result![0].last_message_preview).toBe("string");
+    expect(result![0].last_message_preview).toMatch(/Mocked assistant response/);
+  });
+
+  it("returns null preview for a thread with no messages", async () => {
+    const t = chatTest();
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const { api } = await import("./_generated/api");
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    await asUser.mutation(api.chat.mutations.createThread, {
+      project_id: projectId,
+    });
+
+    const result = await asUser.query(api.chat.queries.listThreads, {
+      project_id: projectId,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!).toHaveLength(1);
+    expect(result![0].last_message_preview).toBeNull();
+  });
+
+  it("truncates preview for long messages to <=121 chars with ellipsis", async () => {
+    mockModelText.current = "x".repeat(200);
+
+    const t = chatTest();
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const { api } = await import("./_generated/api");
+
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const { threadId } = await asUser.mutation(api.chat.mutations.createThread, {
+      project_id: projectId,
+    });
+    await asUser.action(api.chat.chatActions.streamMessage, {
+      threadId,
+      prompt: "Give me a long answer",
+    });
+
+    const result = await asUser.query(api.chat.queries.listThreads, {
+      project_id: projectId,
+    });
+
+    expect(result).not.toBeNull();
+    const preview = result![0].last_message_preview;
+    expect(preview).not.toBeNull();
+    expect(typeof preview).toBe("string");
+    expect(preview!.length).toBeLessThanOrEqual(121);
+    expect(preview!.endsWith("…")).toBe(true);
+    expect(preview!.slice(0, -1)).toBe("x".repeat(120));
+  });
+
+  it("returns null preview for seeded thread without a component thread", async () => {
+    const t = chatTest();
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    await seedChatThread(t, workspaceId, projectId, "previewless", {
+      last_message_at: 1000,
+    });
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const result = await asUser.query(api.chat.queries.listThreads, {
+      project_id: projectId,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result![0].last_message_preview).toBeNull();
+  });
+
+  it("still returns null for cross-workspace project (preview extension preserves ownership)", async () => {
+    const t = chatTest();
+    await seedWorkspace(t, "user1");
+    const wsB = await seedWorkspace(t, "user2");
+    const projectB = await seedProject(t, wsB);
+    await seedChatThread(t, wsB, projectB, "tx");
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const result = await asUser.query(api.chat.queries.listThreads, {
+      project_id: projectB,
+    });
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("chat: getThread query", () => {
+  it("returns title for owned thread", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    await seedChatThread(t, workspaceId, projectId, "thread-get", {
+      title: "Custom Title",
+      last_message_at: 9000,
+    });
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const result = await asUser.query(api.chat.queries.getThread, {
+      thread_id: "thread-get",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.title).toBe("Custom Title");
+    expect(result!.last_message_at).toBe(9000);
+  });
+
+  it("returns null for cross-workspace thread (IDOR guard)", async () => {
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t, "user1");
+    const wsB = await seedWorkspace(t, "user2");
+    const projectB = await seedProject(t, wsB);
+    await seedChatThread(t, wsB, projectB, "thread-other-ws");
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const result = await asUser.query(api.chat.queries.getThread, {
+      thread_id: "thread-other-ws",
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for non-existent thread", async () => {
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t);
+
+    const { api } = await import("./_generated/api");
+    const asUser = t.withIdentity({ subject: "user1", issuer: "test" });
+    const result = await asUser.query(api.chat.queries.getThread, {
+      thread_id: "ghost",
+    });
+
+    expect(result).toBeNull();
   });
 });
 

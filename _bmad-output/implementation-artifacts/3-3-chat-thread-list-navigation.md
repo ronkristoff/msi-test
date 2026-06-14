@@ -4,7 +4,7 @@ baseline_commit: 46aeb5f
 
 # Story 3.3: Chat Thread List & Navigation
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -46,65 +46,65 @@ so that I can resume previous conversations.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Extend `listThreads` query with `last_message_preview` (AC: #2, #8)
-  - [ ] In `convex/chat/queries.ts`, after the existing `threads` fetch (line 54-60), add a parallel `Promise.all` that calls `ctx.runQuery(components.agent.messages.listMessagesByThreadId, { threadId: t.thread_id as Id<"threads">, order: "desc", paginationOpts: { numItems: 1, cursor: null, id: undefined } })` per thread.
-  - [ ] Extract preview text: prefer the `text` field on the returned `MessageDoc`; if empty/absent, extract from `message.content` (string or first text part). Truncate to 120 chars with `…`.
-  - [ ] Map the extended return shape: add `last_message_preview: string | null` alongside the existing fields.
-  - [ ] Import `Id` from `../../_generated/dataModel` for the `threadId` cast (component thread IDs are `Id<"threads">` at the type level; our join stores them as `v.string()` — runtime-safe cast).
-  - [ ] Verify `components.agent.messages.listMessagesByThreadId` is the correct reference (check `convex/_generated/api.d.ts` for the `components.agent` table/function path).
+- [x] Task 1: Extend `listThreads` query with `last_message_preview` (AC: #2, #8)
+  - [x] In `convex/chat/queries.ts`, after the existing `threads` fetch (line 54-60), add a parallel `Promise.all` that calls `ctx.runQuery(components.agent.messages.listMessagesByThreadId, { threadId: t.thread_id as Id<"threads">, order: "desc", paginationOpts: { numItems: 1, cursor: null, id: undefined } })` per thread.
+  - [x] Extract preview text: prefer the `text` field on the returned `MessageDoc`; if empty/absent, extract from `message.content` (string or first text part). Truncate to 120 chars with `…`.
+  - [x] Map the extended return shape: add `last_message_preview: string | null` alongside the existing fields.
+  - [x] Import `Id` from `../../_generated/dataModel` for the `threadId` cast (component thread IDs are `Id<"threads">` at the type level; our join stores them as `v.string()` — runtime-safe cast).
+  - [x] Verify `components.agent.messages.listMessagesByThreadId` is the correct reference (check `convex/_generated/api.d.ts` for the `components.agent` table/function path).
 
-- [ ] Task 2: Write `listThreads` preview test FIRST (AC: #9) — TDD RED
-  - [ ] Extend `convex/chat.test.ts`. The `chatTest()` helper (from 3.1) already registers the agent component. Seed a thread via `seedChatThread`, then seed a component message via `agent.saveMessage(ctx, { threadId, message: { role: "user", content: "What does the auth module do?" } })` (or use `streamMessage` with `mockModel` to produce a real exchange, then verify the preview).
-  - [ ] Test: `listThreads` returns `{ thread_id, title, last_message_at, _creationTime, last_message_preview }` — verify `last_message_preview` is a non-null string containing the message text.
-  - [ ] Test: thread with no messages → `last_message_preview` is `null`.
-  - [ ] Test: long message → preview truncated to ≤121 chars (120 + `…`).
-  - [ ] Test: existing cross-workspace null test still passes (verify the preview extension doesn't break ownership).
+- [x] Task 2: Write `listThreads` preview test FIRST (AC: #9) — TDD RED
+  - [x] Extend `convex/chat.test.ts`. The `chatTest()` helper (from 3.1) already registers the agent component. Seed a thread via `seedChatThread`, then seed a component message via `agent.saveMessage(ctx, { threadId, message: { role: "user", content: "What does the auth module do?" } })` (or use `streamMessage` with `mockModel` to produce a real exchange, then verify the preview).
+  - [x] Test: `listThreads` returns `{ thread_id, title, last_message_at, _creationTime, last_message_preview }` — verify `last_message_preview` is a non-null string containing the message text.
+  - [x] Test: thread with no messages → `last_message_preview` is `null`.
+  - [x] Test: long message → preview truncated to ≤121 chars (120 + `…`).
+  - [x] Test: existing cross-workspace null test still passes (verify the preview extension doesn't break ownership).
 
-- [ ] Task 3: Implement preview extraction — TDD GREEN (AC: #2)
-  - [ ] Task 1 implementation passes Task 2 tests.
+- [x] Task 3: Implement preview extraction — TDD GREEN (AC: #2)
+  - [x] Task 1 implementation passes Task 2 tests.
 
-- [ ] Task 4: Create thread list page `src/app/(auth)/projects/[id]/chat/page.tsx` (AC: #1, #5, #6)
-  - [ ] `"use client"` page component. `useParams<{ id: string }>()`, `projectId = asId(params.id, "projects")`.
-  - [ ] `const threads = useQuery(api.chat.queries.listThreads, { project_id: projectId })`.
-  - [ ] `const createThread = useMutation(api.chat.mutations.createThread)`.
-  - [ ] Loading: `threads === undefined` → `<PageSkeleton />`.
-  - [ ] Cross-workspace/not-found: `threads === null` → `<EmptyState>` "Project not found" with link to `/projects`.
-  - [ ] Empty: `threads?.length === 0` → `<EmptyState>` "No conversations yet" with "New Chat" action.
-  - [ ] Populated: thread cards as `<Link>` elements. Each card: title (bold), preview (muted, single-line truncate), timestamp (`formatRelativeTime`). Mirror the card styling from `KnowledgeModuleList.tsx` or `knowledge/page.tsx` patterns.
-  - [ ] "New Chat" button handler: `async () => { try { setIsCreating(true); const { threadId } = await createThread({ project_id: projectId }); router.push(`/projects/${params.id}/chat/${threadId}`); } catch (err) { ...logError + Alert... } finally { setIsCreating(false); } }`. Must be in an event handler (React 19 rule — no setState in render body).
-  - [ ] Header: "Chat" title + "Back to Project" link, mirroring `knowledge/page.tsx:126-144`.
+- [x] Task 4: Create thread list page `src/app/(auth)/projects/[id]/chat/page.tsx` (AC: #1, #5, #6)
+  - [x] `"use client"` page component. `useParams<{ id: string }>()`, `projectId = asId(params.id, "projects")`.
+  - [x] `const threads = useQuery(api.chat.queries.listThreads, { project_id: projectId })`.
+  - [x] `const createThread = useMutation(api.chat.mutations.createThread)`.
+  - [x] Loading: `threads === undefined` → `<PageSkeleton />`.
+  - [x] Cross-workspace/not-found: `threads === null` → `<EmptyState>` "Project not found" with link to `/projects`.
+  - [x] Empty: `threads?.length === 0` → `<EmptyState>` "No conversations yet" with "New Chat" action.
+  - [x] Populated: thread cards as `<Link>` elements. Each card: title (bold), preview (muted, single-line truncate), timestamp (`formatRelativeTime`). Mirror the card styling from `KnowledgeModuleList.tsx` or `knowledge/page.tsx` patterns.
+  - [x] "New Chat" button handler: `async () => { try { setIsCreating(true); const { threadId } = await createThread({ project_id: projectId }); router.push(`/projects/${params.id}/chat/${threadId}`); } catch (err) { ...logError + Alert... } finally { setIsCreating(false); } }`. Must be in an event handler (React 19 rule — no setState in render body).
+  - [x] Header: "Chat" title + "Back to Project" link, mirroring `knowledge/page.tsx:126-144`.
 
-- [ ] Task 5: Write thread list page tests FIRST (AC: #9) — TDD
-  - [ ] Create `src/app/(auth)/projects/[id]/chat/chat.test.tsx`.
-  - [ ] Mock setup following `knowledge/knowledge.test.tsx:1-52` pattern (mock `convex/react`, `next/navigation`, `@/lib/convex`, `@/lib/error-logger`).
-  - [ ] Test loading state (useQuery returns `undefined`).
-  - [ ] Test empty state (useQuery returns `[]`).
-  - [ ] Test populated state (useQuery returns array of thread objects with title/preview/timestamp) — verify thread cards render and link to the correct href.
-  - [ ] Test "New Chat" button click → `createThread` mock called with `{ project_id }`, `router.push` called with `/projects/{id}/chat/{newThreadId}`.
-  - [ ] Test cross-workspace null state → "Project not found" renders.
+- [x] Task 5: Write thread list page tests FIRST (AC: #9) — TDD
+  - [x] Create `src/app/(auth)/projects/[id]/chat/chat.test.tsx`.
+  - [x] Mock setup following `knowledge/knowledge.test.tsx:1-52` pattern (mock `convex/react`, `next/navigation`, `@/lib/convex`, `@/lib/error-logger`).
+  - [x] Test loading state (useQuery returns `undefined`).
+  - [x] Test empty state (useQuery returns `[]`).
+  - [x] Test populated state (useQuery returns array of thread objects with title/preview/timestamp) — verify thread cards render and link to the correct href.
+  - [x] Test "New Chat" button click → `createThread` mock called with `{ project_id }`, `router.push` called with `/projects/{id}/chat/{newThreadId}`.
+  - [x] Test cross-workspace null state → "Project not found" renders.
 
-- [ ] Task 6: Create thread view page `src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx` (AC: #4, #7)
-  - [ ] `"use client"` page. `useParams<{ id: string; threadId: string }>()`.
-  - [ ] `const { results, status, loadMore } = useUIMessages(api.chat.queries.listThreadMessages, { threadId: params.threadId }, { initialNumItems: 50 })`. NO `stream: true` (that's 3.4).
-  - [ ] Extract a `MessageBubble` component (same dir or `src/components/chat/`) that takes a `UIMessageLike` and renders role + text parts. Keep it reusable for 3.4.
-  - [ ] Loading: `status === "LoadingFirstPage"` → skeleton or "Loading messages…".
-  - [ ] Empty: `results.length === 0` → `<EmptyState>` "This conversation has no messages yet." (brand-new thread from "New Chat" before 3.4 composer).
-  - [ ] Error: wrap in error state for `ConvexError("Thread not found")` — show "Thread not found" + link to `/projects/${id}/chat`.
-  - [ ] Header: thread title (from a `getThread` query or inferred from messages — see Dev Notes) + "Back to Chat" link.
-  - [ ] Messages render oldest-first (reverse the `results` array if the hook returns newest-first).
+- [x] Task 6: Create thread view page `src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx` (AC: #4, #7)
+  - [x] `"use client"` page. `useParams<{ id: string; threadId: string }>()`.
+  - [x] `const { results, status, loadMore } = useUIMessages(api.chat.queries.listThreadMessages, { threadId: params.threadId }, { initialNumItems: 50 })`. NO `stream: true` (that's 3.4).
+  - [x] Extract a `MessageBubble` component (same dir or `src/components/chat/`) that takes a `UIMessageLike` and renders role + text parts. Keep it reusable for 3.4.
+  - [x] Loading: `status === "LoadingFirstPage"` → skeleton or "Loading messages…".
+  - [x] Empty: `results.length === 0` → `<EmptyState>` "This conversation has no messages yet." (brand-new thread from "New Chat" before 3.4 composer).
+  - [x] Error: wrap in error state for `ConvexError("Thread not found")` — show "Thread not found" + link to `/projects/${id}/chat`.
+  - [x] Header: thread title (from a `getThread` query or inferred from messages — see Dev Notes) + "Back to Chat" link.
+  - [x] Messages render oldest-first (reverse the `results` array if the hook returns newest-first).
 
-- [ ] Task 7: Write thread view page tests (AC: #9) — TDD
-  - [ ] Create `src/app/(auth)/projects/[id]/chat/[threadId]/thread-view.test.tsx`.
-  - [ ] Mock `@convex-dev/agent/react` → `useUIMessages` returns `{ results: [{ role: "user", parts: [{ type: "text", text: "Hello" }], order: 0, stepOrder: 0, status: "success" }], status: "Loaded", loadMore: vi.fn() }`.
-  - [ ] Test messages render with correct text and role indicators.
-  - [ ] Test empty state (results = []).
-  - [ ] Test "Back to Chat" link present.
+- [x] Task 7: Write thread view page tests (AC: #9) — TDD
+  - [x] Create `src/app/(auth)/projects/[id]/chat/[threadId]/thread-view.test.tsx`.
+  - [x] Mock `@convex-dev/agent/react` → `useUIMessages` returns `{ results: [{ role: "user", parts: [{ type: "text", text: "Hello" }], order: 0, stepOrder: 0, status: "success" }], status: "Loaded", loadMore: vi.fn() }`.
+  - [x] Test messages render with correct text and role indicators.
+  - [x] Test empty state (results = []).
+  - [x] Test "Back to Chat" link present.
 
-- [ ] Task 8: Validation (AC: #9)
-  - [ ] `pnpm lint` — zero new errors.
-  - [ ] `pnpm test:convex` — all backend tests pass (new + existing, zero regressions).
-  - [ ] `pnpm test` — all frontend tests pass (new + existing, zero regressions).
-  - [ ] `pnpm build` — Next.js build succeeds (pre-existing `bmadActions.ts`/`baselineActions.ts` type errors are documented in deferred-work line 106 and NOT caused by this story).
+- [x] Task 8: Validation (AC: #9)
+  - [x] `pnpm lint` — zero new errors.
+  - [x] `pnpm test:convex` — all backend tests pass (new + existing, zero regressions).
+  - [x] `pnpm test` — all frontend tests pass (new + existing, zero regressions).
+  - [x] `pnpm build` — Next.js build succeeds (pre-existing `bmadActions.ts`/`baselineActions.ts` type errors are documented in deferred-work line 106 and NOT caused by this story).
 
 ## Dev Notes
 
@@ -491,10 +491,70 @@ Per retrospective action A8, review `_bmad-output/implementation-artifacts/defer
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+glm-5.2 (zai-coding-plan/glm-5.2)
 
 ### Debug Log References
 
+- **Build type error — `Id<"threads">` constraint violation**: Initial `asComponentThreadId` helper in `preview.ts` and the inline cast in `queries.ts` used `Id<"threads">` from the app's `_generated/dataModel`. The app's `Id<T>` type parameter constrains `T` to app `TableNames`, but `"threads"` is a component table — not in the app schema. Fix: removed the unused helper from `preview.ts`; in `queries.ts`, introduced `type ListMessagesArgs = FunctionArgs<typeof components.agent.messages.listMessagesByThreadId>` and cast `t.thread_id as ListMessagesArgs["threadId"]` to use the component's own branded type without referencing the app's `Id` type.
+- **Empty state duplicate "New Chat" button**: First implementation rendered both the header "New Chat" button and the `EmptyState` action "New Chat" button simultaneously when `threads.length === 0`, causing a `getByRole` "multiple elements found" test failure. Fix: the header "New Chat" button is now conditionally rendered only when `threads.length > 0` — the empty state's action button is the sole CTA in that state.
+
 ### Completion Notes List
 
+- **AC1 — Thread list page** (`src/app/(auth)/projects/[id]/chat/page.tsx`): renders thread cards with title, preview, and relative timestamp. Header has "Chat" title, "Back to Project" link, and "New Chat" button (populated state only). AppLayout wraps automatically via `PAGE_META["/projects"]` prefix match.
+- **AC2 — `listThreads` preview extension** (`convex/chat/queries.ts`): `listThreads` now returns `last_message_preview: string | null` per thread, fetched in parallel (bounded to 50) via `components.agent.messages.listMessagesByThreadId`. Per-thread try/catch ensures graceful null on component query failure. Preview extracted via `extractMessageText` (prefers string content, falls back to first `{ type: "text" }` part) and truncated to 120 chars + `…` via code-point-safe `truncatePreview`.
+- **AC3 — Thread navigation**: each thread card is a `<Link>` to `/projects/${id}/chat/${thread.thread_id}`.
+- **AC4 — `[threadId]` page** (`src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx`): loads message history via `useUIMessages` (non-streaming, `initialNumItems: 50`). Messages sorted oldest-first. Reusable `MessageBubble` component extracted to `src/components/chat/MessageBubble.tsx` for 3.4 reuse. Title from new `getThread` query.
+- **AC5 — "New Chat" button**: calls `createThread` mutation then `router.push` inside the async event handler (React 19 compliant — no render-body setState). Loading state while pending; error shown via `Alert` + `logError`.
+- **AC6 — List page states**: loading → `<PageSkeleton />`; empty → `<EmptyState>` "No conversations yet" with "New Chat" action; null (cross-workspace) → `<EmptyState>` "Project not found" with link to `/projects`.
+- **AC7 — View page states**: loading → `<PageSkeleton />`; empty → `<EmptyState>` "This conversation has no messages yet."; null (ownership fail via `getThread` returning null) → `<EmptyState>` "Thread not found" with "Back to Chat" link.
+- **AC8 — Cross-workspace isolation**: verified via existing `getOptionalOwnedEntity` on `listThreads` and `verifyThreadOwnership` on `getThread`/`listThreadMessages`. No new guard added — existing ones verified by new tests.
+- **AC9 — Tests**: 12 helper unit tests (`convex/chat/preview.test.ts`), 4 new `listThreads` preview integration tests + 3 `getThread` tests (`convex/chat.test.ts`), 11 thread list page tests (`chat.test.tsx`), 8 thread view page tests (`thread-view.test.tsx`). All existing tests pass — zero regressions (937 backend + 301 frontend).
+- **`getThread` query added** (`convex/chat/queries.ts`): per Dev Notes "option 3 (PREFERRED)" — ownership-scoped via `verifyThreadOwnership` (B3 IDOR guard). Returns `{ title, last_message_at }` or `null`.
+
 ### File List
+
+**New files:**
+- `convex/chat/preview.ts` — pure helpers: `extractMessageText`, `truncatePreview`
+- `convex/chat/preview.test.ts` — 12 unit tests for preview helpers
+- `src/app/(auth)/projects/[id]/chat/page.tsx` — thread list page
+- `src/app/(auth)/projects/[id]/chat/chat.test.tsx` — 11 thread list page tests
+- `src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx` — thread view page
+- `src/app/(auth)/projects/[id]/chat/[threadId]/thread-view.test.tsx` — 8 thread view page tests
+- `src/components/chat/MessageBubble.tsx` — reusable message renderer + `MessageList` wrapper
+
+**Modified files:**
+- `convex/chat/queries.ts` — extended `listThreads` with `last_message_preview`; added `getThread` query
+- `convex/chat.test.ts` — added 4 `listThreads` preview tests + 3 `getThread` tests; updated shape test to include `last_message_preview`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status updated (ready-for-dev → in-progress → review)
+- `_bmad-output/implementation-artifacts/3-3-chat-thread-list-navigation.md` — status + Dev Agent Record + Change Log
+
+## Change Log
+
+- 2026-06-14: Story 3.3 implemented — thread list page, thread view page (read-only), `listThreads` preview extension, `getThread` query, reusable `MessageBubble`, "New Chat" flow. 38 new tests (12 helper + 7 backend + 11 list page + 8 view page), zero regressions. Pre-existing `baselineActions.ts` build error confirmed at baseline (deferred-work line 106).
+- 2026-06-14: 3-layer code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor) — 9 patches applied: `useUIMessages` `"skip"` gate; `extractMessageText` prefers `text` field + normalizes empty/whitespace to null; preview-fetch catch logs via `ctx.logger?.warn`; `excludeToolMessages: true` on preview fetch; long-message truncation integration test + content-asserting preview test; `MessageBubble` text-part separator + stable key; double-click "New Chat" guard (reset `isCreating` only on error); `thread-view` skip/error-path tests. 5 items deferred (N+1 fan-out, getThread auth-consistency, project-id binding, grapheme truncation, invalid-id skeleton — all pre-existing/accepted). Backend 943 passed (+7), frontend 303 passed (+2), lint 0 errors.
+
+## Review Findings
+
+_Code review run 2026-06-14 — 3-layer adversarial review (Blind Hunter + Edge Case Hunter + Acceptance Auditor). 0 decision-needed, 9 patch, 5 defer, 1 dismissed._
+
+**Patches (actionable, unambiguous fixes):**
+
+- [x] [Review][Patch] `useUIMessages` fires unconditionally — no `"skip"` pattern; `listThreadMessages` throws `ConvexError("Thread not found")` on every subscription tick for cross-workspace/invalid `threadId` (AC7 violation, project-context.md line 58) [`src/app/(auth)/projects/[id]/chat/[threadId]/page.tsx:28`] — fix: gate on `thread ? { threadId: params.threadId } : "skip"`. (Flagged by all 3 layers.)
+- [x] [Review][Patch] `extractMessageText` ignores the top-level `text` field — spec AC2 / Dev Notes say "prefer `msg.text` if non-empty; otherwise extract from `message.content`". Implementation only reads `message.content`. Also: empty-string `content` returns `""` → renders a blank preview line instead of the "No messages yet" fallback (frontend `??` doesn't catch `""`) [`convex/chat/preview.ts:10`, `src/app/(auth)/projects/[id]/chat/page.tsx:147`] — fix: add `text` field fallback first; normalize empty/whitespace-only result to `null`.
+- [x] [Review][Patch] Broad `catch { return null; }` swallows every preview-fetch error with no logging — masks regressions (e.g. args-shape change silently nulls all previews) [`convex/chat/queries.ts:83`] — fix: add `ctx.logger.warn(...)` in the catch; keeps graceful degradation, surfaces failures.
+- [x] [Review][Patch] Backend integration test missing long-message truncation assertion (AC9 / Task 2: "Test: long message → preview truncated to ≤121 chars") [`convex/chat.test.ts`] — fix: add an integration test seeding a >120-char message, assert `last_message_preview.length <= 121` and `endsWith("…")`.
+- [x] [Review][Patch] Backend "non-null preview" test asserts only `typeof === "string"`, not content — passes on `""`; spec Task 2 says "containing the message text" [`convex/chat.test.ts:276`] — fix: `expect(result[0].last_message_preview).toBe("Mocked assistant response")` (or `.toMatch(/.../)`).
+- [x] [Review][Patch] `MessageBubble` renders multiple text parts as adjacent `<span>`s with no separator ("Helloworld") and uses `key={i}` anti-pattern [`src/components/chat/MessageBubble.tsx:38`] — fix: add a separator/whitespace between parts; use a stable key. Matters now since the component must be reusable for 3.4.
+- [x] [Review][Patch] Rapid double-click on "New Chat" can create duplicate threads — `finally { setIsCreating(false) }` re-enables the button after `router.push` but before the page unmounts [`src/app/(auth)/projects/[id]/chat/page.tsx:54`] — fix: only reset `isCreating` in the `catch`, not `finally` (successful navigation unmounts the component).
+- [x] [Review][Patch] `thread-view` test never covers the `listThreadMessages` error / `"skip"` path — the mock always returns success [`src/app/(auth)/projects/[id]/chat/[threadId]/thread-view.test.tsx`] — fix: add a test where `getThread` returns `null` and assert the page renders "Thread not found" without calling `listThreadMessages` (pairs with the first patch).
+- [x] [Review][Patch] Latest tool-call/image-only message yields `extractMessageText → null` → list shows misleading "No messages yet" for a thread that has messages [`convex/chat/queries.ts:71`] — fix: pass `excludeToolMessages: true` to `listMessagesByThreadId`, or change the frontend fallback to a neutral label (null preview ≠ no messages).
+
+**Deferred (real, not actionable for this story):**
+
+- [x] [Review][Defer] N+1 component query fan-out in `listThreads` — up to 50 parallel `ctx.runQuery` calls per subscription evaluation [`convex/chat/queries.ts:68`] — deferred; spec Dev Notes explicitly acknowledge & accept this for v1. Future optimization: cache `last_message_preview` on the `chat_threads` row (written by `streamMessage`).
+- [x] [Review][Defer] `getThread` throws `ConvexError("Not authenticated")` on session expiry while sibling `listThreads` returns `null` — inconsistent graceful-degradation UX [`convex/chat/queries.ts:102`] — deferred; matches sibling `listThreadMessages` (also throws). Session-expiry query-error UX is a codebase-wide deferred concern (deferred-work line 45).
+- [x] [Review][Defer] `getThread` verifies workspace ownership but not that the thread belongs to the URL's `params.id` — `/projects/<wrong-project>/chat/<your-thread>` renders with a misleading "Back to Chat" link [`convex/chat/queries.ts:99`] — deferred; AC8 (workspace ownership / B3 IDOR guard) is satisfied. Project-id binding is defense-in-depth, out of spec scope.
+- [x] [Review][Defer] `truncatePreview` splits base + combining-mark sequences — `Array.from` is code-point-safe, not grapheme-safe (e.g. `"e\u0301"` split at the boundary) [`convex/chat/preview.ts:19`] — deferred; mirrors the established `sanitizeTitle` pattern from 3.1. Grapheme segmentation (`Intl.Segmenter`) is a repo-wide truncation-utility enhancement, not story-specific.
+- [x] [Review][Defer] Invalid `params.id` (not a valid Convex `Id<"projects">`) → `listThreads` validator rejects before handler → `useQuery` stays `undefined` → perpetual skeleton [`src/app/(auth)/projects/[id]/chat/page.tsx:27`] — deferred; pre-existing codebase-wide pattern across all `projects/[id]` pages (spec explicitly mirrors `knowledge/page.tsx`). Needs a repo-wide client-side ID-validation fix.
+
+**Dismissed (1):** the `t.thread_id as ListMessagesArgs["threadId"]` cast — documented intentional decision in this story's Debug Log (necessary because `chat_threads.thread_id` is `v.string()` per the 3.1 schema).
