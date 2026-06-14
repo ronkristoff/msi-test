@@ -482,4 +482,17 @@ export default defineSchema({
     .index("by_project_id", ["project_id"])
     .index("by_project_id_and_version", ["project_id", "version"])
     .index("by_baseline_rd_id", ["baseline_rd_id"]),
+
+  chat_threads: defineTable({
+    thread_id: v.string(),
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    title: v.string(),
+    created_by_user_id: v.string(),
+    last_message_at: v.optional(v.number()),
+  })
+    .index("by_thread_id", ["thread_id"])
+    .index("by_project_id", ["project_id"])
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_project_id_and_last_message_at", ["project_id", "last_message_at"]),
 });

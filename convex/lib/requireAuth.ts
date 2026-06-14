@@ -89,6 +89,19 @@ export async function getOwnedEntity<T extends TableNames>(
   return { user, workspace, entity: entity as Doc<T> & { _id: Id<T> } };
 }
 
+export async function getOwnedEntityMessage<T extends TableNames>(
+  ctx: QueryCtx | MutationCtx,
+  entityId: Id<T>,
+  tableName: T,
+  message: string,
+) {
+  const { user, workspace } = await getMemberWorkspace(ctx);
+  const entity = await ctx.db.get(entityId);
+  if (!entity) throw new ConvexError(message);
+  if (entity.workspace_id !== workspace._id) throw new ConvexError(message);
+  return { user, workspace, entity: entity as Doc<T> & { _id: Id<T> } };
+}
+
 export async function getOptionalOwnedEntity<T extends TableNames>(
   ctx: QueryCtx | MutationCtx,
   entityId: Id<T>,

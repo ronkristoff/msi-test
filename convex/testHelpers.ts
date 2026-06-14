@@ -530,6 +530,25 @@ export async function seedRunWithTwoTests(t: TestCtx) {
   return { workspaceId, projectId, suiteId, testId1, testId2, runId };
 }
 
+export async function seedChatThread(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  threadId: string,
+  overrides?: Partial<{ title: string; created_by_user_id: string; last_message_at: number }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("chat_threads", {
+      thread_id: threadId,
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      title: overrides?.title ?? "New Chat",
+      created_by_user_id: overrides?.created_by_user_id ?? "user1",
+      last_message_at: overrides?.last_message_at,
+    });
+  });
+}
+
 export async function seedStagehandTest(
   t: TestCtx,
   workspaceId: string,
