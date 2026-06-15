@@ -44,6 +44,9 @@ vi.mock("@/lib/convex", () => ({
       impactActions: {
         analyzeImpact: "chat.impactActions.analyzeImpact",
       },
+      storyActions: {
+        generateStories: "chat.storyActions.generateStories",
+      },
     },
   },
 }));

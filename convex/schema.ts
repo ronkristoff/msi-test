@@ -495,4 +495,33 @@ export default defineSchema({
     .index("by_project_id", ["project_id"])
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id_and_last_message_at", ["project_id", "last_message_at"]),
+
+  user_stories: defineTable({
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    thread_id: v.string(),
+    title: v.string(),
+    user_story: v.object({
+      as_a: v.string(),
+      i_want: v.string(),
+      so_that: v.string(),
+    }),
+    acceptance_criteria: v.array(v.string()),
+    affected_components: v.object({
+      modules: v.array(v.string()),
+      apis: v.array(v.string()),
+      data_models: v.array(v.string()),
+    }),
+    technical_context: v.optional(v.string()),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("approved"),
+      v.literal("exported"),
+    ),
+    generated_at: v.number(),
+    updated_at: v.optional(v.number()),
+  })
+    .index("by_workspace_id", ["workspace_id"])
+    .index("by_project_id", ["project_id"])
+    .index("by_project_id_and_status", ["project_id", "status"]),
 });

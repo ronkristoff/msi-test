@@ -1,5 +1,6 @@
 import { internalQuery, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { getOptionalMemberWorkspace } from "../lib/requireAuth";
@@ -102,5 +103,57 @@ export const _updateThreadLastMessageAt = internalMutation({
     await ctx.db.patch(join._id, {
       last_message_at: args.last_message_at,
     });
+  },
+});
+
+const storedStoryValidator = v.object({
+  title: v.string(),
+  user_story: v.object({
+    as_a: v.string(),
+    i_want: v.string(),
+    so_that: v.string(),
+  }),
+  acceptance_criteria: v.array(v.string()),
+  affected_components: v.object({
+    modules: v.array(v.string()),
+    apis: v.array(v.string()),
+    data_models: v.array(v.string()),
+  }),
+  technical_context: v.optional(v.string()),
+});
+
+export const _storeUserStories = internalMutation({
+  args: {
+    thread_id: v.string(),
+    workspace_id: v.id("workspaces"),
+    project_id: v.id("projects"),
+    stories: v.array(storedStoryValidator),
+  },
+  handler: async (ctx, args) => {
+    const stored_ids: Id<"user_stories">[] = [];
+    const generated_at = Date.now();
+    for (const story of args.stories) {
+      if (story.acceptance_criteria.length === 0) {
+        throw new ConvexError({
+          type: "validation_error",
+          message:
+            "Story cannot have empty acceptance_criteria (at least one criterion required).",
+        });
+      }
+      const id = await ctx.db.insert("user_stories", {
+        workspace_id: args.workspace_id,
+        project_id: args.project_id,
+        thread_id: args.thread_id,
+        title: story.title,
+        user_story: story.user_story,
+        acceptance_criteria: story.acceptance_criteria,
+        affected_components: story.affected_components,
+        technical_context: story.technical_context,
+        status: "draft",
+        generated_at,
+      });
+      stored_ids.push(id);
+    }
+    return { stored_ids };
   },
 });

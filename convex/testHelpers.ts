@@ -586,3 +586,52 @@ export async function seedStagehandTest(
     return { projectId, suiteId, testId };
   });
 }
+
+type UserStoryOverrides = Partial<{
+  title: string;
+  user_story: { as_a: string; i_want: string; so_that: string };
+  acceptance_criteria: string[];
+  affected_components: {
+    modules: string[];
+    apis: string[];
+    data_models: string[];
+  };
+  technical_context: string;
+  status: "draft" | "approved" | "exported";
+  generated_at: number;
+  updated_at: number;
+}>;
+
+export async function seedUserStory(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  threadId: string,
+  overrides?: UserStoryOverrides,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("user_stories", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      thread_id: threadId,
+      title: overrides?.title ?? "Test user story",
+      user_story: overrides?.user_story ?? {
+        as_a: "an authenticated user",
+        i_want: "to perform an action",
+        so_that: "I achieve a goal",
+      },
+      acceptance_criteria: overrides?.acceptance_criteria ?? [
+        "Given a precondition, When an action occurs, Then the expected result happens.",
+      ],
+      affected_components: overrides?.affected_components ?? {
+        modules: [],
+        apis: [],
+        data_models: [],
+      },
+      technical_context: overrides?.technical_context,
+      status: overrides?.status ?? "draft",
+      generated_at: overrides?.generated_at ?? Date.now(),
+      updated_at: overrides?.updated_at,
+    });
+  });
+}

@@ -12,7 +12,9 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import { MessageBubble, MessageList } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { ImpactAnalysisCard } from "@/components/chat/ImpactAnalysisCard";
+import { UserStoriesCard } from "@/components/chat/UserStoriesCard";
 import type { ImpactAnalysis } from "../../../../../../../convex/chat/impactSchema";
+import type { UserStory } from "../../../../../../../convex/chat/storySchema";
 import {
   ChatComposer,
   type PendingMessage,
@@ -54,11 +56,15 @@ export default function ThreadViewPage() {
   const [impactResults, setImpactResults] = useState<
     Array<{ analysis: ImpactAnalysis; grounded: boolean }>
   >([]);
+  const [storyResults, setStoryResults] = useState<
+    Array<{ stories: UserStory[]; grounded: boolean; generationNote?: string }>
+  >([]);
 
   if (prevThreadId !== params.threadId) {
     setPrevThreadId(params.threadId);
     setPendingMessages([]);
     setImpactResults([]);
+    setStoryResults([]);
   }
 
   const activeThreadIdRef = useRef(params.threadId);
@@ -110,6 +116,7 @@ export default function ThreadViewPage() {
     showBelowListTyping,
     streamingTextLen,
     impactResults.length,
+    storyResults.length,
   ]);
 
   const handlePending = (msg: PendingMessage) => {
@@ -129,6 +136,15 @@ export default function ThreadViewPage() {
   const handleImpactResult = (analysis: ImpactAnalysis, grounded: boolean) => {
     if (activeThreadIdRef.current !== params.threadId) return;
     setImpactResults((prev) => [...prev, { analysis, grounded }]);
+  };
+
+  const handleStoriesResult = (
+    stories: UserStory[],
+    grounded: boolean,
+    generationNote?: string,
+  ) => {
+    if (activeThreadIdRef.current !== params.threadId) return;
+    setStoryResults((prev) => [...prev, { stories, grounded, generationNote }]);
   };
 
   if (thread === undefined) {
@@ -218,6 +234,14 @@ export default function ThreadViewPage() {
                 grounded={item.grounded}
               />
             ))}
+            {storyResults.map((item, i) => (
+              <UserStoriesCard
+                key={`stories-${i}`}
+                stories={item.stories}
+                grounded={item.grounded}
+                generationNote={item.generationNote}
+              />
+            ))}
             {showBelowListTyping && (
               <div className="flex justify-start mt-3">
                 <TypingIndicator />
@@ -247,6 +271,7 @@ export default function ThreadViewPage() {
           onRollback={handleRollback}
           onSendingChange={setComposerSending}
           onImpactResult={handleImpactResult}
+          onStoriesResult={handleStoriesResult}
         />
       </div>
     </div>

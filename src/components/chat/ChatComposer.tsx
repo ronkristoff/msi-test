@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { useErrorLogger } from "@/lib/error-logger";
 import type { ImpactAnalysis } from "../../../convex/chat/impactSchema";
+import type { UserStory } from "../../../convex/chat/storySchema";
 
 export type PendingMessage = {
   role: "user";
@@ -17,7 +18,7 @@ export type PendingMessage = {
   pendingId: string;
 };
 
-type ChatMode = "chat" | "impact";
+type ChatMode = "chat" | "impact" | "stories";
 
 type ChatComposerProps = {
   threadId: string;
@@ -27,6 +28,7 @@ type ChatComposerProps = {
   onRollback: (pendingId: string) => void;
   onSendingChange: (sending: boolean) => void;
   onImpactResult: (analysis: ImpactAnalysis, grounded: boolean) => void;
+  onStoriesResult: (stories: UserStory[], grounded: boolean, generationNote?: string) => void;
 };
 
 const INPUT_BASE =
@@ -47,9 +49,11 @@ export function ChatComposer({
   onRollback,
   onSendingChange,
   onImpactResult,
+  onStoriesResult,
 }: ChatComposerProps) {
   const streamMessage = useAction(api.chat.chatActions.streamMessage);
   const analyzeImpact = useAction(api.chat.impactActions.analyzeImpact);
+  const generateStories = useAction(api.chat.storyActions.generateStories);
   const { logError } = useErrorLogger();
 
   const [prompt, setPrompt] = useState("");
@@ -67,7 +71,9 @@ export function ChatComposer({
   const placeholder =
     mode === "impact"
       ? "Paste a feature request to analyze its impact…"
-      : "Ask about this project's codebase…";
+      : mode === "stories"
+        ? "Describe a feature to generate user stories…"
+        : "Ask about this project's codebase…";
 
   useEffect(() => {
     onSendingChange(isSending);
@@ -104,6 +110,28 @@ export function ChatComposer({
         }
         onSent();
         setMode("chat");
+      } else if (activeMode === "stories") {
+        const result = await generateStories({
+          threadId,
+          featureRequest: saved,
+        });
+        if (result?.stories && Array.isArray(result.stories) && result.stories.length > 0) {
+          onStoriesResult(
+            result.stories,
+            result.grounded ?? false,
+            result.generationNote,
+          );
+        } else {
+          const msg = "Story generation returned no stories. Please retry.";
+          setError(msg);
+          onError(msg);
+          logError(msg, {
+            severity: "error",
+            context: { source: "ChatComposer.handleSubmit.stories", result },
+          });
+        }
+        onSent();
+        if (mode === activeMode) setMode("chat");
       } else {
         await streamMessage({ threadId, prompt: saved });
         onSent();
@@ -113,7 +141,7 @@ export function ChatComposer({
       const msg = stripConvexError(err);
       setError(msg);
       setPrompt(saved);
-      setMode("chat");
+      if (mode === activeMode) setMode("chat");
       onError(msg);
       if (lastPendingIdRef.current !== null) {
         onRollback(lastPendingIdRef.current);
@@ -162,7 +190,8 @@ export function ChatComposer({
           type="button"
           onClick={() => setMode("chat")}
           aria-pressed={mode === "chat"}
-          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
+          disabled={isSending}
+          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             mode === "chat"
               ? "bg-[var(--accent)] text-[var(--accent-on)]"
               : "text-[var(--muted)] hover:text-[var(--fg)]"
@@ -174,13 +203,27 @@ export function ChatComposer({
           type="button"
           onClick={() => setMode("impact")}
           aria-pressed={mode === "impact"}
-          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
+          disabled={isSending}
+          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             mode === "impact"
               ? "bg-[var(--accent)] text-[var(--accent-on)]"
               : "text-[var(--muted)] hover:text-[var(--fg)]"
           }`}
         >
           Analyze Impact
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("stories")}
+          aria-pressed={mode === "stories"}
+          disabled={isSending}
+          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === "stories"
+              ? "bg-[var(--accent)] text-[var(--accent-on)]"
+              : "text-[var(--muted)] hover:text-[var(--fg)]"
+          }`}
+        >
+          Generate Stories
         </button>
       </div>
       <label htmlFor="chat-input" className="sr-only">
@@ -198,6 +241,7 @@ export function ChatComposer({
         rows={2}
         className={INPUT_BASE}
         aria-label="Type your message"
+        disabled={isSending}
       />
       <div className="flex justify-end">
         <Button onClick={submitSafely} disabled={!canSubmit}>

@@ -2,15 +2,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { mockStreamMessage, mockAnalyzeImpact, mockLogError } = vi.hoisted(() => ({
+const { mockStreamMessage, mockAnalyzeImpact, mockGenerateStories, mockLogError } = vi.hoisted(() => ({
   mockStreamMessage: vi.fn(),
   mockAnalyzeImpact: vi.fn(),
+  mockGenerateStories: vi.fn(),
   mockLogError: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
   useAction: vi.fn((ref: string) => {
     if (ref === "chat.impactActions.analyzeImpact") return mockAnalyzeImpact;
+    if (ref === "chat.storyActions.generateStories") return mockGenerateStories;
     return mockStreamMessage;
   }),
 }));
@@ -23,6 +25,9 @@ vi.mock("@/lib/convex", () => ({
       },
       impactActions: {
         analyzeImpact: "chat.impactActions.analyzeImpact",
+      },
+      storyActions: {
+        generateStories: "chat.storyActions.generateStories",
       },
     },
   },
@@ -41,6 +46,7 @@ const onError = vi.fn<(msg: string) => void>();
 const onRollback = vi.fn<(pendingId: string) => void>();
 const onSendingChange = vi.fn<(sending: boolean) => void>();
 const onImpactResult = vi.fn<(analysis: import("../../../convex/chat/impactSchema").ImpactAnalysis, grounded: boolean) => void>();
+const onStoriesResult = vi.fn<(stories: import("../../../convex/chat/storySchema").UserStory[], grounded: boolean) => void>();
 
 function setup() {
   return render(
@@ -52,6 +58,7 @@ function setup() {
       onRollback={onRollback}
       onSendingChange={onSendingChange}
       onImpactResult={onImpactResult}
+      onStoriesResult={onStoriesResult}
     />,
   );
 }
@@ -302,6 +309,144 @@ describe("ChatComposer: mode toggle (impact analysis)", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
         /Knowledge Base is not ready/,
+      );
+    });
+    expect(textarea).toHaveValue("Add OAuth");
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText(/Ask about this project/i),
+      ).toBeInTheDocument();
+    });
+    expect(mockLogError).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ChatComposer: mode toggle (generate stories)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStreamMessage.mockReset();
+    mockStreamMessage.mockResolvedValue(undefined);
+    mockAnalyzeImpact.mockReset();
+    mockGenerateStories.mockReset();
+    mockGenerateStories.mockResolvedValue({
+      threadId: THREAD_ID,
+      stories: [
+        {
+          title: "User logs in with OAuth",
+          user_story: {
+            as_a: "an authenticated user",
+            i_want: "to log in via Google OAuth",
+            so_that: "I do not need a new password",
+          },
+          acceptance_criteria: [
+            "Given a valid account, When the user clicks Login, Then they reach the dashboard.",
+          ],
+          affected_components: {
+            modules: ["auth"],
+            apis: [],
+            data_models: [],
+          },
+        },
+      ],
+      generationNote: "Decomposed into one story.",
+      grounded: true,
+    });
+  });
+
+  it("renders mode toggle with Chat, Analyze Impact, AND Generate Stories options", () => {
+    setup();
+    expect(screen.getByRole("button", { name: /chat/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /analyze impact/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /generate stories/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("changes placeholder when Generate Stories mode is activated", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /generate stories/i }));
+    expect(
+      screen.getByPlaceholderText(/Describe a feature to generate user stories/i),
+    ).toBeInTheDocument();
+  });
+
+  it("calls generateStories (not streamMessage or analyzeImpact) in stories mode", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /generate stories/i }));
+    await user.type(
+      screen.getByPlaceholderText(/Describe a feature to generate user stories/i),
+      "Add OAuth login",
+    );
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(mockGenerateStories).toHaveBeenCalledWith({
+        threadId: THREAD_ID,
+        featureRequest: "Add OAuth login",
+      });
+    });
+    expect(mockStreamMessage).not.toHaveBeenCalled();
+    expect(mockAnalyzeImpact).not.toHaveBeenCalled();
+  });
+
+  it("fires onStoriesResult with stories + grounded after stories mode send", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /generate stories/i }));
+    await user.type(
+      screen.getByPlaceholderText(/Describe a feature to generate user stories/i),
+      "Add dark mode",
+    );
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(onStoriesResult).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ title: "User logs in with OAuth" }),
+        ]),
+        true,
+        "Decomposed into one story.",
+      );
+    });
+  });
+
+  it("resets mode to Chat after successful stories generation", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /generate stories/i }));
+    await user.type(
+      screen.getByPlaceholderText(/Describe a feature to generate user stories/i),
+      "Add feature X",
+    );
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText(/Ask about this project/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("restores prompt, resets mode to chat, and logs error on stories mode error", async () => {
+    const user = userEvent.setup();
+    mockGenerateStories.mockRejectedValue(
+      new Error("Uncaught ConvexError: Story generation failed: model not available."),
+    );
+    setup();
+    await user.click(screen.getByRole("button", { name: /generate stories/i }));
+    const textarea = screen.getByPlaceholderText(
+      /Describe a feature to generate user stories/i,
+    );
+    await user.type(textarea, "Add OAuth");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /Story generation failed/,
       );
     });
     expect(textarea).toHaveValue("Add OAuth");
