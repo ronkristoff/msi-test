@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -9,6 +10,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { MessageBubble, MessageList } from "@/components/chat/MessageBubble";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
+import {
+  ChatComposer,
+  type PendingMessage,
+} from "@/components/chat/ChatComposer";
 
 type UIMessageLike = {
   role: string;
@@ -17,6 +23,15 @@ type UIMessageLike = {
   status: string;
   parts: { type: string; text?: string }[];
 };
+
+const SCROLL_NEAR_BOTTOM_THRESHOLD_PX = 100;
+
+function isActive(m: UIMessageLike): boolean {
+  return (
+    m.role === "assistant" &&
+    (m.status === "streaming" || m.status === "pending")
+  );
+}
 
 export default function ThreadViewPage() {
   const params = useParams<{ id: string; threadId: string }>();
@@ -28,8 +43,76 @@ export default function ThreadViewPage() {
   const { results, status } = useUIMessages(
     api.chat.queries.listThreadMessages,
     thread ? { threadId: params.threadId } : "skip",
-    { initialNumItems: 50 },
+    { initialNumItems: 50, stream: true },
   );
+
+  const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
+  const [composerSending, setComposerSending] = useState(false);
+  const [prevThreadId, setPrevThreadId] = useState(params.threadId);
+
+  if (prevThreadId !== params.threadId) {
+    setPrevThreadId(params.threadId);
+    setPendingMessages([]);
+  }
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const subscriptionResults = results as UIMessageLike[];
+  const hasActiveBubble = subscriptionResults.some(isActive);
+  const hasEmptyActiveBubble = subscriptionResults.some(
+    (m: UIMessageLike) =>
+      isActive(m) && m.parts.every((p) => p.type !== "text" || !p.text),
+  );
+  const showBelowListTyping =
+    (composerSending || hasActiveBubble) && !hasEmptyActiveBubble;
+  const streamingTextLen = subscriptionResults
+    .filter(isActive)
+    .reduce((sum, m) => sum + (m.parts[0]?.text?.length ?? 0), 0);
+
+  const deliveredUserTexts = new Set(
+    subscriptionResults
+      .filter((m) => m.role === "user")
+      .map((m) => m.parts[0]?.text ?? ""),
+  );
+  const visiblePending = pendingMessages.filter(
+    (m) => !deliveredUserTexts.has(m.parts[0]?.text ?? ""),
+  );
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isNearBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight <
+      SCROLL_NEAR_BOTTOM_THRESHOLD_PX;
+  };
+
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [
+    results.length,
+    visiblePending.length,
+    hasActiveBubble,
+    showBelowListTyping,
+    streamingTextLen,
+  ]);
+
+  const handlePending = (msg: PendingMessage) => {
+    setPendingMessages((prev) => [...prev, msg]);
+  };
+
+  const handleSent = () => {
+    setPendingMessages([]);
+  };
+
+  const handleRollback = (pendingId: string) => {
+    setPendingMessages((prev) => prev.filter((m) => m.pendingId !== pendingId));
+  };
+
+  const handleError = () => {};
 
   if (thread === undefined) {
     return <PageSkeleton />;
@@ -60,13 +143,16 @@ export default function ThreadViewPage() {
     return <PageSkeleton />;
   }
 
-  const messages = [...results].sort(
+  const subscriptionMessages = [...subscriptionResults].sort(
     (a: UIMessageLike, b: UIMessageLike) =>
       a.order - b.order || a.stepOrder - b.stepOrder,
-  ) as UIMessageLike[];
+  );
+
+  const hasMessages =
+    subscriptionMessages.length > 0 || visiblePending.length > 0;
 
   return (
-    <div className="max-w-[1080px]">
+    <div className="max-w-[1080px] flex flex-col h-full">
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <h2 className="font-[var(--font-display)] text-2xl font-bold text-[var(--fg)] truncate">
@@ -83,27 +169,61 @@ export default function ThreadViewPage() {
         </div>
       </div>
 
-      {messages.length === 0 ? (
-        <EmptyState
-          icon={
-            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-            </svg>
-          }
-          title="No messages"
-          description="This conversation has no messages yet."
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto min-h-[300px]"
+      >
+        {hasMessages ? (
+          <>
+            <MessageList>
+              {subscriptionMessages.map((msg, i) => (
+                <MessageBubble
+                  key={`sub-${msg.order}-${msg.stepOrder}-${i}`}
+                  role={msg.role}
+                  parts={msg.parts}
+                  isStreaming={isActive(msg)}
+                />
+              ))}
+              {visiblePending.map((msg) => (
+                <MessageBubble
+                  key={msg.pendingId}
+                  role={msg.role}
+                  parts={msg.parts}
+                  isStreaming={false}
+                />
+              ))}
+            </MessageList>
+            {showBelowListTyping && (
+              <div className="flex justify-start mt-3">
+                <TypingIndicator />
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        ) : (
+          <EmptyState
+            icon={
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+            }
+            title="No messages"
+            description="This conversation has no messages yet."
+          />
+        )}
+      </div>
+
+      <div className="mt-4">
+        <ChatComposer
+          threadId={params.threadId}
+          onPending={handlePending}
+          onSent={handleSent}
+          onError={handleError}
+          onRollback={handleRollback}
+          onSendingChange={setComposerSending}
         />
-      ) : (
-        <MessageList>
-          {messages.map((msg, i) => (
-            <MessageBubble
-              key={`${msg.order}-${msg.stepOrder}-${i}`}
-              role={msg.role}
-              parts={msg.parts}
-            />
-          ))}
-        </MessageList>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,22 +1,29 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { TypingIndicator } from "./TypingIndicator";
 
 export type MessagePart = { type: string; text?: string };
 
 type MessageBubbleProps = {
   role: string;
   parts: MessagePart[];
+  isStreaming?: boolean;
 };
 
-export function MessageBubble({ role, parts }: MessageBubbleProps) {
+export function MessageBubble({
+  role,
+  parts,
+  isStreaming = false,
+}: MessageBubbleProps) {
   const textParts = parts.filter(
     (p): p is { type: "text"; text: string } =>
-      p.type === "text" && typeof p.text === "string",
+      p.type === "text" && typeof p.text === "string" && p.text.length > 0,
   );
 
   const ariaLabel = role === "user" ? "Your message" : "AI response";
   const isUser = role === "user";
+  const showInlineTyping = isStreaming && textParts.length === 0;
 
   return (
     <div
@@ -42,6 +49,8 @@ export function MessageBubble({ role, parts }: MessageBubbleProps) {
               </span>
             ))}
           </div>
+        ) : showInlineTyping ? (
+          <TypingIndicator />
         ) : (
           <div className="text-sm italic opacity-60">[non-text content]</div>
         )}

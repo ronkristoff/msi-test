@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { useUIMessages } from "@convex-dev/agent/react";
+
+const { mockStreamMessage } = vi.hoisted(() => ({
+  mockStreamMessage: vi.fn(),
+}));
 
 let mockMessages: unknown[] = [];
 let mockStatus = "Loaded";
@@ -20,6 +24,7 @@ vi.mock("convex/react", () => ({
     if (key.includes("getThread")) return mockThread;
     return undefined;
   }),
+  useAction: vi.fn(() => mockStreamMessage),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -33,6 +38,9 @@ vi.mock("@/lib/convex", () => ({
         listThreadMessages: "chat.queries.listThreadMessages",
         getThread: "chat.queries.getThread",
       },
+      chatActions: {
+        streamMessage: "chat.chatActions.streamMessage",
+      },
     },
   },
 }));
@@ -43,7 +51,8 @@ vi.mock("@/lib/error-logger", () => ({
 
 async function setup() {
   const { default: ThreadViewPage } = await import("./page");
-  return render(<ThreadViewPage />);
+  const utils = render(<ThreadViewPage />);
+  return { ...utils, ThreadViewPage };
 }
 
 describe("ThreadViewPage", () => {
@@ -52,6 +61,8 @@ describe("ThreadViewPage", () => {
     mockMessages = [];
     mockStatus = "Loaded";
     mockThread = { title: "Auth Module Question", last_message_at: 5000 };
+    mockStreamMessage.mockReset();
+    mockStreamMessage.mockResolvedValue(undefined);
   });
 
   it("renders thread title from getThread query in the header", async () => {
@@ -176,5 +187,146 @@ describe("ThreadViewPage", () => {
       { threadId: "thread-abc" },
       expect.anything(),
     );
+  });
+
+  it("enables streaming via { stream: true } option in useUIMessages", async () => {
+    await setup();
+    expect(vi.mocked(useUIMessages)).toHaveBeenCalledWith(
+      "chat.queries.listThreadMessages",
+      { threadId: "thread-abc" },
+      expect.objectContaining({ stream: true, initialNumItems: 50 }),
+    );
+  });
+
+  it("renders the composer (ChatComposer) when thread is owned", async () => {
+    await setup();
+    expect(
+      screen.getByPlaceholderText(/Ask about this project/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
+  });
+
+  it("does NOT render the composer when thread is null (not found)", async () => {
+    mockThread = null;
+    await setup();
+    expect(
+      screen.queryByPlaceholderText(/Ask about this project/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does NOT render the composer while thread is still loading (undefined)", async () => {
+    mockThread = undefined;
+    await setup();
+    expect(
+      screen.queryByPlaceholderText(/Ask about this project/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the empty state WITH the composer (first-message UX)", async () => {
+    mockMessages = [];
+    await setup();
+    expect(
+      screen.getByText("This conversation has no messages yet."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Ask about this project/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders typing indicator when an assistant message is streaming", async () => {
+    mockMessages = [
+      {
+        role: "user",
+        order: 0,
+        stepOrder: 0,
+        status: "success",
+        parts: [{ type: "text", text: "Hello" }],
+      },
+      {
+        role: "assistant",
+        order: 1,
+        stepOrder: 0,
+        status: "streaming",
+        parts: [{ type: "text", text: "Hi" }],
+      },
+    ];
+    await setup();
+    expect(
+      screen.getByLabelText("Assistant is typing"),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT render typing indicator when no message is streaming", async () => {
+    mockMessages = [
+      {
+        role: "user",
+        order: 0,
+        stepOrder: 0,
+        status: "success",
+        parts: [{ type: "text", text: "Hello" }],
+      },
+      {
+        role: "assistant",
+        order: 1,
+        stepOrder: 0,
+        status: "success",
+        parts: [{ type: "text", text: "Hi there" }],
+      },
+    ];
+    await setup();
+    expect(
+      screen.queryByLabelText("Assistant is typing"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("optimistically renders the user's message after submit, before subscription delivers", async () => {
+    let _resolve: (v: unknown) => void = () => {};
+    mockStreamMessage.mockReturnValue(
+      new Promise((res) => {
+        _resolve = res;
+      }),
+    );
+    mockMessages = [];
+    await setup();
+    const textarea = screen.getByPlaceholderText(/Ask about this project/i);
+    fireEvent.change(textarea, { target: { value: "What about docs?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() =>
+      expect(screen.getByText("What about docs?")).toBeInTheDocument(),
+    );
+    _resolve(undefined);
+  });
+
+  it("clears the optimistic pending message once the subscription delivers the matching user message (no duplicate)", async () => {
+    mockMessages = [];
+    let _resolve: (v: unknown) => void = () => {};
+    mockStreamMessage.mockReturnValue(
+      new Promise((res) => {
+        _resolve = res;
+      }),
+    );
+    const { rerender, ThreadViewPage } = await setup();
+    const textarea = screen.getByPlaceholderText(/Ask about this project/i);
+    fireEvent.change(textarea, { target: { value: "dedup check" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() =>
+      expect(screen.getByText("dedup check")).toBeInTheDocument(),
+    );
+    // Subscription delivers the real user message while the action is still pending.
+    mockMessages = [
+      {
+        role: "user",
+        order: 0,
+        stepOrder: 0,
+        status: "success",
+        parts: [{ type: "text", text: "dedup check" }],
+      },
+    ];
+    rerender(<ThreadViewPage />);
+    // After the dedup effect runs, exactly one copy of the message remains.
+    await waitFor(() =>
+      expect(screen.getAllByText("dedup check").length).toBe(1),
+    );
+    _resolve(undefined);
   });
 });
