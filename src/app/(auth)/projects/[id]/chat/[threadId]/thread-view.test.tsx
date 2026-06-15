@@ -41,6 +41,9 @@ vi.mock("@/lib/convex", () => ({
       chatActions: {
         streamMessage: "chat.chatActions.streamMessage",
       },
+      impactActions: {
+        analyzeImpact: "chat.impactActions.analyzeImpact",
+      },
     },
   },
 }));

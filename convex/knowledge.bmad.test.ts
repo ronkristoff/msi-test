@@ -576,6 +576,84 @@ describe("bmad: getBmadMetadata public query", () => {
   });
 });
 
+describe("bmad: _getBmadMetadata internal query", () => {
+  it("returns all 4 types filtered by kb_id", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+
+    await seedBmadMetadata(t, workspaceId, kbId, [
+      { type: "prd_section", key: "Intro", content: "Intro content", source_path: "prd.md" },
+      { type: "adr", key: "ADR-0001", content: "Decision A", source_path: "a.md" },
+      { type: "adr", key: "ADR-0002", content: "Decision B", source_path: "b.md" },
+      { type: "convention", key: "Naming", content: "Use PascalCase", source_path: "pc.md" },
+      { type: "domain_term", key: "Workspace", content: "Top-level container", source_path: "CONTEXT.md" },
+    ]);
+
+    const { internal } = await import("./_generated/api");
+    const result = await t.query(internal.knowledge.internal._getBmadMetadata, {
+      knowledge_base_id: kbId as never,
+      workspace_id: workspaceId as never,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.prd_sections).toHaveLength(1);
+    expect(result!.adrs).toHaveLength(2);
+    expect(result!.conventions).toHaveLength(1);
+    expect(result!.domain_terms).toHaveLength(1);
+    expect(result!.adrs[0].key).toBe("ADR-0001");
+    expect(result!.adrs[1].key).toBe("ADR-0002");
+  });
+
+  it("returns empty arrays when KB has no BMAD metadata", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+
+    const { internal } = await import("./_generated/api");
+    const result = await t.query(internal.knowledge.internal._getBmadMetadata, {
+      knowledge_base_id: kbId as never,
+      workspace_id: workspaceId as never,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.prd_sections).toEqual([]);
+    expect(result!.adrs).toEqual([]);
+    expect(result!.conventions).toEqual([]);
+    expect(result!.domain_terms).toEqual([]);
+  });
+
+  it("returns null when workspace_id does not match KB workspace", async () => {
+    const t = convexTest(schema, modules);
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+    const kbId = await seedKnowledgeBase(t, workspaceId, projectId);
+
+    await seedBmadMetadata(t, workspaceId, kbId, [
+      { type: "adr", key: "ADR-0001", content: "Decision", source_path: "a.md" },
+    ]);
+
+    const otherWorkspaceId = await t.run(async (ctx) => {
+      const wsId = await ctx.db.insert("workspaces", {
+        name: "Other WS",
+        owner_id: "user2",
+        ai_config: { endpoint_url: "https://api.example.com", api_key: "key", model_name: "gpt-4" },
+      });
+      return wsId;
+    });
+
+    const { internal } = await import("./_generated/api");
+    const result = await t.query(internal.knowledge.internal._getBmadMetadata, {
+      knowledge_base_id: kbId as never,
+      workspace_id: otherWorkspaceId as never,
+    });
+
+    expect(result).toBeNull();
+  });
+});
+
 describe("bmad: detectAndParseBmad action registration", () => {
   it("detectAndParseBmad is registered as an internal action", async () => {
     const mod = await import("./knowledge/bmadActions");

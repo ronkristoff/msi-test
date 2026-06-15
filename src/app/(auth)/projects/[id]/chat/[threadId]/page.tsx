@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/Button";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { MessageBubble, MessageList } from "@/components/chat/MessageBubble";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
+import { ImpactAnalysisCard } from "@/components/chat/ImpactAnalysisCard";
+import type { ImpactAnalysis } from "../../../../../../../convex/chat/impactSchema";
 import {
   ChatComposer,
   type PendingMessage,
@@ -49,11 +51,20 @@ export default function ThreadViewPage() {
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [composerSending, setComposerSending] = useState(false);
   const [prevThreadId, setPrevThreadId] = useState(params.threadId);
+  const [impactResults, setImpactResults] = useState<
+    Array<{ analysis: ImpactAnalysis; grounded: boolean }>
+  >([]);
 
   if (prevThreadId !== params.threadId) {
     setPrevThreadId(params.threadId);
     setPendingMessages([]);
+    setImpactResults([]);
   }
+
+  const activeThreadIdRef = useRef(params.threadId);
+  useEffect(() => {
+    activeThreadIdRef.current = params.threadId;
+  }, [params.threadId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,6 +109,7 @@ export default function ThreadViewPage() {
     hasActiveBubble,
     showBelowListTyping,
     streamingTextLen,
+    impactResults.length,
   ]);
 
   const handlePending = (msg: PendingMessage) => {
@@ -113,6 +125,11 @@ export default function ThreadViewPage() {
   };
 
   const handleError = () => {};
+
+  const handleImpactResult = (analysis: ImpactAnalysis, grounded: boolean) => {
+    if (activeThreadIdRef.current !== params.threadId) return;
+    setImpactResults((prev) => [...prev, { analysis, grounded }]);
+  };
 
   if (thread === undefined) {
     return <PageSkeleton />;
@@ -194,6 +211,13 @@ export default function ThreadViewPage() {
                 />
               ))}
             </MessageList>
+            {impactResults.map((item, i) => (
+              <ImpactAnalysisCard
+                key={`impact-${i}`}
+                analysis={item.analysis}
+                grounded={item.grounded}
+              />
+            ))}
             {showBelowListTyping && (
               <div className="flex justify-start mt-3">
                 <TypingIndicator />
@@ -222,6 +246,7 @@ export default function ThreadViewPage() {
           onError={handleError}
           onRollback={handleRollback}
           onSendingChange={setComposerSending}
+          onImpactResult={handleImpactResult}
         />
       </div>
     </div>

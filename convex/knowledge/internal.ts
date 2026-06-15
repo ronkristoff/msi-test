@@ -577,6 +577,47 @@ export const _getBmadMetadataForExtraction = internalQuery({
   },
 });
 
+export const _getBmadMetadata = internalQuery({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+    workspace_id: v.id("workspaces"),
+  },
+  handler: async (ctx, args) => {
+    const kb = await ctx.db.get(args.knowledge_base_id);
+    if (!kb) return null;
+    if (kb.workspace_id !== args.workspace_id) return null;
+
+    const [prd_sections, adrs, conventions, domain_terms] = await Promise.all([
+      ctx.db
+        .query("kb_bmad_metadata")
+        .withIndex("by_kb_id_and_type", (q) =>
+          q.eq("kb_id", args.knowledge_base_id).eq("type", "prd_section"),
+        )
+        .collect(),
+      ctx.db
+        .query("kb_bmad_metadata")
+        .withIndex("by_kb_id_and_type", (q) =>
+          q.eq("kb_id", args.knowledge_base_id).eq("type", "adr"),
+        )
+        .collect(),
+      ctx.db
+        .query("kb_bmad_metadata")
+        .withIndex("by_kb_id_and_type", (q) =>
+          q.eq("kb_id", args.knowledge_base_id).eq("type", "convention"),
+        )
+        .collect(),
+      ctx.db
+        .query("kb_bmad_metadata")
+        .withIndex("by_kb_id_and_type", (q) =>
+          q.eq("kb_id", args.knowledge_base_id).eq("type", "domain_term"),
+        )
+        .collect(),
+    ]);
+
+    return { prd_sections, adrs, conventions, domain_terms };
+  },
+});
+
 export const _storeBaselineRd = internalMutation({
   args: {
     project_id: v.id("projects"),

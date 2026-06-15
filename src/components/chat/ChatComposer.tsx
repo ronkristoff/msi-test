@@ -6,6 +6,7 @@ import { api } from "@/lib/convex";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { useErrorLogger } from "@/lib/error-logger";
+import type { ImpactAnalysis } from "../../../convex/chat/impactSchema";
 
 export type PendingMessage = {
   role: "user";
@@ -16,6 +17,8 @@ export type PendingMessage = {
   pendingId: string;
 };
 
+type ChatMode = "chat" | "impact";
+
 type ChatComposerProps = {
   threadId: string;
   onPending: (msg: PendingMessage) => void;
@@ -23,6 +26,7 @@ type ChatComposerProps = {
   onError: (msg: string) => void;
   onRollback: (pendingId: string) => void;
   onSendingChange: (sending: boolean) => void;
+  onImpactResult: (analysis: ImpactAnalysis, grounded: boolean) => void;
 };
 
 const INPUT_BASE =
@@ -42,13 +46,16 @@ export function ChatComposer({
   onError,
   onRollback,
   onSendingChange,
+  onImpactResult,
 }: ChatComposerProps) {
   const streamMessage = useAction(api.chat.chatActions.streamMessage);
+  const analyzeImpact = useAction(api.chat.impactActions.analyzeImpact);
   const { logError } = useErrorLogger();
 
   const [prompt, setPrompt] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ChatMode>("chat");
 
   const isSendingRef = useRef(false);
   const pendingIdRef = useRef(0);
@@ -56,6 +63,11 @@ export function ChatComposer({
 
   const trimmed = prompt.trim();
   const canSubmit = trimmed.length > 0 && !isSending;
+
+  const placeholder =
+    mode === "impact"
+      ? "Paste a feature request to analyze its impact…"
+      : "Ask about this project's codebase…";
 
   useEffect(() => {
     onSendingChange(isSending);
@@ -78,14 +90,30 @@ export function ChatComposer({
       stepOrder: 0,
       pendingId,
     });
+
+    const activeMode = mode;
+
     try {
-      await streamMessage({ threadId, prompt: saved });
-      onSent();
+      if (activeMode === "impact") {
+        const result = await analyzeImpact({
+          threadId,
+          featureRequest: saved,
+        });
+        if (result?.analysis) {
+          onImpactResult(result.analysis, result.grounded ?? true);
+        }
+        onSent();
+        setMode("chat");
+      } else {
+        await streamMessage({ threadId, prompt: saved });
+        onSent();
+      }
       lastPendingIdRef.current = null;
     } catch (err) {
       const msg = stripConvexError(err);
       setError(msg);
       setPrompt(saved);
+      setMode("chat");
       onError(msg);
       if (lastPendingIdRef.current !== null) {
         onRollback(lastPendingIdRef.current);
@@ -125,6 +153,36 @@ export function ChatComposer({
           {error}
         </Alert>
       )}
+      <div
+        role="group"
+        aria-label="Message mode"
+        className="flex gap-1 p-1 rounded-[var(--radius-sm)] bg-[var(--bg)] border border-[var(--border)] w-fit"
+      >
+        <button
+          type="button"
+          onClick={() => setMode("chat")}
+          aria-pressed={mode === "chat"}
+          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
+            mode === "chat"
+              ? "bg-[var(--accent)] text-[var(--accent-on)]"
+              : "text-[var(--muted)] hover:text-[var(--fg)]"
+          }`}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("impact")}
+          aria-pressed={mode === "impact"}
+          className={`px-3 py-1 text-xs font-medium rounded-[var(--radius-sm)] transition-colors ${
+            mode === "impact"
+              ? "bg-[var(--accent)] text-[var(--accent-on)]"
+              : "text-[var(--muted)] hover:text-[var(--fg)]"
+          }`}
+        >
+          Analyze Impact
+        </button>
+      </div>
       <label htmlFor="chat-input" className="sr-only">
         Message
       </label>
@@ -136,7 +194,7 @@ export function ChatComposer({
           setPrompt(e.target.value);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Ask about this project's codebase…"
+        placeholder={placeholder}
         rows={2}
         className={INPUT_BASE}
         aria-label="Type your message"
