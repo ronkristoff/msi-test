@@ -191,7 +191,7 @@ export const clearRagNamespace = internalAction({
     do {
       const result = await rag.list(ctx, {
         namespaceId: ns.namespaceId,
-        paginationOpts: { cursor: cursor ?? undefined, numItems: 100 },
+        paginationOpts: { cursor, numItems: 100 },
       });
 
       for (const entry of result.page) {

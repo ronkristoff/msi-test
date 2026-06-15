@@ -60,7 +60,7 @@ export const detectAndParseBmad = internalAction({
 
       if (file.size !== undefined && file.size > MAX_BMAD_FILE_SIZE) continue;
 
-      let content: string;
+      let content: string | null;
       try {
         content = await fetchFileContent(
           owner,

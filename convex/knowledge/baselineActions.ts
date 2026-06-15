@@ -3,6 +3,7 @@
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { generateObject } from "ai";
 import { getWorkspaceModel } from "../ai/model";
@@ -41,7 +42,7 @@ export const generateBaselineRd = internalAction({
     knowledge_base_id: v.id("knowledge_bases"),
     workspace_id: v.id("workspaces"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ baselineRdId: Id<"baseline_rds">; version: number }> => {
     const kb = await ctx.runQuery(
       internal.knowledge.internal._getKbForBaselineRd,
       { knowledge_base_id: args.knowledge_base_id },
@@ -152,7 +153,7 @@ export const generateBaselineRdWithLogging = internalAction({
     knowledge_base_id: v.id("knowledge_bases"),
     workspace_id: v.id("workspaces"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ baselineRdId: Id<"baseline_rds"> | null; version: number; error?: string }> => {
     try {
       return await ctx.runAction(
         internal.knowledge.baselineActions.generateBaselineRd,
