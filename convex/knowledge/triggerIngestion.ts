@@ -5,19 +5,28 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { start } from "@convex-dev/workflow";
 import { ConvexError } from "convex/values";
-import { requireAuth, getOwnerId } from "../lib/requireAuth";
+import type { Id } from "../_generated/dataModel";
+import type { GenerateDriftReportWithLoggingResult } from "./driftActions";
+
+type IngestionTriggerResult = {
+  knowledgeBaseId: Id<"knowledge_bases">;
+  workflowId: string;
+};
+
+type BaselineRdResult = {
+  baselineRdId: Id<"baseline_rds"> | null;
+  version: number;
+  error?: string;
+};
 
 export const triggerIngestion = action({
   args: {
     project_id: v.id("projects"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
-    const userId = getOwnerId(user);
-
+  handler: async (ctx, args): Promise<IngestionTriggerResult> => {
     const membership = await ctx.runQuery(
-      internal.knowledge.internal._getMembershipForUser,
-      { user_id: userId },
+      internal.knowledge.internal._getAuthMembership,
+      {},
     );
     if (!membership) {
       throw new ConvexError("Not authenticated");
@@ -90,13 +99,10 @@ export const resyncKnowledgeBase = action({
   args: {
     project_id: v.id("projects"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
-    const userId = getOwnerId(user);
-
+  handler: async (ctx, args): Promise<IngestionTriggerResult> => {
     const membership = await ctx.runQuery(
-      internal.knowledge.internal._getMembershipForUser,
-      { user_id: userId },
+      internal.knowledge.internal._getAuthMembership,
+      {},
     );
     if (!membership) {
       throw new ConvexError("Not authenticated");
@@ -198,13 +204,10 @@ export const triggerBaselineRd = action({
   args: {
     project_id: v.id("projects"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
-    const userId = getOwnerId(user);
-
+  handler: async (ctx, args): Promise<BaselineRdResult> => {
     const membership = await ctx.runQuery(
-      internal.knowledge.internal._getMembershipForUser,
-      { user_id: userId },
+      internal.knowledge.internal._getAuthMembership,
+      {},
     );
     if (!membership) {
       throw new ConvexError("Not authenticated");
@@ -259,13 +262,10 @@ export const triggerDriftReport = action({
   args: {
     project_id: v.id("projects"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
-    const userId = getOwnerId(user);
-
+  handler: async (ctx, args): Promise<GenerateDriftReportWithLoggingResult> => {
     const membership = await ctx.runQuery(
-      internal.knowledge.internal._getMembershipForUser,
-      { user_id: userId },
+      internal.knowledge.internal._getAuthMembership,
+      {},
     );
     if (!membership) {
       throw new ConvexError("Not authenticated");

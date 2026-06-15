@@ -523,5 +523,6 @@ export default defineSchema({
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"])
-    .index("by_project_id_and_status", ["project_id", "status"]),
+    .index("by_project_id_and_status", ["project_id", "status"])
+    .index("by_project_id_and_generated_at", ["project_id", "generated_at"]),
 });

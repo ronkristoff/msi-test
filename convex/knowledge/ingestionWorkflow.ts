@@ -5,6 +5,7 @@ import { mutation } from "../_generated/server";
 import { cancel } from "@convex-dev/workflow";
 import { getOwnedEntity } from "../lib/requireAuth";
 import { ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 
 export const ingestionWorkflow = defineWorkflow(components.workflow, {
   args: {
@@ -15,7 +16,6 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
   const project = await step.runQuery(
     internal.knowledge.internal._getProjectForIngestion,
     { project_id: args.project_id },
-    { retry: true },
   );
 
   if (!project || !project.repo_url || !project.encrypted_pat) {
@@ -31,7 +31,7 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
   const treeResult: {
     files: { path: string; size: number }[];
     truncated: boolean;
-    bmadFiles: { path: string; size: number }[];
+    bmadFiles: { path: string; size: number | undefined }[];
   } = await step.runAction(
     internal.knowledge.ingestionActions.decryptAndFetchTree,
     {
@@ -40,7 +40,6 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
       encrypted_pat: project.encrypted_pat,
       knowledge_base_id: args.knowledge_base_id,
     },
-    { retry: true },
   );
 
   const progressMsg = treeResult.truncated
@@ -144,7 +143,7 @@ export const ingestionWorkflow = defineWorkflow(components.workflow, {
   });
 
   const baselineResult: {
-    baselineRdId: string | null;
+    baselineRdId: Id<"baseline_rds"> | null;
     version: number;
     error?: string;
   } = await step.runAction(

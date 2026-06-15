@@ -20,6 +20,16 @@ import {
   getErrorMessage,
 } from "./embeddingActions";
 import { MAX_DRIFT_ITEMS } from "../lib/constraints";
+import type { Id } from "../_generated/dataModel";
+
+type GenerateDriftReportResult =
+  | { driftReportId: null; reason: "no_old_rd" }
+  | { driftReportId: null; reason: "no_baseline_rd" }
+  | { driftReportId: Id<"drift_reports">; version: number };
+
+export type GenerateDriftReportWithLoggingResult =
+  | GenerateDriftReportResult
+  | { driftReportId: null; version: number; error: string };
 
 export function buildDriftReportErrorMessage(error: unknown): string {
   const statusCode = getErrorStatusCode(error);
@@ -41,7 +51,7 @@ export const generateDriftReport = internalAction({
     workspace_id: v.id("workspaces"),
     baseline_rd_id: v.id("baseline_rds"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<GenerateDriftReportResult> => {
     const kb = await ctx.runQuery(
       internal.knowledge.internal._getKbForDriftReport,
       {
@@ -155,7 +165,7 @@ export const generateDriftReportWithLogging = internalAction({
     workspace_id: v.id("workspaces"),
     baseline_rd_id: v.id("baseline_rds"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<GenerateDriftReportWithLoggingResult> => {
     try {
       return await ctx.runAction(
         internal.knowledge.driftActions.generateDriftReport,

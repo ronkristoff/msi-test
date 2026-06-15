@@ -244,6 +244,9 @@ export default function ProjectDetailPage() {
                       Knowledge
                     </Button>
                   </Link>
+                  <Link href={`/projects/${project._id}/stories`}>
+                    <Button variant="secondary" size="sm">Stories</Button>
+                  </Link>
                   <Link href={`/projects/${project._id}/environments`}>
                     <Button variant="secondary" size="sm">Environments</Button>
                   </Link>

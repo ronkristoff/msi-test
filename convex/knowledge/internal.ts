@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { getOwnedEntity } from "../lib/requireAuth";
+import { getOwnedEntity, requireAuth, getOwnerId } from "../lib/requireAuth";
 import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { MAX_EMBEDDING_CHUNKS, RD_ERROR_MESSAGE_MAX_LENGTH, DRIFT_ERROR_MESSAGE_MAX_LENGTH } from "../lib/constraints";
@@ -224,6 +224,26 @@ export const _getMembershipForUser = internalQuery({
     const membership = await ctx.db
       .query("workspace_members")
       .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+      .first();
+    if (!membership) return null;
+    const workspace = await ctx.db.get(membership.workspace_id);
+    if (!workspace) return null;
+    return {
+      user_id: membership.user_id,
+      workspace_id: workspace._id,
+      role: membership.role,
+    };
+  },
+});
+
+export const _getAuthMembership = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAuth(ctx);
+    const userId = getOwnerId(user);
+    const membership = await ctx.db
+      .query("workspace_members")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
       .first();
     if (!membership) return null;
     const workspace = await ctx.db.get(membership.workspace_id);
