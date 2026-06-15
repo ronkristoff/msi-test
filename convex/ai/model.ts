@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { Config } from "@convex-dev/agent";
 import { internalQuery } from "../_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
@@ -31,6 +31,11 @@ export const getWorkspaceAiConfigQuery = internalQuery({
 });
 
 export function getWorkspaceModel(config: AiConfig): AgentModel {
+  if (config.model_name.toLowerCase().endsWith("free")) {
+    throw new ConvexError(
+      `Model "${config.model_name}" is a free-tier model. Free-tier models are not permitted — configure a production model in workspace AI settings.`,
+    );
+  }
   const openai = createOpenAI({
     baseURL: config.endpoint_url,
     apiKey: config.api_key,
