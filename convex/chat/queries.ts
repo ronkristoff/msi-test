@@ -82,7 +82,7 @@ export const listThreads = query({
           const text = extractMessageText(lastMsg);
           return text === null ? null : truncatePreview(text);
         } catch (err) {
-          ctx.logger?.warn("chat.listThreads: preview fetch failed", {
+          console.warn("chat.listThreads: preview fetch failed", {
             threadId: t.thread_id,
             error: err instanceof Error ? err.message : String(err),
           });
