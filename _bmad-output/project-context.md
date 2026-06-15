@@ -97,12 +97,16 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 - **Commit format**: `<type>: <description>`. Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
 - **Local dev**: `pnpm dev` starts everything (Convex + Next.js + Runner). Don't run processes individually unless debugging.
-- **Pre-commit verification**: Run `pnpm lint` and `pnpm test:all` before committing. Never skip.
+- **Pre-commit verification**: Run `pnpm build`, `pnpm lint`, and `pnpm test:all` before committing. Never skip. (`pnpm build` passes with `typescript.ignoreBuildErrors: true` — pre-existing Convex TS2589/TS7022 deep-generic errors tracked via `pnpm typecheck`.)
 - **Runner isolation**: `runner/` is stateless. Never put API keys in Runner. Convex is source of truth for all state.
 - **Error logging**: UI code calls `logError()` from `src/lib/error-logger.ts` in all catch blocks. Never silently swallow errors.
 - **Convex error logging**: `convex/logs/mutations.ts` has `logError` (public, no auth, auto-truncates). Set up via `setGlobalErrorLogger()` + `initGlobalErrorHandlers()` in root layout.
 - **PR workflow**: Full commit history analysis → summary → test plan → push with `-u`.
 - **Review gate (mandatory before `sprint-status → done`)**: Every story's `done` transition requires (a) a `### Review Findings` section in the story file with the 3-layer review outcome, and (b) the story file's `Status:` header matching `sprint-status.yaml`. Story 2.3 shipped `done` in sprint-status but `review` in its file with no Review Findings section — a reviewed story looked unreviewed. This is an enforced gate, not an aspiration (Epic 2 retro action B1).
+- **Pre-review self-checklist (C1)**: Before moving a story to `review`, verify three recurring defect classes the adversarial review catches repeatedly: (a) **error-handling paths** — enumerate surfaced vs swallowed vs leaked for every try/catch; (b) **dual-write atomicity** — code writing to two systems (agent thread + join table, pending state + subscription) must be atomic or have defined reconciliation; (c) **test-asserts-on-content** — tests assert expected values (`.toBe(...)` / `.toMatch(/.../)`), not just types (`typeof === "string"` passes on `""`). Plus a spec-consistency sweep: re-read ACs ↔ Tasks ↔ Dev Notes ↔ "What NOT to Reinvent" and resolve contradictions. Goal: ≤5 review patches/story (Epic 3 averaged ~10).
+- **Async-timing verification (C2)**: Any spec claim of the form "the window is <Xms" or "this resolves before Y" must cite an installed-type contract (`.d.ts` path + line) OR be marked `UNVERIFIED` and tested before the spec is locked. Story 3.4 shipped a CRITICAL duplicate-message bug because a dev-note asserted a "<500ms" dedup window that was empirically 10–30s.
+- **Spike API-citation gate (C4)**: Every spike decision asserting an external-library API shape must cite the installed `.d.ts` path + line. Spikes asserting without citation get a verification task at the top of the first consuming story. The streaming spike's "thread metadata via `updateThreadMetadata`" was impossible in `@convex-dev/agent` v0.6.1 — `ThreadDoc` has no `metadata` field.
+- **`*-free` model guard enforced (C5)**: `getWorkspaceModel` (`convex/ai/model.ts`) throws `ConvexError` on model names ending in "free" (case-insensitive). Every agent factory inherits the guard. Third-epic carry-forward (B4), resolved post-Epic 3 retro.
 
 ### Critical Don't-Miss Rules
 

@@ -1,11 +1,11 @@
-## Epic 3 Triage (2026-06-14, from Epic 2 retrospective)
+## Epic 3 Triage (2026-06-14, from Epic 2 retrospective) — ALL RESOLVED
 
-Items promoted to blocking / prerequisite status for Epic 3 (AI Chat). Full detail in the per-review sections below; this section is the index.
+All items promoted for Epic 3 have been resolved during Epic 3 implementation or the post-Epic 3 retro. Retained for audit trail.
 
-- **[BLOCKING — Story 3.2 prerequisite] `searchProjectRag` has no rate limiting** (line 16). Chat is the highest-volume AI surface — every message embeds the query via the workspace's API key. `@convex-dev/rate-limiter` (^0.3.2) is already installed but unused; `aiRateLimit.ts` is only a delay/retry helper. Wire the rate-limiter component to `searchProjectRag` before Story 3.2 ships.
-- **[Story 3.2] `_getProjectWorkspaceForSearch` uses `.first()` without ordering** (line 17). Same search path; fix alongside the rate-limit work.
-- **[Story 3.1 + 3.2] IDOR / cross-project scoping** (line 36 pattern + retro B3). `searchProjectRag` resolves the workspace from `project_id` via an internal query with no caller-membership check. Chat endpoints (thread creation, RAG namespace scoping) must enforce `project.workspace_id !== membership.workspace_id` from the first commit. Worst case is cross-project data leak via RAG.
-- **[Epic 3] No `*-free` model guard** (line 71, retro B4 promoted to High). Chat amplifies cost/quality cliffs faster than batch generation.
+- **✅ RESOLVED (Story 3.2 AC5)** `searchProjectRag` rate limiting — `ragSearchPerWorkspace` wired (20/min/workspace via `@convex-dev/rate-limiter`).
+- **✅ RESOLVED (Story 3.2 AC6)** `_getProjectWorkspaceForSearch` `.first()` ordering — pre-satisfied in code (`.order("desc").first()`); test added.
+- **✅ RESOLVED (Story 3.2 AC7)** IDOR / cross-project scoping — `getOptionalOwnedEntity` already enforces membership; stale deferred-work comment de-staled.
+- **✅ RESOLVED (post-Epic 3 retro, C5)** No `*-free` model guard — enforced in `getWorkspaceModel` (`convex/ai/model.ts`); all agent factories inherit automatically.
 
 Items accepted at current scale (no action for Epic 3): the O(n²) read-amplification items, the `.first()` ordering on non-search paths, the test-quality gaps.
 
@@ -24,8 +24,8 @@ Items accepted at current scale (no action for Epic 3): the O(n²) read-amplific
 
 ## Deferred from: code review of 1-4-vector-embeddings-rag-storage (2026-06-13, re-review)
 
-- **[PROMOTED — Story 3.2 prerequisite, Epic 2 retro]** searchProjectRag has no rate limiting — cost abuse vector [convex/knowledge/queries.ts] — Every search call embeds the query via the workspace's API key. No per-user throttle. Malicious client can incur unbounded embedding costs. `@convex-dev/rate-limiter` (^0.3.2) is installed but unused — wire it here before Epic 3 chat ships. Cross-cutting concern not specific to this story's ACs; follows existing query pattern in the codebase.
-- **[PROMOTED — Story 3.2, same search path]** _getProjectWorkspaceForSearch uses .first() without ordering [convex/knowledge/queries.ts:107-110] — If a project has multiple knowledge bases (from re-ingestion), .first() returns oldest by default. Should use .order("desc").first() like getIngestionProgress does. Multiple KBs per project is story 1-8 scope.
+- **[✅ RESOLVED — Story 3.2 AC5]** searchProjectRag rate limiting — `ragSearchPerWorkspace` wired (20/min/workspace via `@convex-dev/rate-limiter`). Cost abuse vector closed.
+- **[✅ RESOLVED — Story 3.2 AC6]** _getProjectWorkspaceForSearch .first() ordering — pre-satisfied in code (`.order("desc").first()`); test added in Story 3.2.
 - Sequential embedding, not batched — EMBEDDING_BATCH_SIZE only controls progress [convex/knowledge/embeddingActions.ts] — Each rag.add() is awaited sequentially. The RAG component likely supports batch insertion. For 10k chunks this is 10k sequential awaits. Performance concern only, not correctness.
 - Separate mutations for ready+synced — partial failure [convex/knowledge/ingestionWorkflow.ts] — "ready" status and last_synced_at are in two separate step.runMutation calls. If first succeeds but second fails, workflow retries and re-runs embedChunks from scratch. Cost concern; key-based upsert ensures correctness.
 - 429 ignores Retry-After header [convex/knowledge/embeddingActions.ts:78] — Uses fixed 30s instead of server-provided backoff. Requires extracting Retry-After from AI SDK error responseHeaders. Blocked by the 429 statusCode property fix (patch finding #2).
@@ -79,7 +79,7 @@ Items accepted at current scale (no action for Epic 3): the O(n²) read-amplific
 
 ## Deferred from: code review of 2-1-baseline-rd-generation (2026-06-14)
 
-- No `*-free` model guard [convex/knowledge/baselineActions.ts:87] — `getWorkspaceModel` returns whatever the workspace configured; retrospective A6 ("NEVER `*-free` models") is aspirational. The existing `extractionActions.ts` (the pattern this story mirrors) also lacks the guard, so adding it here would be inconsistent unless applied cross-cutting. A workspace-level model allowlist/denylist is the right home for this control.
+- **[✅ RESOLVED — post-Epic 3 retro, C5]** No `*-free` model guard — enforced in `getWorkspaceModel` (`convex/ai/model.ts`); all agent factories inherit automatically. Third-epic carry-forward (B4), now enforced codebase-wide.
 
 ## Deferred from: code review of 2-2-drift-report-generation (2026-06-14)
 
