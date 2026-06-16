@@ -58,7 +58,7 @@ export const generateTestsAction = internalAction({
     const { thread } = await agent.createThread(ctx, { title: `NL Generation — ${project.name}` });
     const result = await thread.generateText({
       maxRetries: aiMaxRetries,
-      prompt: buildNlGenerationPrompt({ ...promptOpts, retryContext }),
+      prompt: buildNlGenerationPrompt({ ...promptOpts, retryContext, projectId: String(args.project_id) }),
     });
 
     let testBlocks = extractMultipleTests(result.text);

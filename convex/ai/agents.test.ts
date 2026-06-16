@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../schema";
 import type { Id } from "../_generated/dataModel";
-import { seedFullStack } from "../testHelpers";
+import { seedFullStack, seedWorkspace, seedProject, seedKnowledgeBase, seedModule } from "../testHelpers";
 
 interface AiErrorData {
   type: string;
@@ -128,6 +128,21 @@ describe("Agent definitions", () => {
     expect(agent.options.name).toBe("Test Generation");
     expect(agent.options.instructions).toBe(TEST_GENERATION_PROMPT);
     expect(agent.options.languageModel).toBeDefined();
+  });
+
+  it("createTestGenerationAgent tool set includes readKnowledgeBase", async () => {
+    const { createTestGenerationAgent } = await import("./agents");
+    const { getWorkspaceModel } = await import("./model");
+
+    const model = getWorkspaceModel({
+      endpoint_url: "https://api.example.com/v1",
+      api_key: "test-key-not-real",
+      model_name: "gpt-4",
+    });
+    const agent = createTestGenerationAgent(model);
+
+    expect(Object.keys(agent.options.tools ?? {})).toContain("readKnowledgeBase");
+    expect(Object.keys(agent.options.tools ?? {})).toContain("readProjectContext");
   });
 
   it("createExplorationAnalysisAgent creates agent with correct name", async () => {
@@ -316,6 +331,149 @@ describe("Agent tools", () => {
     const result = readRecentFailuresLogic();
     expect(result).toEqual([]);
   });
+
+  describe("readKnowledgeBase", () => {
+    it("returns full KB shape with content for a ready KB and modules", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      const kbId = await seedKnowledgeBase(t, workspaceId, projectId, {
+        status: "ready",
+        architecture_summary: "Modular monolith with auth + billing.",
+        tech_stack: ["Next.js", "Convex"],
+        architecture_type: "modular monolith",
+      });
+      await seedModule(t, workspaceId, kbId, {
+        name: "Auth Module",
+        description: "Handles login and sessions.",
+        file_count: 8,
+        dependencies: ["User Module", "Core Module"],
+        apis: { endpoints: [{ path: "/api/login", method: "POST" }] },
+        data_models: { tables: ["sessions"] },
+        user_flows: { flows: ["login"] },
+      });
+      await seedModule(t, workspaceId, kbId, {
+        name: "Billing Module",
+        dependencies: [],
+      });
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.architecture_summary).toBe("Modular monolith with auth + billing.");
+      expect(result!.tech_stack).toEqual(["Next.js", "Convex"]);
+      expect(result!.architecture_type).toBe("modular monolith");
+      expect(result!.modules).toHaveLength(2);
+      expect(result!.modules[0].name).toBe("Auth Module");
+      expect(result!.modules[0].description).toBe("Handles login and sessions.");
+      expect(result!.modules[0].file_count).toBe(8);
+      expect(result!.modules[0].dependencies).toEqual(["User Module", "Core Module"]);
+      expect(result!.modules[0].apis).toEqual({ endpoints: [{ path: "/api/login", method: "POST" }] });
+      expect(result!.modules[0].data_models).toEqual({ tables: ["sessions"] });
+      expect(result!.modules[0].user_flows).toEqual({ flows: ["login"] });
+      expect(result!.modules[1].name).toBe("Billing Module");
+      expect(result!.modules[1].dependencies).toEqual([]);
+    });
+
+    it("returns null when project has no knowledge_bases row", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when latest KB status is building", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      await seedKnowledgeBase(t, workspaceId, projectId, { status: "building" });
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when latest KB status is error", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      await seedKnowledgeBase(t, workspaceId, projectId, { status: "error" });
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it("returns modules: [] (not null) when KB ready but has zero modules", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      await seedKnowledgeBase(t, workspaceId, projectId, {
+        status: "ready",
+        architecture_summary: "Empty KB.",
+      });
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.modules).toEqual([]);
+      expect(result!.architecture_summary).toBe("Empty KB.");
+    });
+
+    it("picks the latest KB when multiple ready KBs exist", async () => {
+      const t = convexTest(schema, modules);
+      const workspaceId = await seedWorkspace(t);
+      const projectId = await seedProject(t, workspaceId);
+      await seedKnowledgeBase(t, workspaceId, projectId, {
+        status: "ready",
+        architecture_summary: "Older summary",
+        last_synced_at: 1000,
+      });
+      await seedKnowledgeBase(t, workspaceId, projectId, {
+        status: "ready",
+        architecture_summary: "Newer summary",
+        last_synced_at: 2000,
+      });
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, projectId as Id<"projects">);
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.architecture_summary).toBe("Newer summary");
+    });
+
+    it("returns null for a non-existent project_id", async () => {
+      const t = convexTest(schema, modules);
+      await seedWorkspace(t);
+
+      const result = await t.run(async (ctx) => {
+        const { readKnowledgeBaseLogic } = await import("./tools/logic");
+        return readKnowledgeBaseLogic(ctx, "00000000000000000000000000000000" as Id<"projects">);
+      });
+
+      expect(result).toBeNull();
+    });
+  });
 });
 
 describe("Prompt content snapshots", () => {
@@ -364,5 +522,119 @@ describe("Prompt content snapshots", () => {
     const agent = createRefineAgent(model);
 
     expect(agent.options.instructions).toBe(`${TEST_GENERATION_PROMPT}\n\n${TEST_REFINEMENT_PROMPT}`);
+  });
+
+  it("buildPrdGenerationPrompt injects projectId + readKnowledgeBase hint when projectId provided", async () => {
+    const { buildPrdGenerationPrompt } = await import("./agents");
+
+    const prompt = buildPrdGenerationPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdText: "prd",
+      snapshotContext: "",
+      retryContext: "",
+      projectId: "abc123",
+    });
+
+    expect(prompt).toContain("Project ID: abc123");
+    expect(prompt).toContain("readKnowledgeBase");
+  });
+
+  it("buildPrdGenerationPrompt omits readKnowledgeBase when projectId omitted", async () => {
+    const { buildPrdGenerationPrompt } = await import("./agents");
+
+    const prompt = buildPrdGenerationPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdText: "prd",
+      snapshotContext: "",
+      retryContext: "",
+    });
+
+    expect(prompt).not.toContain("readKnowledgeBase");
+    expect(prompt).not.toContain("Project ID:");
+  });
+
+  it("buildPrdGenerationPrompt omits readKnowledgeBase when projectId is empty string", async () => {
+    const { buildPrdGenerationPrompt } = await import("./agents");
+
+    const prompt = buildPrdGenerationPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdText: "prd",
+      snapshotContext: "",
+      retryContext: "",
+      projectId: "",
+    });
+
+    expect(prompt).not.toContain("readKnowledgeBase");
+  });
+
+  it("buildNlGenerationPrompt injects projectId + readKnowledgeBase hint when projectId provided", async () => {
+    const { buildNlGenerationPrompt } = await import("./agents");
+
+    const prompt = buildNlGenerationPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdContext: "",
+      snapshotContext: "",
+      retryContext: "",
+      prompt: "do a thing",
+      projectId: "xyz789",
+    });
+
+    expect(prompt).toContain("Project ID: xyz789");
+    expect(prompt).toContain("readKnowledgeBase");
+  });
+
+  it("buildNlGenerationPrompt omits readKnowledgeBase when projectId omitted", async () => {
+    const { buildNlGenerationPrompt } = await import("./agents");
+
+    const prompt = buildNlGenerationPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdContext: "",
+      snapshotContext: "",
+      retryContext: "",
+      prompt: "do a thing",
+    });
+
+    expect(prompt).not.toContain("readKnowledgeBase");
+  });
+
+  it("buildPrdFormatRetryPrompt does not reference readKnowledgeBase", async () => {
+    const { buildPrdFormatRetryPrompt } = await import("./agents");
+
+    const prompt = buildPrdFormatRetryPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdText: "prd",
+      snapshotContext: "",
+    });
+
+    expect(prompt).not.toContain("readKnowledgeBase");
+    expect(prompt).not.toContain("Project ID:");
+  });
+
+  it("buildNlFormatRetryPrompt does not reference readKnowledgeBase", async () => {
+    const { buildNlFormatRetryPrompt } = await import("./agents");
+
+    const prompt = buildNlFormatRetryPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdContext: "",
+      snapshotContext: "",
+      prompt: "do a thing",
+    });
+
+    expect(prompt).not.toContain("readKnowledgeBase");
+    expect(prompt).not.toContain("Project ID:");
   });
 });

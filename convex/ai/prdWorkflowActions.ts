@@ -64,6 +64,7 @@ export const generateTestsAction = internalAction({
       prdText: args.prd_text,
       snapshotContext,
       retryContext,
+      projectId: String(args.project_id),
     });
 
     const agent = createTestGenerationAgent(getWorkspaceModel(aiConfig));

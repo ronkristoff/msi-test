@@ -498,6 +498,11 @@ Assertion anti-patterns — NEVER:
 
 Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.`;
 
+function buildKnowledgeBaseToolHint(projectId?: string): string {
+  if (!projectId) return "";
+  return `\nProject ID: ${projectId}\nIf the project has a Knowledge Base, use the readKnowledgeBase tool with this exact project_id to look up its modules, APIs, data models, and user flows before generating tests.\n`;
+}
+
 export function buildNlGenerationPrompt(opts: {
   projectName: string;
   appUrl: string;
@@ -506,12 +511,13 @@ export function buildNlGenerationPrompt(opts: {
   snapshotContext: string;
   retryContext: string;
   prompt: string;
+  projectId?: string;
 }): string {
   return `Generate Playwright tests from the following test description.
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
+${buildKnowledgeBaseToolHint(opts.projectId)}${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
 
 Test Description:
 ${opts.prompt}
@@ -546,12 +552,13 @@ export function buildPrdGenerationPrompt(opts: {
   prdText: string;
   snapshotContext: string;
   retryContext: string;
+  projectId?: string;
 }): string {
   return `Generate Playwright tests for the following application.
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${opts.authContext}${opts.snapshotContext}${opts.retryContext}
+${buildKnowledgeBaseToolHint(opts.projectId)}${opts.authContext}${opts.snapshotContext}${opts.retryContext}
 
 Product Requirements:
 ${opts.prdText}

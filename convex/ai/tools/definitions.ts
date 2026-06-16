@@ -35,6 +35,18 @@ export function createToolDefinitions() {
         });
       },
     }),
+    readKnowledgeBase: createTool({
+      description:
+        "Read the Knowledge Base for a project — architecture summary, tech stack, and detected modules with their API endpoints, data models, user flows, and cross-module dependencies. Returns null if no Knowledge Base exists or it is not ready. The project_id must be the Convex document ID (a long alphanumeric string), NOT a human-readable project name.",
+      inputSchema: z.object({ project_id: z.string() }),
+      execute: async (ctx, input) => {
+        const err = validateConvexId(input.project_id, "project_id");
+        if (err) return { error: err };
+        return ctx.runQuery(internal.ai.tools.queries.readKnowledgeBaseQuery, {
+          project_id: input.project_id as Id<"projects">,
+        });
+      },
+    }),
     readTestCode: createTool({
       description:
         "Read the full test code for a specific test. The test_id must be the Convex document ID (a long alphanumeric string), NOT a human-readable test name.",

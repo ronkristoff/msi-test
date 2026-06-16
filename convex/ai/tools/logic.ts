@@ -21,6 +21,53 @@ export async function readProjectContextLogic(
   return { name: project.name, app_url: project.app_url, prd_text: project.prd_text };
 }
 
+export interface ReadKnowledgeBaseResult {
+  architecture_summary: string | null;
+  tech_stack: string[] | null;
+  architecture_type: string | null;
+  modules: Array<{
+    name: string;
+    description: string | null;
+    file_count: number;
+    dependencies: string[];
+    apis: unknown;
+    data_models: unknown;
+    user_flows: unknown;
+  }>;
+}
+
+export async function readKnowledgeBaseLogic(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+): Promise<ReadKnowledgeBaseResult | null> {
+  const kb = await ctx.db
+    .query("knowledge_bases")
+    .withIndex("by_project_id", (q) => q.eq("project_id", projectId))
+    .order("desc")
+    .first();
+  if (!kb || kb.status !== "ready") return null;
+
+  const modules = await ctx.db
+    .query("kb_modules")
+    .withIndex("by_knowledge_base_id", (q) => q.eq("knowledge_base_id", kb._id))
+    .collect();
+
+  return {
+    architecture_summary: kb.architecture_summary ?? null,
+    tech_stack: kb.tech_stack ?? null,
+    architecture_type: kb.architecture_type ?? null,
+    modules: modules.map((m) => ({
+      name: m.name,
+      description: m.description ?? null,
+      file_count: m.file_count ?? 0,
+      dependencies: m.dependencies ?? [],
+      apis: m.apis ?? null,
+      data_models: m.data_models ?? null,
+      user_flows: m.user_flows ?? null,
+    })),
+  };
+}
+
 export async function readTestCodeLogic(
   ctx: QueryCtx,
   testId: Id<"tests">,
