@@ -14,6 +14,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatDate, formatRelativeTime } from "@/lib/format";
 import { useErrorLogger } from "@/lib/error-logger";
 import { STATUS_VARIANT, type StoryStatus } from "@/components/stories/StoryCard";
+import { ExportSingleStory } from "./ExportSingleStory";
+import { CopyStoryButton } from "./CopyStoryButton";
 
 function ChipList({
   label,
@@ -67,6 +69,15 @@ export default function StoryDetailPage() {
   const story = useQuery(api.stories.queries.getStory, { story_id: storyId });
   const updateStoryStatus = useMutation(api.stories.mutations.updateStoryStatus);
   const deleteStory = useMutation(api.stories.mutations.deleteStory);
+  const kb = useQuery(api.knowledge.queries.getKnowledgeBase, {
+    project_id: asId(params.id, "projects"),
+  });
+  const project = useQuery(api.projects.queries.getProject, {
+    project_id: asId(params.id, "projects"),
+  });
+
+  const bmadDetected = kb?.bmad_detected === true;
+  const projectName = project?.name ?? "";
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
@@ -193,6 +204,15 @@ export default function StoryDetailPage() {
             )}
           </div>
         </header>
+
+        <div className="flex items-center gap-2">
+          <ExportSingleStory
+            story={story}
+            bmadDetected={bmadDetected}
+            projectName={projectName}
+          />
+          <CopyStoryButton story={story} />
+        </div>
 
         <dl className="space-y-1 text-sm">
           <div className="flex gap-1.5">

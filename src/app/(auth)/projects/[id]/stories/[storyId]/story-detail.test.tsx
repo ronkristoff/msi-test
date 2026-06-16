@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -6,16 +6,21 @@ const { mockLogError } = vi.hoisted(() => ({
   mockLogError: vi.fn(),
 }));
 
+const mockDownloadFile = vi.fn();
 let mockStory: unknown = undefined;
 const mockUpdateStoryStatus = vi.fn();
 const mockDeleteStory = vi.fn();
 const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn();
+let mockKb: unknown = { bmad_detected: false };
+let mockProject: unknown = { name: "Test Project" };
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn((_queryRef: unknown) => {
     const key = typeof _queryRef === "string" ? _queryRef : String(_queryRef);
     if (key.includes("getStory")) return mockStory;
+    if (key.includes("getKnowledgeBase")) return mockKb;
+    if (key.includes("getProject")) return mockProject;
     return undefined;
   }),
   useMutation: vi.fn((_mutationRef: unknown) => {
@@ -43,6 +48,16 @@ vi.mock("@/lib/convex", () => ({
         deleteStory: "stories.mutations.deleteStory",
       },
     },
+    knowledge: {
+      queries: {
+        getKnowledgeBase: "knowledge.queries.getKnowledgeBase",
+      },
+    },
+    projects: {
+      queries: {
+        getProject: "projects.queries.getProject",
+      },
+    },
   },
   asId: (v: string) => v,
 }));
@@ -54,6 +69,10 @@ vi.mock("@/lib/error-logger", () => ({
 vi.mock("@/lib/format", () => ({
   formatRelativeTime: (ts: number) => `relative:${ts}`,
   formatDate: (ts: number) => `date:${ts}`,
+}));
+
+vi.mock("../downloadFile", () => ({
+  downloadFile: (...args: unknown[]) => mockDownloadFile(...args),
 }));
 
 const draftStory = {
@@ -89,11 +108,31 @@ async function setup() {
 }
 
 describe("StoryDetailPage", () => {
+  let writeTextMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockStory = undefined;
+    mockKb = { bmad_detected: false };
+    mockProject = { name: "Test Project" };
     mockUpdateStoryStatus.mockResolvedValue(undefined);
     mockDeleteStory.mockResolvedValue(undefined);
+    writeTextMock = vi.fn().mockResolvedValue(undefined);
+    if (navigator.clipboard) {
+      vi.spyOn(navigator.clipboard, "writeText").mockImplementation(
+        (...args: Parameters<typeof writeTextMock>) => writeTextMock(...args),
+      );
+    } else {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: writeTextMock },
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("renders loading skeleton when story is undefined", async () => {
@@ -259,5 +298,63 @@ describe("StoryDetailPage", () => {
     await user.click(screen.getByRole("button", { name: /^Delete$/i }));
     await screen.findByRole("alert");
     expect(mockLogError).toHaveBeenCalled();
+  });
+
+  it("renders Export dropdown in the action row", async () => {
+    mockStory = draftStory;
+    await setup();
+    expect(screen.getByRole("button", { name: /^Export$/i })).toBeInTheDocument();
+  });
+
+  it("renders Copy to Clipboard button in the action row", async () => {
+    mockStory = draftStory;
+    await setup();
+    expect(
+      screen.getByRole("button", { name: /Copy to Clipboard/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking Export -> Markdown calls downloadFile with story-{slug}.md", async () => {
+    const user = userEvent.setup();
+    mockStory = draftStory;
+    await setup();
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    await user.click(screen.getByRole("menuitem", { name: /Markdown/i }));
+    expect(mockDownloadFile).toHaveBeenCalledTimes(1);
+    const [, filename] = mockDownloadFile.mock.calls[0];
+    expect(filename).toBe("story-login-with-google.md");
+  });
+
+  it("clicking Copy to Clipboard calls navigator.clipboard.writeText", async () => {
+    const user = userEvent.setup();
+    mockStory = draftStory;
+    await setup();
+    await user.click(screen.getByRole("button", { name: /Copy to Clipboard/i }));
+    await screen.findByRole("button", { name: /Copied!/i });
+    expect(writeTextMock).toHaveBeenCalledTimes(1);
+    const arg = writeTextMock.mock.calls[0][0] as string;
+    expect(arg).toContain("## Login with Google");
+  });
+
+  it("BMAD Story File option present when bmadDetected is true", async () => {
+    const user = userEvent.setup();
+    mockStory = draftStory;
+    mockKb = { bmad_detected: true };
+    await setup();
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    expect(
+      screen.getByRole("menuitem", { name: /BMAD Story File/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("BMAD Story File option absent when bmadDetected=false AND no technical_context", async () => {
+    const user = userEvent.setup();
+    mockStory = noTechContextStory;
+    mockKb = { bmad_detected: false };
+    await setup();
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    expect(
+      screen.queryByRole("menuitem", { name: /BMAD Story File/i }),
+    ).not.toBeInTheDocument();
   });
 });

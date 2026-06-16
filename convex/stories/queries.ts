@@ -1,6 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getOptionalOwnedEntity } from "../lib/requireAuth";
+import { getMemberWorkspace, getOptionalOwnedEntity } from "../lib/requireAuth";
 import type { Doc, Id } from "../_generated/dataModel";
 
 type StoryStatus = "draft" | "approved" | "exported";
@@ -81,5 +81,17 @@ export const getStory = query({
     );
     if (!result) return null;
     return result.entity;
+  },
+});
+
+export const getStoriesByIds = query({
+  args: { ids: v.array(v.id("user_stories")) },
+  handler: async (ctx, args): Promise<Doc<"user_stories">[]> => {
+    const memberWorkspace = await getMemberWorkspace(ctx);
+    const docs = await Promise.all(args.ids.map((id) => ctx.db.get(id)));
+    return docs.filter(
+      (s): s is Doc<"user_stories"> =>
+        s !== null && s.workspace_id === memberWorkspace.workspace._id,
+    );
   },
 });

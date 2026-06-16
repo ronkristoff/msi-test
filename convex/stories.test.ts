@@ -565,3 +565,158 @@ describe("stories: deleteStory", () => {
     ).rejects.toThrow(/Story not found/);
   });
 });
+
+describe("stories: getStoriesByIds", () => {
+  it("returns full docs for valid IDs (not summary shape)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    const id1 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Story A",
+      user_story: {
+        as_a: "an authenticated user",
+        i_want: "to log in with Google",
+        so_that: "I avoid a new password",
+      },
+      acceptance_criteria: [
+        "Given a precondition, When an action occurs, Then the expected result happens.",
+      ],
+      affected_components: {
+        modules: ["auth"],
+        apis: ["POST /login"],
+        data_models: [],
+      },
+    });
+    const id2 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Story B",
+    });
+    const id3 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Story C",
+    });
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.stories.queries.getStoriesByIds, {
+      ids: [id1, id2, id3],
+    });
+
+    expect(result).toHaveLength(3);
+    expect(result[0].acceptance_criteria).toEqual([
+      "Given a precondition, When an action occurs, Then the expected result happens.",
+    ]);
+    expect(result[0].user_story.as_a).toBe("an authenticated user");
+    expect(result[0].user_story.i_want).toBe("to log in with Google");
+    expect(result[0].affected_components.modules).toEqual(["auth"]);
+    expect(result[0].affected_components.apis).toEqual(["POST /login"]);
+  });
+
+  it("returns [] for empty ids array", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    await seedProject(t, workspaceId);
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.stories.queries.getStoriesByIds, {
+      ids: [],
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("silently excludes cross-workspace IDs (C1 content assertion)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    const idA1 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Owned 1",
+    });
+    const idA2 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Owned 2",
+    });
+
+    const otherWorkspaceId = await t.run(async (ctx) => {
+      const wsId = await ctx.db.insert("workspaces", {
+        name: "Other WS",
+        owner_id: "user2",
+        ai_config: {
+          endpoint_url: "https://api.example.com",
+          api_key: "key",
+          model_name: "gpt-4",
+        },
+      });
+      await ctx.db.insert("workspace_members", {
+        workspace_id: wsId,
+        user_id: "user2",
+        role: "owner",
+        invited_at: Date.now(),
+        user_name: "user2",
+      });
+      return wsId;
+    });
+    const otherProjectId = await seedProject(t, otherWorkspaceId);
+    const idB1 = await seedUserStory(t, otherWorkspaceId, otherProjectId, "other", {
+      title: "Other WS story",
+    });
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.stories.queries.getStoriesByIds, {
+      ids: [idA1, idB1, idA2],
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result.map((s) => s._id)).toEqual([idA1, idA2]);
+    expect(result[0].title).toBe("Owned 1");
+    expect(result[1].title).toBe("Owned 2");
+  });
+
+  it("silently excludes non-existent IDs (valid-but-deleted)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    const idValid = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Live Story",
+    });
+    const idDeleted = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Doomed",
+    });
+    await t.run(async (ctx) => ctx.db.delete(idDeleted));
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.stories.queries.getStoriesByIds, {
+      ids: [idValid, idDeleted],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]._id).toBe(idValid);
+    expect(result[0].title).toBe("Live Story");
+  });
+
+  it("preserves input order minus excluded IDs (deterministic)", async () => {
+    const t = convexTest(schema, modules).withIdentity({ subject: "user1" });
+    const workspaceId = await seedWorkspace(t);
+    const projectId = await seedProject(t, workspaceId);
+
+    const id1 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "First",
+      generated_at: 1000,
+    });
+    const id2 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Second",
+      generated_at: 2000,
+    });
+    const id3 = await seedUserStory(t, workspaceId, projectId, "t1", {
+      title: "Third",
+      generated_at: 3000,
+    });
+
+    const { api } = await import("./_generated/api");
+    const result = await t.query(api.stories.queries.getStoriesByIds, {
+      ids: [id3, id1, id2],
+    });
+
+    expect(result.map((s) => s._id)).toEqual([id3, id1, id2]);
+    expect(result.map((s) => s.title)).toEqual(["Third", "First", "Second"]);
+  });
+});

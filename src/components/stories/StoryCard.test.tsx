@@ -1,17 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StoryCard, type StoryListItem } from "./StoryCard";
+
+const mockLinkClick = vi.fn();
 
 vi.mock("next/link", () => ({
   __esModule: true,
   default: ({
     children,
     href,
+    onClick,
   }: {
     children: React.ReactNode;
     href: string;
+    onClick?: (e: { preventDefault: () => void; stopPropagation: () => void }) => void;
   }) => (
-    <a href={href} data-testid="link">
+    <a
+      href={href}
+      data-testid="link"
+      onClick={(e) => {
+        mockLinkClick();
+        onClick?.(e);
+      }}
+    >
       {children}
     </a>
   ),
@@ -100,5 +112,63 @@ describe("StoryCard", () => {
     render(<StoryCard story={baseStory} projectId="proj1" />);
     const link = screen.getByTestId("link");
     expect(link).toHaveAttribute("href", "/projects/proj1/stories/story1");
+  });
+
+  it("does NOT render a checkbox when onToggleSelect is not provided", () => {
+    render(<StoryCard story={baseStory} projectId="proj1" />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("renders a checkbox with aria-label when onToggleSelect is provided", () => {
+    render(
+      <StoryCard
+        story={baseStory}
+        projectId="proj1"
+        onToggleSelect={() => {}}
+      />,
+    );
+    expect(
+      screen.getByLabelText(`Select story: ${baseStory.title}`),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking the checkbox calls onToggleSelect with the story id", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    render(
+      <StoryCard
+        story={baseStory}
+        projectId="proj1"
+        onToggleSelect={onToggle}
+      />,
+    );
+    await user.click(screen.getByLabelText(`Select story: ${baseStory.title}`));
+    expect(onToggle).toHaveBeenCalledWith(baseStory._id);
+  });
+
+  it("clicking the checkbox does NOT call the Link onClick (stopPropagation)", async () => {
+    const user = userEvent.setup();
+    mockLinkClick.mockClear();
+    render(
+      <StoryCard
+        story={baseStory}
+        projectId="proj1"
+        onToggleSelect={() => {}}
+      />,
+    );
+    await user.click(screen.getByLabelText(`Select story: ${baseStory.title}`));
+    expect(mockLinkClick).not.toHaveBeenCalled();
+  });
+
+  it("reflects the selected prop as checked state", () => {
+    render(
+      <StoryCard
+        story={baseStory}
+        projectId="proj1"
+        selected
+        onToggleSelect={() => {}}
+      />,
+    );
+    expect(screen.getByLabelText(`Select story: ${baseStory.title}`)).toBeChecked();
   });
 });

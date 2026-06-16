@@ -1,5 +1,5 @@
 # generated: 2026-06-13
-# last_updated: 2026-06-15T20:00:00Z
+# last_updated: 2026-06-16T16:15:00Z
 # project: msi-test
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-15T22:06:00Z
+last_updated: 2026-06-16T16:15:00Z
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,7 @@ development_status:
   4-1-impact-analysis-agent: done
   4-2-user-story-generation: done
   4-3-story-list-status-management: done
-  4-4-story-export: backlog
+  4-4-story-export: done
   epic-4-retrospective: optional
 
   epic-5: backlog

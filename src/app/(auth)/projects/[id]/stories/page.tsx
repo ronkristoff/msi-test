@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { StoryCard, type StoryListItem } from "@/components/stories/StoryCard";
+import { ExportStories } from "./ExportStories";
 
 type StatusFilter = "all" | "draft" | "approved" | "exported";
 
@@ -17,11 +18,33 @@ export default function StoriesPage() {
   const projectId = asId(params.id, "projects");
 
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const stories = useQuery(api.stories.queries.listStories, {
     project_id: projectId,
     ...(filter === "all" ? {} : { status: filter }),
   });
+  const kb = useQuery(api.knowledge.queries.getKnowledgeBase, {
+    project_id: projectId,
+  });
+  const project = useQuery(api.projects.queries.getProject, {
+    project_id: projectId,
+  });
+
+  const bmadDetected = kb?.bmad_detected === true;
+  const projectName = project?.name ?? "";
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   if (stories === undefined) {
     return <PageSkeleton />;
@@ -57,10 +80,20 @@ export default function StoriesPage() {
     );
   }
 
+  const allSelected =
+    stories.length > 0 && stories.every((s: StoryListItem) => selectedIds.has(s._id));
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(stories.map((s: StoryListItem) => s._id)));
+    }
+  };
+
   return (
     <div className="max-w-[1080px]">
       <div className="mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h2 className="font-[var(--font-display)] text-2xl font-bold text-[var(--fg)]">
             Stories
           </h2>
@@ -88,9 +121,10 @@ export default function StoriesPage() {
             <select
               aria-label="Filter stories by status"
               value={filter}
-              onChange={(e) =>
-                setFilter(e.target.value as StatusFilter)
-              }
+              onChange={(e) => {
+                setFilter(e.target.value as StatusFilter);
+                setSelectedIds(new Set());
+              }}
               className="px-2 py-1 border border-[var(--border)] rounded-[var(--radius-sm)] text-sm bg-[var(--surface)] text-[var(--fg)] outline-none focus:border-[var(--accent)]"
             >
               <option value="all">All</option>
@@ -99,6 +133,21 @@ export default function StoriesPage() {
               <option value="exported">Exported</option>
             </select>
           </label>
+          {stories.length > 0 && (
+            <input
+              type="checkbox"
+              aria-label="Select all visible stories"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="cursor-pointer"
+            />
+          )}
+          <ExportStories
+            selectedIds={selectedIds}
+            projectId={params.id}
+            bmadDetected={bmadDetected}
+            projectName={projectName}
+          />
         </div>
       </div>
 
@@ -128,6 +177,8 @@ export default function StoriesPage() {
               key={story._id}
               story={story}
               projectId={params.id}
+              selected={selectedIds.has(story._id)}
+              onToggleSelect={toggleSelect}
             />
           ))}
         </div>
