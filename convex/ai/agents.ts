@@ -498,9 +498,9 @@ Assertion anti-patterns — NEVER:
 
 Only use locators for elements that are reasonable for the described feature. Do NOT invent or guess selectors without basis.`;
 
-function buildKnowledgeBaseToolHint(projectId?: string): string {
+function buildContextToolHints(projectId?: string): string {
   if (!projectId) return "";
-  return `\nProject ID: ${projectId}\nIf the project has a Knowledge Base, use the readKnowledgeBase tool with this exact project_id to look up its modules, APIs, data models, and user flows before generating tests.\n`;
+  return `\nProject ID: ${projectId}\nIf the project has a Knowledge Base, use the readKnowledgeBase tool with this exact project_id to look up its modules, APIs, data models, and user flows before generating tests.\nIf the project has a Baseline Requirements Document, use the readBaselineRd tool with this exact project_id to look up its RD sections and confidence scores before generating tests.\n`;
 }
 
 export function buildNlGenerationPrompt(opts: {
@@ -517,7 +517,7 @@ export function buildNlGenerationPrompt(opts: {
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${buildKnowledgeBaseToolHint(opts.projectId)}${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
+${buildContextToolHints(opts.projectId)}${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
 
 Test Description:
 ${opts.prompt}
@@ -558,7 +558,7 @@ export function buildPrdGenerationPrompt(opts: {
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${buildKnowledgeBaseToolHint(opts.projectId)}${opts.authContext}${opts.snapshotContext}${opts.retryContext}
+${buildContextToolHints(opts.projectId)}${opts.authContext}${opts.snapshotContext}${opts.retryContext}
 
 Product Requirements:
 ${opts.prdText}

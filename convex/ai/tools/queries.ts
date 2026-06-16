@@ -5,6 +5,7 @@ import {
   readProjectContextLogic,
   readTestCodeLogic,
   readKnowledgeBaseLogic,
+  readBaselineRdLogic,
 } from "./logic";
 
 export const readExistingTestsQuery = internalQuery({
@@ -25,4 +26,9 @@ export const readTestCodeQuery = internalQuery({
 export const readKnowledgeBaseQuery = internalQuery({
   args: { project_id: v.id("projects") },
   handler: async (ctx, args) => readKnowledgeBaseLogic(ctx, args.project_id),
+});
+
+export const readBaselineRdQuery = internalQuery({
+  args: { project_id: v.id("projects") },
+  handler: async (ctx, args) => readBaselineRdLogic(ctx, args.project_id),
 });

@@ -47,6 +47,18 @@ export function createToolDefinitions() {
         });
       },
     }),
+    readBaselineRd: createTool({
+      description:
+        "Read the latest usable Baseline Requirements Document (RD) for a project — its version, status, and sections with titles, content, confidence scores, and any divergence notes / BMAD-PRD alignment. Returns null if no usable RD exists (none, or all archived/failed). The project_id must be the Convex document ID (a long alphanumeric string), NOT a human-readable project name.",
+      inputSchema: z.object({ project_id: z.string() }),
+      execute: async (ctx, input) => {
+        const err = validateConvexId(input.project_id, "project_id");
+        if (err) return { error: err };
+        return ctx.runQuery(internal.ai.tools.queries.readBaselineRdQuery, {
+          project_id: input.project_id as Id<"projects">,
+        });
+      },
+    }),
     readTestCode: createTool({
       description:
         "Read the full test code for a specific test. The test_id must be the Convex document ID (a long alphanumeric string), NOT a human-readable test name.",

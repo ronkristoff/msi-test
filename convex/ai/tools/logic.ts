@@ -77,6 +77,47 @@ export async function readTestCodeLogic(
   return { name: test.name, playwright_code: test.playwright_code ?? "" };
 }
 
+export interface ReadBaselineRdResult {
+  version: number;
+  status: "draft" | "approved";
+  sections: Array<{
+    id: string;
+    title: string;
+    content: string;
+    confidence: number;
+    divergence_note?: string;
+    bmad_alignment?: {
+      prd_section_title: string;
+      agreement: "agree" | "diverge" | "partial";
+    };
+  }>;
+}
+
+export async function readBaselineRdLogic(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+): Promise<ReadBaselineRdResult | null> {
+  const rds = await ctx.db
+    .query("baseline_rds")
+    .withIndex("by_project_id_and_version", (q) => q.eq("project_id", projectId))
+    .order("desc")
+    .take(10);
+  const rd = rds.find((r) => r.status !== "archived" && r.status !== "failed");
+  if (!rd) return null;
+  return {
+    version: rd.version,
+    status: rd.status as ReadBaselineRdResult["status"],
+    sections: rd.sections.map((s) => ({
+      id: s.id,
+      title: s.title,
+      content: s.content,
+      confidence: s.confidence,
+      divergence_note: s.divergence_note,
+      bmad_alignment: s.bmad_alignment,
+    })),
+  };
+}
+
 export function readPreviousExplorationsLogic(): [] {
   return [];
 }
