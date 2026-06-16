@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-16T16:15:00Z
+last_updated: 2026-06-16T18:00:00Z
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -68,12 +68,12 @@ development_status:
   3-4-chat-ui-streaming-display: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-impact-analysis-agent: done
   4-2-user-story-generation: done
   4-3-story-list-status-management: done
   4-4-story-export: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   epic-5: backlog
   5-1-read-knowledge-base-agent-tool: backlog
