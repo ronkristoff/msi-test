@@ -94,6 +94,11 @@ export default function ExplorePage() {
     [prdCoverage],
   );
 
+  const kbCoverageGaps = useMemo<string[]>(
+    () => (exploration as { kb_coverage_gaps?: string[] } | null)?.kb_coverage_gaps ?? [],
+    [exploration],
+  );
+
   const capturedPages = useMemo<CapturedPageWithUrl[]>(
     () => (exploration?.captured_pages as CapturedPageWithUrl[] | undefined) ?? [],
     [exploration],
@@ -639,6 +644,15 @@ export default function ExplorePage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {kbCoverageGaps.length > 0 && (
+              <div className="mb-4 p-2 rounded-[var(--radius-sm)] border border-amber-300/30 bg-amber-50/10">
+                <p className="text-xs text-amber-600">
+                  {kbCoverageGaps.length} Knowledge Base module{kbCoverageGaps.length !== 1 ? "s" : ""} have no matching exploration page.
+                  Consider exploring these areas to improve coverage.
+                </p>
               </div>
             )}
 

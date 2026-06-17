@@ -212,6 +212,31 @@ describe("Agent zod schemas", () => {
     expect(result.success).toBe(false);
   });
 
+  it("exploration scenario schema accepts kbModule when present", async () => {
+    const { explorationScenarioSchema } = await import("./agents");
+
+    const result = explorationScenarioSchema.safeParse({
+      name: "Login Flow",
+      description: "User logs in",
+      flowSummary: "Navigate → Enter → Submit",
+      area: "Authentication",
+      kbModule: "Auth Module",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("exploration scenario schema accepts absence of kbModule (optional field)", async () => {
+    const { explorationScenarioSchema } = await import("./agents");
+
+    const result = explorationScenarioSchema.safeParse({
+      name: "Login Flow",
+      description: "User logs in",
+      flowSummary: "Navigate → Enter → Submit",
+      area: "Authentication",
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("failure analysis schema validates correct shape", async () => {
     const { failureAnalysisSchema } = await import("./agents");
 
@@ -1293,19 +1318,119 @@ describe("Prompt content snapshots", () => {
       expect(prompt).not.toContain("## Project Knowledge Context");
     });
 
-    it("buildNlFormatRetryPrompt does not contain kbContext block", async () => {
-      const { buildNlFormatRetryPrompt } = await import("./agents");
+  it("buildNlFormatRetryPrompt does not contain kbContext block", async () => {
+    const { buildNlFormatRetryPrompt } = await import("./agents");
 
-      const prompt = buildNlFormatRetryPrompt({
-        projectName: "P",
-        appUrl: "https://example.com",
-        authContext: "",
-        prdContext: "",
-        snapshotContext: "",
-        prompt: "do a thing",
-      });
+    const prompt = buildNlFormatRetryPrompt({
+      projectName: "P",
+      appUrl: "https://example.com",
+      authContext: "",
+      prdContext: "",
+      snapshotContext: "",
+      prompt: "do a thing",
+    });
 
-      expect(prompt).not.toContain("## Project Knowledge Context");
+    expect(prompt).not.toContain("## Project Knowledge Context");
+  });
+  });
+
+  describe("computeKbCoverageGaps", () => {
+    it("returns [] when moduleNames is empty", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps([], [
+        { kbModule: "Auth" },
+      ]);
+
+      expect(gaps).toEqual([]);
+    });
+
+    it("returns [] when all modules are annotated on at least one scenario", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(
+        ["Auth Module", "Billing Module"],
+        [
+          { kbModule: "Auth Module" },
+          { kbModule: "Billing Module" },
+        ],
+      );
+
+      expect(gaps).toEqual([]);
+    });
+
+    it("returns unmatched module names when some modules have no annotating scenario", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(
+        ["Auth Module", "Billing Module", "User Module"],
+        [{ kbModule: "Auth Module" }],
+      );
+
+      expect(gaps).toEqual(["Billing Module", "User Module"]);
+    });
+
+    it("matches case-insensitively after trim (scenario with whitespace covers differently-cased module)", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(
+        ["Auth Module"],
+        [{ kbModule: " auth module " }],
+      );
+
+      expect(gaps).toEqual([]);
+    });
+
+    it("ignores scenarios with undefined / empty / whitespace-only kbModule", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gapsUndefined = computeKbCoverageGaps(["Auth Module"], [{ kbModule: undefined }]);
+      expect(gapsUndefined).toEqual(["Auth Module"]);
+
+      const gapsEmpty = computeKbCoverageGaps(["Auth Module"], [{ kbModule: "" }]);
+      expect(gapsEmpty).toEqual(["Auth Module"]);
+
+      const gapsWhitespace = computeKbCoverageGaps(["Auth Module"], [{ kbModule: "   " }]);
+      expect(gapsWhitespace).toEqual(["Auth Module"]);
+    });
+
+    it("handles duplicate module annotations across scenarios without issue", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(
+        ["Auth Module"],
+        [
+          { kbModule: "Auth Module" },
+          { kbModule: "Auth Module" },
+        ],
+      );
+
+      expect(gaps).toEqual([]);
+    });
+
+    it("returns [] when both moduleNames and scenarios are empty", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      expect(computeKbCoverageGaps([], [])).toEqual([]);
+    });
+
+    it("returns all module names when scenarios is empty but moduleNames is non-empty", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(["Auth Module", "Billing Module"], []);
+
+      expect(gaps).toEqual(["Auth Module", "Billing Module"]);
+    });
+
+    it("preserves original module name casing in the returned gaps", async () => {
+      const { computeKbCoverageGaps } = await import("./agents");
+
+      const gaps = computeKbCoverageGaps(
+        ["AuthModule", "Billing Module"],
+        [{ kbModule: "authmodule" }],
+      );
+
+      expect(gaps).toEqual(["Billing Module"]);
     });
   });
 });

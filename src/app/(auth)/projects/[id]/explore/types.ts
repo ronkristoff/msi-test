@@ -16,6 +16,7 @@ export interface Scenario {
   flow_summary: string;
   area: string;
   related_flows?: string[];
+  kb_module?: string;
 }
 
 export interface CapturedPageWithUrl {

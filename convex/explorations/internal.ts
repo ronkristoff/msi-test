@@ -105,14 +105,17 @@ export const storeProposedScenarios = internalMutation({
         area: v.string(),
         related_flows: v.optional(v.array(v.string())),
         relevant_page_urls: v.optional(v.array(v.string())),
+        kb_module: v.optional(v.string()),
       }),
     ),
+    kb_coverage_gaps: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.exploration_id, {
       status: "analyzed",
       proposed_scenarios: args.scenarios,
       progress_message: "Analysis complete. Review proposed scenarios.",
+      ...(args.kb_coverage_gaps !== undefined ? { kb_coverage_gaps: args.kb_coverage_gaps } : {}),
     });
   },
 });

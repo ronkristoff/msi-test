@@ -473,6 +473,8 @@ type ExplorationOverrides = Partial<{
   progress_message: string;
   pages_captured: number;
   interactive: boolean;
+  goal: string;
+  captured_pages: Array<{ url: string; title: string; structure_text: string }>;
 }>;
 
 export async function seedExploration(
@@ -491,6 +493,8 @@ export async function seedExploration(
       progress_message: overrides?.progress_message,
       pages_captured: overrides?.pages_captured,
       interactive: overrides?.interactive,
+      goal: overrides?.goal,
+      captured_pages: overrides?.captured_pages,
     });
   });
 }

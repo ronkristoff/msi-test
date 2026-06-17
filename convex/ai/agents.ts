@@ -14,6 +14,7 @@ export const explorationScenarioSchema = z.object({
   area: z.string(),
   relatedFlows: z.array(z.string()).optional(),
   relevantPageUrls: z.array(z.string()).optional(),
+  kbModule: z.string().optional(),
 });
 
 export const failureAnalysisSchema = z.object({
@@ -175,6 +176,8 @@ When PRD / product requirements are provided:
 - Prioritize scenarios that test PRD-described features
 - If a PRD feature was not found during exploration, include a scenario for it anyway (marked in the description as "PRD requirement — not found during exploration")
 - Note coverage gaps in your scenario descriptions
+
+When Knowledge Base module context is provided in the user prompt, cross-reference the discovered pages against those modules. For each scenario that clearly corresponds to a Knowledge Base module, set "kbModule" to the EXACT module name (verbatim from the context block). Omit "kbModule" when no Knowledge Base is provided or no module is a clear match.
 
 Focus on critical user flows, edge cases, and error states. Prioritize by business impact.`;
 
@@ -596,6 +599,18 @@ export function buildKbContextBlock(
 
   const joined = `## Project Knowledge Context\n\n${parts.join("\n\n")}`;
   return truncateContext(joined, TEST_GEN_KB_CONTEXT_CHARS);
+}
+
+export function computeKbCoverageGaps(
+  moduleNames: string[],
+  scenarios: { kbModule?: string }[],
+): string[] {
+  const coveredSet = new Set(
+    scenarios
+      .map((s) => s.kbModule?.trim().toLowerCase())
+      .filter((v): v is string => typeof v === "string" && v.length > 0),
+  );
+  return moduleNames.filter((name) => !coveredSet.has(name.trim().toLowerCase()));
 }
 
 export function buildNlGenerationPrompt(opts: {

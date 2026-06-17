@@ -85,6 +85,11 @@ function ScenarioItem({
           <span className="inline-flex items-center rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--accent)]">
             {scenario.area}
           </span>
+          {scenario.kb_module && (
+            <span className="inline-flex items-center rounded-full bg-[var(--border-soft)] px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-medium text-[var(--muted)]">
+              KB: {scenario.kb_module}
+            </span>
+          )}
           {generated && (
             <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-[var(--font-mono)] font-semibold text-green-700">
               Generated

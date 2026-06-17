@@ -4,7 +4,7 @@ import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal, api } from "../_generated/api";
-import { createExplorationAnalysisAgent, createTestGenerationAgent, createHybridTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema, hybridTestStepSchema } from "./agents";
+import { createExplorationAnalysisAgent, createTestGenerationAgent, createHybridTestGenerationAgent, extractMultipleTests, deriveTestName, explorationScenarioSchema, hybridTestStepSchema, buildKbContextBlock, computeKbCoverageGaps } from "./agents";
 import { extractJsonFromAiResponse } from "./parse";
 import { classifyAiError } from "./errors";
 import { aiDelay, aiMaxRetries } from "./aiRateLimit";
@@ -265,7 +265,8 @@ IMPORTANT: Respond with ONLY a valid JSON array. No markdown, no code fences, no
 - "flowSummary": string — step-by-step flow the test will execute
 - "area": string — app area category (e.g. "Authentication", "Dashboard", "Settings", "Navigation")
 - "relatedFlows": array of strings (optional) — names of discovered flows this scenario covers. Only include if the scenario clearly exercises a listed flow's steps.
-- "relevantPageUrls": array of strings — the URLs of captured pages this scenario tests. Must be exact URLs from the "Captured pages" list above. Only include pages directly exercised by the scenario.`;
+- "relevantPageUrls": array of strings — the URLs of captured pages this scenario tests. Must be exact URLs from the "Captured pages" list above. Only include pages directly exercised by the scenario.
+- "kbModule": string (optional) — the EXACT name of the Knowledge Base module this scenario corresponds to. Only include when KB module context is provided above AND the scenario clearly maps to one module. Use the module name verbatim. Omit if no KB context or no clear match.`;
 
 async function markAllSuitesFailed(
   ctx: ActionCtx,
@@ -312,6 +313,7 @@ export const analyzeExploration = internalAction({
     });
 
     let scenarios: { name: string; description: string; flow_summary: string; area: string }[];
+    let kbCoverageGaps: string[] | undefined = undefined;
     try {
       const agent = createExplorationAnalysisAgent(
         (await import("./model")).getWorkspaceModel(aiConfig),
@@ -331,6 +333,14 @@ export const analyzeExploration = internalAction({
         ? `\nPRD / Product Requirements:\n${prdText.slice(0, PRD_ANALYSIS_LIMIT)}\n\nIMPORTANT: Cross-reference the discovered pages and flows against the PRD above. For each PRD feature:\n- If found during exploration, note it in the scenario description\n- If NOT found, still propose a scenario for it and mark it as "PRD requirement — not found during exploration"\n`
         : "";
 
+      const kb = await ctx.runQuery(internal.ai.tools.queries.readKnowledgeBaseQuery, {
+        project_id: exploration.project_id,
+      });
+      const kbContext = buildKbContextBlock(kb, null);
+      const kbContextSection = kbContext
+        ? `\nKnowledge Base modules:\n${kbContext}\n\nIMPORTANT: Cross-reference the discovered pages above against these Knowledge Base modules. For each scenario that clearly maps to a module, set "kbModule" to the EXACT module name verbatim.\n`
+        : "";
+
       const prdCoverageSection = exploration.prd_coverage
         ? `\nPRD keyword coverage (preliminary):\n${exploration.prd_coverage.map((c: { feature: string; found: boolean }) => `- ${c.feature}: ${c.found ? "Found" : "NOT FOUND"}`).join("\n")}\n`
         : "";
@@ -341,8 +351,7 @@ export const analyzeExploration = internalAction({
 
 Captured pages:
 ${pagesDescription}
-${flowsDescription ? `\nDiscovered navigation flows:\n${flowsDescription}\n` : ""}
-${prdSection}${prdCoverageSection}${exploration.goal ? `\nUser's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}
+${flowsDescription ? `\nDiscovered navigation flows:\n${flowsDescription}\n` : ""}${kbContextSection}${prdSection}${prdCoverageSection}${exploration.goal ? `\nUser's testing goal: ${exploration.goal}\n\nPrioritize scenarios that align with this goal, but also include important general scenarios.\n` : ""}
 
 ${ANALYSIS_PROMPT}`,
       });
@@ -371,7 +380,9 @@ ${ANALYSIS_PROMPT}`,
         area: s.area,
         related_flows: s.relatedFlows,
         relevant_page_urls: s.relevantPageUrls,
+        kb_module: s.kbModule,
       }));
+      kbCoverageGaps = kb ? computeKbCoverageGaps(kb.modules.map((m) => m.name), validated) : undefined;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       await ctx.runMutation(internal.explorations.internal.updateExplorationStatus, {
@@ -385,6 +396,7 @@ ${ANALYSIS_PROMPT}`,
     await ctx.runMutation(internal.explorations.internal.storeProposedScenarios, {
       exploration_id: args.exploration_id,
       scenarios,
+      kb_coverage_gaps: kbCoverageGaps,
     });
   },
 });

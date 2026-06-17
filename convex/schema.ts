@@ -287,6 +287,7 @@ export default defineSchema({
     selected_pages: v.optional(v.array(v.string())),
     discovered_flows: v.optional(v.array(discoveredFlowValidator)),
     prd_coverage: v.optional(v.array(prdCoverageItemValidator)),
+    kb_coverage_gaps: v.optional(v.array(v.string())),
     proposed_scenarios: v.optional(
       v.array(
         v.object({
@@ -296,6 +297,7 @@ export default defineSchema({
           area: v.string(),
           related_flows: v.optional(v.array(v.string())),
           relevant_page_urls: v.optional(v.array(v.string())),
+          kb_module: v.optional(v.string()),
         }),
       ),
     ),

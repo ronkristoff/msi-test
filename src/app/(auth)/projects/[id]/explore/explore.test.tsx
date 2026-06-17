@@ -151,6 +151,19 @@ const analyzedNoFlows = {
   ],
 };
 
+const analyzedWithKbModule = {
+  _id: "expl-kb",
+  status: "analyzed",
+  url: "https://example.com",
+  generated_areas: [],
+  captured_pages: [],
+  proposed_scenarios: [
+    { name: "Login test", description: "Test login", flow_summary: "Load login", area: "Authentication", kb_module: "Auth Module" },
+    { name: "Browse test", description: "Test browsing", flow_summary: "Load page", area: "Navigation" },
+  ],
+  kb_coverage_gaps: ["Billing Module"],
+};
+
 const discoveredExploration = {
   _id: "expl-disc",
   status: "discovered",
@@ -543,5 +556,56 @@ describe("ExplorePage", () => {
 
     expect(screen.getByText("Deep Explore")).toBeInTheDocument();
     expect(screen.queryByText("Analyze")).not.toBeInTheDocument();
+  });
+
+  it("renders KB module badge on scenarios with kb_module in list view", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = analyzedWithKbModule;
+    mockQueryResults.latestActive = { _id: "expl-kb" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByRole("button", { name: /list view/i }));
+
+    expect(screen.getByText("KB: Auth Module")).toBeInTheDocument();
+    const kbBadges = screen.queryAllByText(/^KB:/);
+    expect(kbBadges).toHaveLength(1);
+  });
+
+  it("does not render KB badge when scenarios have no kb_module", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = analyzedNoFlows;
+    mockQueryResults.latestActive = { _id: "expl2" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    await userEvent.click(screen.getByRole("button", { name: /list view/i }));
+
+    expect(screen.queryAllByText(/^KB:/)).toHaveLength(0);
+  });
+
+  it("renders KB coverage gaps banner when kb_coverage_gaps is non-empty", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = analyzedWithKbModule;
+    mockQueryResults.latestActive = { _id: "expl-kb" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.getByText(/no matching exploration page/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 Knowledge Base module/i)).toBeInTheDocument();
+  });
+
+  it("does not render KB coverage gaps banner when kb_coverage_gaps is absent", async () => {
+    mockQueryResults.project = projectData;
+    mockQueryResults.exploration = analyzedNoFlows;
+    mockQueryResults.latestActive = { _id: "expl2" };
+
+    const { default: ExplorePage } = await import("./page");
+    render(<ExplorePage />);
+
+    expect(screen.queryByText(/no matching exploration page/i)).not.toBeInTheDocument();
   });
 });
