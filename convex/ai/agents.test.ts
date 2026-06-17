@@ -4,6 +4,8 @@ import { convexTest } from "convex-test";
 import schema from "../schema";
 import type { Id } from "../_generated/dataModel";
 import { seedFullStack, seedWorkspace, seedProject, seedKnowledgeBase, seedModule, seedBaselineRd } from "../testHelpers";
+import { TEST_GEN_KB_CONTEXT_CHARS } from "../lib/constraints";
+import type { ReadKnowledgeBaseResult, ReadBaselineRdResult } from "./tools/logic";
 
 interface AiErrorData {
   type: string;
@@ -964,5 +966,346 @@ describe("Prompt content snapshots", () => {
 
     expect(prompt).not.toContain("readBaselineRd");
     expect(prompt).not.toContain("Project ID:");
+  });
+
+  describe("buildKbContextBlock", () => {
+    const kbFixture: ReadKnowledgeBaseResult = {
+      architecture_type: "monolith",
+      tech_stack: ["Next.js", "Convex"],
+      architecture_summary: "Full-stack web application.",
+      modules: [
+        {
+          name: "Auth Module",
+          description: "Handles authentication flows.",
+          file_count: 5,
+          dependencies: ["convex-auth"],
+          apis: [{ path: "/api/login", method: "POST" }],
+          data_models: { tables: [{ name: "secret_users_table" }] },
+          user_flows: [{ route: "/dashboard", name: "Dashboard" }],
+        },
+        {
+          name: "Billing Module",
+          description: "Manages subscriptions.",
+          file_count: 3,
+          dependencies: ["stripe"],
+          apis: null,
+          data_models: null,
+          user_flows: null,
+        },
+      ],
+    };
+
+    const rdFixture: ReadBaselineRdResult = {
+      version: 2,
+      status: "approved",
+      sections: [
+        { id: "overview", title: "Overview", content: "Auth + billing app.", confidence: 0.82 },
+        { id: "auth", title: "Authentication", content: "Email + Google OAuth.", confidence: 0.9 },
+      ],
+    };
+
+    const zeroModuleKb: ReadKnowledgeBaseResult = {
+      architecture_type: "microservices",
+      tech_stack: null,
+      architecture_summary: null,
+      modules: [],
+    };
+
+    it("returns empty string when both kb and rd are null", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      expect(buildKbContextBlock(null, null)).toBe("");
+    });
+
+    it("returns empty string for zero-module KB with null rd", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      expect(buildKbContextBlock(zeroModuleKb, null)).toBe("");
+    });
+
+    it("formats KB-only block with architecture type, tech stack, summary, and module names", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(kbFixture, null);
+
+      expect(block).toContain("## Project Knowledge Context");
+      expect(block).toContain("### Knowledge Base");
+      expect(block).toContain("monolith");
+      expect(block).toContain("Next.js");
+      expect(block).toContain("Convex");
+      expect(block).toContain("Full-stack web application.");
+      expect(block).toContain("Auth Module");
+      expect(block).toContain("Handles authentication flows.");
+      expect(block).toContain("Billing Module");
+      expect(block).toContain("Manages subscriptions.");
+    });
+
+    it("includes apis rendering with endpoint paths and methods", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(kbFixture, null);
+
+      expect(block).toContain("/api/login");
+      expect(block).toContain("POST");
+    });
+
+    it("includes user_flows rendering with routes", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(kbFixture, null);
+
+      expect(block).toContain("/dashboard");
+    });
+
+    it("omits data_models from KB block", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(kbFixture, null);
+
+      expect(block).not.toContain("secret_users_table");
+      expect(block).not.toContain("Data Model");
+    });
+
+    it("formats RD-only block with version, status, and section content", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(null, rdFixture);
+
+      expect(block).toContain("### Baseline Requirements Document");
+      expect(block).toContain("2");
+      expect(block).toContain("approved");
+      expect(block).toContain("Overview");
+      expect(block).toContain("Auth + billing app.");
+      expect(block).toContain("0.82");
+      expect(block).toContain("Authentication");
+      expect(block).toContain("Email + Google OAuth.");
+    });
+
+    it("formats both KB and RD under single top-level header", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(kbFixture, rdFixture);
+
+      expect(block).toContain("## Project Knowledge Context");
+      expect(block).toContain("### Knowledge Base");
+      expect(block).toContain("### Baseline Requirements Document");
+      const headerCount = (block.match(/## Project Knowledge Context/g) || []).length;
+      expect(headerCount).toBe(1);
+    });
+
+    it("emits only RD section when KB has zero modules but RD is present", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const block = buildKbContextBlock(zeroModuleKb, rdFixture);
+
+      expect(block).toContain("### Baseline Requirements Document");
+      expect(block).not.toContain("### Knowledge Base");
+    });
+
+    it("truncates oversized block at boundary with marker", async () => {
+      const { buildKbContextBlock } = await import("./agents");
+      const oversizedKb: ReadKnowledgeBaseResult = {
+        architecture_type: "monolith",
+        tech_stack: ["React"],
+        architecture_summary: "X".repeat(200),
+        modules: Array.from({ length: 80 }, (_, i) => ({
+          name: `Module ${i}`,
+          description: "Y".repeat(200),
+          file_count: 1,
+          dependencies: [],
+          apis: null,
+          data_models: null,
+          user_flows: null,
+        })),
+      };
+
+      const block = buildKbContextBlock(oversizedKb, null);
+      const marker = "… [truncated]";
+
+      expect(block.endsWith(marker)).toBe(true);
+      expect(block.length).toBeLessThanOrEqual(TEST_GEN_KB_CONTEXT_CHARS + marker.length + 1);
+      expect(block.at(-(marker.length + 1))).toBe("\n");
+      expect(block).toContain("## Project Knowledge Context");
+      expect(block).toContain("Module 0");
+      expect(block).not.toContain("Module 79");
+    });
+
+    it("cuts at \\n\\n boundary not mid-paragraph (D6 defect prevention)", async () => {
+      const { truncateContext } = await import("./agents");
+
+      const input = "First paragraph.\n\nSecond long paragraph with lots of extra content here.";
+      const naiveSlice = input.slice(0, 30);
+      expect(naiveSlice).toContain("Second");
+
+      const result = truncateContext(input, 30);
+      expect(result).toContain("… [truncated]");
+      expect(result).toContain("First paragraph.");
+      expect(result).not.toContain("Second");
+    });
+  });
+
+  describe("truncateContext", () => {
+    it("returns short input unchanged", async () => {
+      const { truncateContext } = await import("./agents");
+      expect(truncateContext("hello world", 100)).toBe("hello world");
+    });
+
+    it("returns exact-max input unchanged (no marker)", async () => {
+      const { truncateContext } = await import("./agents");
+      const input = "a".repeat(50);
+      expect(truncateContext(input, 50)).toBe(input);
+    });
+
+    it("appends marker and cuts at boundary for oversized input", async () => {
+      const { truncateContext } = await import("./agents");
+      const input = "Section A content.\n\nSection B content that is longer than the limit allows here.";
+      const result = truncateContext(input, 25);
+
+      expect(result).toContain("… [truncated]");
+      expect(result).toContain("Section A");
+      expect(result).not.toContain("Section B");
+      expect(result.length).toBeLessThanOrEqual(25 + "… [truncated]".length + 1);
+    });
+
+    it("falls back to raw cut when no \\n\\n boundary exists", async () => {
+      const { truncateContext } = await import("./agents");
+      const input = "a".repeat(100);
+      const result = truncateContext(input, 50);
+
+      expect(result).toContain("… [truncated]");
+      expect(result.length).toBe(50 + "… [truncated]".length);
+    });
+
+    it("uses exact ellipsis marker literal", async () => {
+      const { truncateContext } = await import("./agents");
+      const result = truncateContext("a".repeat(100), 10);
+      expect(result.endsWith("… [truncated]")).toBe(true);
+    });
+  });
+
+  describe("kbContext prompt injection", () => {
+    const kbContextBlock = "## Project Knowledge Context\n### Knowledge Base\n- Auth Module";
+
+    it("buildPrdGenerationPrompt injects kbContext after projectId and before auth", async () => {
+      const { buildPrdGenerationPrompt } = await import("./agents");
+
+      const prompt = buildPrdGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "[AUTH CONTEXT MARKER]",
+        prdText: "prd",
+        snapshotContext: "",
+        retryContext: "",
+        projectId: "abc123",
+        kbContext: kbContextBlock,
+      });
+
+      expect(prompt).toContain("## Project Knowledge Context");
+      expect(prompt).toContain("Project ID: abc123");
+      expect(prompt).toContain("readKnowledgeBase");
+      expect(prompt).toContain("readBaselineRd");
+      expect(prompt.indexOf("## Project Knowledge Context")).toBeGreaterThan(prompt.indexOf("Project ID: abc123"));
+      expect(prompt.indexOf("## Project Knowledge Context")).toBeLessThan(prompt.indexOf("[AUTH CONTEXT MARKER]"));
+    });
+
+    it("buildPrdGenerationPrompt omits kbContext block when empty string", async () => {
+      const { buildPrdGenerationPrompt } = await import("./agents");
+
+      const prompt = buildPrdGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdText: "prd",
+        snapshotContext: "",
+        retryContext: "",
+        kbContext: "",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
+
+    it("buildPrdGenerationPrompt omits kbContext block when omitted", async () => {
+      const { buildPrdGenerationPrompt } = await import("./agents");
+
+      const prompt = buildPrdGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdText: "prd",
+        snapshotContext: "",
+        retryContext: "",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
+
+    it("buildPrdGenerationPrompt treats whitespace-only kbContext as empty", async () => {
+      const { buildPrdGenerationPrompt } = await import("./agents");
+
+      const prompt = buildPrdGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdText: "prd",
+        snapshotContext: "",
+        retryContext: "",
+        kbContext: "   ",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
+
+    it("buildNlGenerationPrompt injects kbContext when provided", async () => {
+      const { buildNlGenerationPrompt } = await import("./agents");
+
+      const prompt = buildNlGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdContext: "",
+        snapshotContext: "",
+        retryContext: "",
+        prompt: "do a thing",
+        kbContext: kbContextBlock,
+      });
+
+      expect(prompt).toContain("## Project Knowledge Context");
+    });
+
+    it("buildNlGenerationPrompt omits kbContext when omitted", async () => {
+      const { buildNlGenerationPrompt } = await import("./agents");
+
+      const prompt = buildNlGenerationPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdContext: "",
+        snapshotContext: "",
+        retryContext: "",
+        prompt: "do a thing",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
+
+    it("buildPrdFormatRetryPrompt does not contain kbContext block", async () => {
+      const { buildPrdFormatRetryPrompt } = await import("./agents");
+
+      const prompt = buildPrdFormatRetryPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdText: "prd",
+        snapshotContext: "",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
+
+    it("buildNlFormatRetryPrompt does not contain kbContext block", async () => {
+      const { buildNlFormatRetryPrompt } = await import("./agents");
+
+      const prompt = buildNlFormatRetryPrompt({
+        projectName: "P",
+        appUrl: "https://example.com",
+        authContext: "",
+        prdContext: "",
+        snapshotContext: "",
+        prompt: "do a thing",
+      });
+
+      expect(prompt).not.toContain("## Project Knowledge Context");
+    });
   });
 });

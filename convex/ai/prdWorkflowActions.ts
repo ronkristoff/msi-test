@@ -4,7 +4,7 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { buildPrdGenerationPrompt, buildPrdFormatRetryPrompt, createTestGenerationAgent, extractMultipleTests } from "./agents";
+import { buildPrdGenerationPrompt, buildPrdFormatRetryPrompt, createTestGenerationAgent, extractMultipleTests, buildKbContextBlock } from "./agents";
 import { buildAuthPromptContext } from "./authContext";
 import { type SnapshotData } from "./snapshotFormatter";
 import { buildSnapshotContext, buildRetryContext } from "./workflowShared";
@@ -57,6 +57,12 @@ export const generateTestsAction = internalAction({
       args.previous_code,
     );
 
+    const [kb, rd] = await Promise.all([
+      ctx.runQuery(internal.ai.tools.queries.readKnowledgeBaseQuery, { project_id: args.project_id }),
+      ctx.runQuery(internal.ai.tools.queries.readBaselineRdQuery, { project_id: args.project_id }),
+    ]);
+    const kbContext = buildKbContextBlock(kb, rd);
+
     const prompt = buildPrdGenerationPrompt({
       projectName: project.name,
       appUrl: project.app_url,
@@ -65,6 +71,7 @@ export const generateTestsAction = internalAction({
       snapshotContext,
       retryContext,
       projectId: String(args.project_id),
+      kbContext,
     });
 
     const agent = createTestGenerationAgent(getWorkspaceModel(aiConfig));

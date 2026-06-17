@@ -3,7 +3,7 @@
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { buildNlGenerationPrompt, buildNlFormatRetryPrompt, createTestGenerationAgent, extractMultipleTests } from "./agents";
+import { buildNlGenerationPrompt, buildNlFormatRetryPrompt, createTestGenerationAgent, extractMultipleTests, buildKbContextBlock } from "./agents";
 import { buildAuthPromptContext } from "./authContext";
 import { type SnapshotData } from "./snapshotFormatter";
 import { buildSnapshotContext, buildRetryContext } from "./workflowShared";
@@ -52,13 +52,19 @@ export const generateTestsAction = internalAction({
       args.previous_code,
     );
 
+    const [kb, rd] = await Promise.all([
+      ctx.runQuery(internal.ai.tools.queries.readKnowledgeBaseQuery, { project_id: args.project_id }),
+      ctx.runQuery(internal.ai.tools.queries.readBaselineRdQuery, { project_id: args.project_id }),
+    ]);
+    const kbContext = buildKbContextBlock(kb, rd);
+
     const promptOpts = { projectName: project.name, appUrl: project.app_url, authContext, prdContext, snapshotContext, prompt: args.prompt };
 
     const agent = createTestGenerationAgent(getWorkspaceModel(aiConfig));
     const { thread } = await agent.createThread(ctx, { title: `NL Generation — ${project.name}` });
     const result = await thread.generateText({
       maxRetries: aiMaxRetries,
-      prompt: buildNlGenerationPrompt({ ...promptOpts, retryContext, projectId: String(args.project_id) }),
+      prompt: buildNlGenerationPrompt({ ...promptOpts, retryContext, projectId: String(args.project_id), kbContext }),
     });
 
     let testBlocks = extractMultipleTests(result.text);

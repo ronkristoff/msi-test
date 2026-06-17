@@ -4,6 +4,8 @@ import { z } from "zod/v3";
 
 type AgentModel = Config extends { languageModel?: infer M } ? M : never;
 import { createToolDefinitions } from "./tools/definitions";
+import { TEST_GEN_KB_CONTEXT_CHARS } from "../lib/constraints";
+import type { ReadKnowledgeBaseResult, ReadBaselineRdResult } from "./tools/logic";
 
 export const explorationScenarioSchema = z.object({
   name: z.string(),
@@ -503,6 +505,99 @@ function buildContextToolHints(projectId?: string): string {
   return `\nProject ID: ${projectId}\nIf the project has a Knowledge Base, use the readKnowledgeBase tool with this exact project_id to look up its modules, APIs, data models, and user flows before generating tests.\nIf the project has a Baseline Requirements Document, use the readBaselineRd tool with this exact project_id to look up its RD sections and confidence scores before generating tests.\n`;
 }
 
+const TRUNCATION_MARKER = "… [truncated]";
+
+export function truncateContext(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const boundaryIndex = text.lastIndexOf("\n\n", maxChars);
+  if (boundaryIndex > 0) {
+    return text.slice(0, boundaryIndex + 1) + TRUNCATION_MARKER;
+  }
+  return text.slice(0, maxChars) + TRUNCATION_MARKER;
+}
+
+function renderApis(apis: unknown): string {
+  const list = Array.isArray(apis)
+    ? apis
+    : apis && typeof apis === "object" && Array.isArray((apis as Record<string, unknown>).endpoints)
+      ? ((apis as Record<string, unknown>).endpoints as unknown[])
+      : null;
+  if (!list) return "";
+  const rendered = list
+    .filter((e): e is Record<string, unknown> => e != null && typeof e === "object")
+    .map((e) => {
+      const method = typeof e.method === "string" ? e.method : "";
+      const path = typeof e.path === "string" ? e.path : "";
+      return `${method} ${path}`.trim();
+    })
+    .filter((s) => s.length > 0);
+  return rendered.length > 0 ? `  APIs: ${rendered.join(", ")}` : "";
+}
+
+function renderUserFlows(flows: unknown): string {
+  if (!Array.isArray(flows)) return "";
+  const rendered = flows
+    .filter((f): f is Record<string, unknown> => f != null && typeof f === "object")
+    .map((f) => {
+      const route = typeof f.route === "string" ? f.route : "";
+      const name = typeof f.name === "string" ? f.name : "";
+      return [route, name].filter((s) => s.length > 0).join(" ");
+    })
+    .filter((s) => s.length > 0);
+  return rendered.length > 0 ? `  Flows: ${rendered.join(", ")}` : "";
+}
+
+export function buildKbContextBlock(
+  kb: ReadKnowledgeBaseResult | null,
+  rd: ReadBaselineRdResult | null,
+): string {
+  const parts: string[] = [];
+
+  if (kb && kb.modules.length > 0) {
+    const moduleBlocks = kb.modules.map((m) => {
+      const lines = [`- **${m.name}**: ${m.description ?? ""}`];
+      if (m.dependencies.length > 0) {
+        lines.push(`  Dependencies: ${m.dependencies.join(", ")}`);
+      }
+      const apis = renderApis(m.apis);
+      if (apis) lines.push(apis);
+      const flows = renderUserFlows(m.user_flows);
+      if (flows) lines.push(flows);
+      return lines.join("\n");
+    });
+
+    const headerLines = [
+      "### Knowledge Base",
+      kb.architecture_type ? `Architecture: ${kb.architecture_type}` : "",
+      kb.tech_stack && kb.tech_stack.length > 0 ? `Tech Stack: ${kb.tech_stack.join(", ")}` : "",
+      kb.architecture_summary ? `Summary: ${kb.architecture_summary}` : "",
+    ].filter((line) => line.length > 0);
+
+    parts.push(
+      moduleBlocks.length > 0
+        ? `${headerLines.join("\n")}\n\n${moduleBlocks.join("\n\n")}`
+        : headerLines.join("\n"),
+    );
+  }
+
+  if (rd) {
+    const sectionBlocks = rd.sections.map(
+      (s) => `**${s.title}** (confidence ${s.confidence})\n${s.content}`,
+    );
+    const rdHeader = [
+      "### Baseline Requirements Document",
+      `Version: v${rd.version}`,
+      `Status: ${rd.status}`,
+    ].join("\n");
+    parts.push(sectionBlocks.length > 0 ? `${rdHeader}\n\n${sectionBlocks.join("\n\n")}` : rdHeader);
+  }
+
+  if (parts.length === 0) return "";
+
+  const joined = `## Project Knowledge Context\n\n${parts.join("\n\n")}`;
+  return truncateContext(joined, TEST_GEN_KB_CONTEXT_CHARS);
+}
+
 export function buildNlGenerationPrompt(opts: {
   projectName: string;
   appUrl: string;
@@ -512,12 +607,13 @@ export function buildNlGenerationPrompt(opts: {
   retryContext: string;
   prompt: string;
   projectId?: string;
+  kbContext?: string;
 }): string {
   return `Generate Playwright tests from the following test description.
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${buildContextToolHints(opts.projectId)}${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
+${buildContextToolHints(opts.projectId)}${opts.kbContext?.trim() ?? ""}${opts.authContext}${opts.prdContext}${opts.snapshotContext}${opts.retryContext}
 
 Test Description:
 ${opts.prompt}
@@ -553,12 +649,13 @@ export function buildPrdGenerationPrompt(opts: {
   snapshotContext: string;
   retryContext: string;
   projectId?: string;
+  kbContext?: string;
 }): string {
   return `Generate Playwright tests for the following application.
 
 Project: ${opts.projectName}
 URL: ${opts.appUrl}
-${buildContextToolHints(opts.projectId)}${opts.authContext}${opts.snapshotContext}${opts.retryContext}
+${buildContextToolHints(opts.projectId)}${opts.kbContext?.trim() ?? ""}${opts.authContext}${opts.snapshotContext}${opts.retryContext}
 
 Product Requirements:
 ${opts.prdText}
