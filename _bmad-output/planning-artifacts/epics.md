@@ -263,6 +263,14 @@ When a project has a Knowledge Base and Baseline RD, test generation automatical
 **NFRs:** NFR-6, NFR-8
 **Depends on:** Epic 1 (KB) + Epic 2 (Baseline RD). Can run in parallel with C3/C4.
 
+### Epic 6: Foundation Hardening
+
+A debt/hardening epic that closes the 5th-epic carry-forwards (disabled TypeScript build gate, missing Playwright smoke coverage, multi-workspace IDOR) and addresses technical debt accumulated across Epics 1–5: structural-aware truncation rollout, prompt-injection hardening, file-size cap violations, and deferred-work triage. No new features — this epic hardens the substrate before any deployment or feature work.
+
+**NFRs:** NFR-3, NFR-8
+**Source:** Epic 5 Retrospective action items E4–E11
+**Depends on:** Epic 1–5 (all delivered functionality is stable; this epic hardens the substrate)
+
 ## Epic 1: Knowledge Base Construction
 
 A BA connects a GitHub repo to a project, triggers analysis, and the system builds a complete structured Knowledge Base — architecture summary, module map with APIs/data models/user flows, and vector-searchable code chunks. The BA can view the KB status, browse modules, and trigger re-syncs.
@@ -881,3 +889,170 @@ So that I can keep tests in sync with code changes.
 
 **FRs:** FR-42
 **NFRs:** NFR-6
+
+## Epic 6: Foundation Hardening
+
+A debt/hardening epic that closes the 5th-epic carry-forwards and addresses technical debt accumulated across Epics 1–5. No new features — this epic hardens the substrate. Story ordering reflects leverage and dependencies: critical-path items (6.1–6.3) must land before the epic is `done`.
+
+### Story 6.1: Restore TypeScript Build Gate
+
+As an architect,
+I want `pnpm build` to enforce TypeScript compilation as a true gate,
+So that type errors are caught at build time instead of silently accumulating behind a suppress flag.
+
+**Acceptance Criteria:**
+
+**Given** the frontend `tsconfig.json` currently includes `convex/` in its compilation scope, re-checking the deep `TestConvexForDataModel` instantiation cascade
+**When** the configuration is fixed
+**Then** `convex/` is excluded from the frontend tsconfig `include` (or `include` is scoped to `src/`)
+**And** `pnpm build` no longer re-checks Convex internal type instantiation
+
+**Given** approximately 32 real `src/` type errors masked by `ignoreBuildErrors: true`
+**When** those errors are fixed
+**Then** `pnpm build` passes with `typescript.ignoreBuildErrors` removed from `next.config.ts`
+**And** `pnpm typecheck` line count for `src/` errors drops to near zero
+
+**Given** `skipLibCheck: true` exists in both `tsconfig.json:6` and `convex/tsconfig.json:12` (D4 finding)
+**When** the suppress-flag audit re-verifies each
+**Then** `skipLibCheck` is kept only if still justified, with a comment documenting the rationale
+**And** any unjustified suppress flags are removed
+
+**NFRs:** NFR-8
+
+### Story 6.2: Playwright Smoke Gate for jsdom-Blind Flows
+
+As a test architect,
+I want Playwright smoke tests covering flows that jsdom cannot verify,
+So that navigation, streaming, clipboard, and download behaviors are regression-protected.
+
+**Acceptance Criteria:**
+
+**Given** the codebase has jsdom-blind flows across Epics 1–5 (chat send/streaming, impact + stories mode toggle + result render, checkbox-select-without-navigating [4.4 CRITICAL], status transitions, export download/clipboard, agent-tool invocation + streaming tool results, KB coverage-gaps banner, stale-tests banner → suite navigation)
+**When** the Playwright smoke suite is built
+**Then** each flow has at least one smoke test asserting the critical user-visible behavior
+**And** the suite reuses the existing `runner/` Playwright infrastructure
+**And** the suite runs via `pnpm test:e2e` and is added to the pre-commit verification chain
+
+**Given** a jsdom test that asserts on navigation/streaming/clipboard/download behavior
+**When** the D3 `UNVERIFIED-IN-JSDOM` rule is applied
+**Then** each such test is either covered by a Playwright smoke test OR marked `UNVERIFIED-IN-JSDOM` in its test file
+
+**NFRs:** NFR-8
+
+### Story 6.3: Fix Multi-Workspace `.first()` IDOR
+
+As an architect,
+I want `getOptionalMemberWorkspace` and `getMemberWorkspace` to resolve the correct workspace for multi-workspace users,
+So that a user with multiple memberships is not silently blocked from their non-primary workspace's data.
+
+**Acceptance Criteria:**
+
+**Given** `getOptionalMemberWorkspace` / `getMemberWorkspace` resolve via `.first()` on `by_user_id` (returning oldest membership), blocking multi-workspace users from non-primary workspace data
+**When** the fix is applied
+**Then** both functions accept a `workspace_id` parameter
+**And** resolve the membership via the `by_workspace_id_and_user_id` index
+**And** all callers across all domains (`knowledge/`, `chat/`, `stories/`, `workspaces/`, `ai/`) are updated to pass the correct `workspace_id`
+
+**Given** a multi-workspace user accessing a project/thread/KB in their non-primary workspace
+**When** they trigger any protected operation (chat, RAG, impact analysis, story generation/list/status/export, KB-aware test-gen, exploration cross-referencing, stale-test flagging)
+**Then** the operation succeeds — no false "Project not found" / "Thread not found" error
+
+**NFRs:** NFR-3
+
+### Story 6.4: Codebase-Wide Structural-Aware Truncation
+
+As a developer,
+I want `truncateContext` applied to all prompt-construction sites,
+So that the LLM never receives markdown truncated mid-bullet or mid-bold.
+
+**Acceptance Criteria:**
+
+**Given** `impactPrompts.ts:34,59` and `storyPrompts.ts:36,61` still use raw `slice(0, MAX_CONTEXT_CHARS)` cutting mid-markdown
+**When** the rollout is applied
+**Then** all four raw slices are replaced with `truncateContext(text, MAX)` calls
+**And** the duplicated `TRUNCATION_MARKER` literal is consolidated into a shared export
+
+**Given** a prompt context that exceeds the character budget
+**When** it is truncated
+**Then** truncation occurs at the last `\n\n` boundary before the limit
+**And** no markdown structure (bullets, bold, headers) is cut mid-element
+
+### Story 6.5: Prompt-Injection Hardening
+
+As an architect,
+I want untrusted KB/RD/code fields wrapped in delimiters before injection into LLM prompts,
+So that prompt-injection / instruction-override payloads in analyzed content cannot manipulate the model.
+
+**Acceptance Criteria:**
+
+**Given** prompt builders across the codebase (`buildKbContextBlock`, `impactPrompts.ts`, `storyPrompts.ts`, test-gen prompts) interpolate untrusted content raw
+**When** the hardening is applied
+**Then** a shared `sanitizeForPrompt()` helper is created in a shared module
+**And** all prompt-construction sites wrap untrusted fields (KB module names/descriptions, RD titles/content, endpoint paths/methods, architecture summaries, code content) via `sanitizeForPrompt()`
+**And** the helper uses XML fences or escaping to delimit untrusted content
+
+**Given** a KB/RD field containing a prompt-injection payload (e.g., "Ignore previous instructions and...")
+**When** it is passed through `sanitizeForPrompt()`
+**Then** the payload is contained within delimiters that the model is instructed to treat as data, not instructions
+
+**NFRs:** NFR-3
+
+### Story 6.6: Split `convex/knowledge/internal.ts`
+
+As a developer,
+I want `convex/knowledge/internal.ts` (currently 1,107 lines, 38% over the 800-line cap) split into focused modules,
+So that the file is within the project's size limits and KB-lifecycle code is navigable.
+
+**Acceptance Criteria:**
+
+**Given** `internal.ts` exceeds the 800-line cap with mixed concerns (resync functions, ingestion-complete handler, workflow hooks, module CRUD)
+**When** the split is applied (gated — triggered when the next change lands in this file)
+**Then** `internal.ts` re-exports from `internal/resync.ts` (`_snapshotModulesForResync`, `_storeModuleDiff`, `_deleteModulesByKb`, `_resetKbForResync`)
+**And** `internal/ingestion.ts` owns `_handleIngestionComplete` + workflow hooks
+**And** all existing imports of `internal.ts` continue to work (re-export preserves API)
+**And** no behavior change — pure structural refactor
+
+### Story 6.7: Promote `errorMessage()` to Shared Utility
+
+As a developer,
+I want `errorMessage()` promoted to `src/lib/`,
+So that the duplicated ConvexError message-scraping logic across components is consolidated.
+
+**Acceptance Criteria:**
+
+**Given** `errorMessage()` has 2+ local copies (`stories/[storyId]/page.tsx`, `CopyStoryButton.tsx`) and the "promote on 3rd caller" rule has fired
+**When** the promotion is applied (opportunistic — triggered when next touching a file with a local copy)
+**Then** `errorMessage()` is exported from `src/lib/`
+**And** all local copies are replaced with imports from the shared module
+**And** the ConvexError message-scraping regex (`/^Uncaught ConvexError:\s*/`) lives in one place
+
+### Story 6.8: TOCTOU Race on `getStaleTests`/Re-Sync
+
+As an architect,
+I want the race condition between `getStaleTests` and concurrent KB re-sync eliminated,
+So that stale-test flagging does not read inconsistent state during a re-sync.
+
+**Acceptance Criteria:**
+
+**Given** `getStaleTests` reads `kb.status` ("ready") and `module_diff` without a lock, and a concurrent re-sync can flip status to "building" and clear/replace `module_diff` between reads
+**When** the race is addressed
+**Then** the fix uses OCC (optimistic concurrency control) or a snapshot isolation mechanism to ensure read consistency across the join fan-out
+**And** `getStaleTests` returns either consistent pre-sync state or consistent post-sync state — never a mix
+**And** the same pattern is verified against the `resyncKnowledgeBase` TOCTOU surface
+
+**NFRs:** NFR-3
+
+### Story 6.9: Deferred-Work Triage & Cleanup
+
+As a developer,
+I want `deferred-work.md` triaged and stale items closed,
+So that the debt backlog is accurate and actionable for future planning.
+
+**Acceptance Criteria:**
+
+**Given** `deferred-work.md` has accumulated items across Epics 1–5 (some resolved, some stale, some blocking)
+**When** the triage is complete
+**Then** resolved items are marked `✅ RESOLVED` with evidence
+**And** stale items that no longer apply are removed with a brief note
+**And** blocking items (F3 dead dedup branch, F4 unbounded `.collect()`) are promoted to action or explicitly accepted with rationale
+**And** remaining items have clear priority and ownership

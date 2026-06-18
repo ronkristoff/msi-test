@@ -5,7 +5,7 @@ date: '2026-06-13'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
 existing_patterns_found: 30
 status: 'complete'
-rule_count: 42
+rule_count: 43
 optimized_for_llm: true
 ---
 
@@ -81,6 +81,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Minimum 80% coverage** — hard rule. TDD mandatory: RED → GREEN → REFACTOR.
 - **No implementation without test first** — exception only when test infrastructure doesn't exist yet (set up infrastructure first).
 - **DOM matchers**: `@testing-library/jest-dom/vitest` auto-loaded via `src/test/setup.ts`. No need to import in individual test files.
+- **Test-fidelity gate (D3)**: Any AC whose behavior depends on navigation, clipboard, download, or streaming MUST have a Playwright smoke test OR be marked `UNVERIFIED-IN-JSDOM` in the story's test section. jsdom cannot verify these flows; a passing jsdom test on such an AC is a false positive. Additionally, every test fixture asserting on an external/extracted shape must **cite the production write site** (file:line of the write) — parallel to the C4 spike-citation gate. Story 5.3 shipped a CRITICAL where `renderApis` tested a `{endpoints:[...]}` wrapper shape that never exists in production (extraction emits a flat array) — a green test against a fake shape.
 
 ### Code Quality & Style Rules
 
@@ -103,7 +104,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Convex error logging**: `convex/logs/mutations.ts` has `logError` (public, no auth, auto-truncates). Set up via `setGlobalErrorLogger()` + `initGlobalErrorHandlers()` in root layout.
 - **PR workflow**: Full commit history analysis → summary → test plan → push with `-u`.
 - **Review gate (mandatory before `sprint-status → done`)**: Every story's `done` transition requires (a) a `### Review Findings` section in the story file with the 3-layer review outcome, and (b) the story file's `Status:` header matching `sprint-status.yaml`. Story 2.3 shipped `done` in sprint-status but `review` in its file with no Review Findings section — a reviewed story looked unreviewed. This is an enforced gate, not an aspiration (Epic 2 retro action B1).
-- **Pre-review self-checklist (C1)**: Before moving a story to `review`, verify three recurring defect classes the adversarial review catches repeatedly: (a) **error-handling paths** — enumerate surfaced vs swallowed vs leaked for every try/catch; (b) **dual-write atomicity** — code writing to two systems (agent thread + join table, pending state + subscription) must be atomic or have defined reconciliation; (c) **test-asserts-on-content** — tests assert expected values (`.toBe(...)` / `.toMatch(/.../)`), not just types (`typeof === "string"` passes on `""`). Plus a spec-consistency sweep: re-read ACs ↔ Tasks ↔ Dev Notes ↔ "What NOT to Reinvent" and resolve contradictions. Goal: ≤5 review patches/story (Epic 3 averaged ~10).
+- **Pre-review self-checklist (C1)**: Before moving a story to `review`, verify four recurring defect classes the adversarial review catches repeatedly: (a) **error-handling paths** — enumerate surfaced vs swallowed vs leaked for every try/catch; (b) **dual-write atomicity** — code writing to two systems (agent thread + join table, pending state + subscription) must be atomic or have defined reconciliation; (c) **test-asserts-on-content** — tests assert expected values (`.toBe(...)` / `.toMatch(/.../)`), not just types (`typeof === "string"` passes on `""`); (d) **fixture-reality** — every test fixture asserting on an external/extracted shape must cite the production write site (file:line) — a green test against a shape that doesn't match production reality is a false positive (Story 5.3 `renderApis` CRITICAL). Plus a spec-consistency sweep: re-read ACs ↔ Tasks ↔ Dev Notes ↔ "What NOT to Reinvent" and resolve contradictions. Goal: ≤5 review patches/story (Epic 3 averaged ~10).
 - **Async-timing verification (C2)**: Any spec claim of the form "the window is <Xms" or "this resolves before Y" must cite an installed-type contract (`.d.ts` path + line) OR be marked `UNVERIFIED` and tested before the spec is locked. Story 3.4 shipped a CRITICAL duplicate-message bug because a dev-note asserted a "<500ms" dedup window that was empirically 10–30s.
 - **Spike API-citation gate (C4)**: Every spike decision asserting an external-library API shape must cite the installed `.d.ts` path + line. Spikes asserting without citation get a verification task at the top of the first consuming story. The streaming spike's "thread metadata via `updateThreadMetadata`" was impossible in `@convex-dev/agent` v0.6.1 — `ThreadDoc` has no `metadata` field.
 - **`*-free` model guard enforced (C5)**: `getWorkspaceModel` (`convex/ai/model.ts`) throws `ConvexError` on model names ending in "free" (case-insensitive). Every agent factory inherits the guard. Third-epic carry-forward (B4), resolved post-Epic 3 retro.
@@ -146,4 +147,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-13
+Last Updated: 2026-06-18
