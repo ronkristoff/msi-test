@@ -2,6 +2,7 @@ import { query, internalQuery, action } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { getOptionalOwnedEntity, getOwnedEntity, getOptionalMemberWorkspace } from "../lib/requireAuth";
+import type { Id } from "../_generated/dataModel";
 import {
   OLD_RD_PREVIEW_LENGTH,
   EMBEDDING_MAX_QUERY_LENGTH,
@@ -160,6 +161,126 @@ export const getModules = query({
       file_count: m.file_count ?? 0,
       dependencies: m.dependencies ?? [],
     }));
+  },
+});
+
+export type StaleTestResult = {
+  _id: Id<"tests">;
+  name: string;
+  suite_id: Id<"suites">;
+  suite_name: string;
+  module_name: string;
+  reason: "changed" | "removed";
+};
+
+export const getStaleTests = query({
+  args: {
+    project_id: v.id("projects"),
+  },
+  handler: async (ctx, args): Promise<StaleTestResult[]> => {
+    const owned = await getOptionalOwnedEntity(ctx, args.project_id, "projects");
+    if (!owned) return [];
+
+    const kb = await ctx.db
+      .query("knowledge_bases")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .order("desc")
+      .first();
+    if (!kb || kb.status !== "ready" || !kb.module_diff) return [];
+
+    const flagEntries: Array<{ name: string; reason: "changed" | "removed" }> = [
+      ...kb.module_diff.removed.map((name) => ({ name, reason: "removed" as const })),
+      ...kb.module_diff.changed.map((name) => ({ name, reason: "changed" as const })),
+    ];
+    if (flagEntries.length === 0) return [];
+
+    const flagMap = new Map<string, "changed" | "removed">();
+    for (const e of flagEntries) {
+      const key = e.name.trim().toLowerCase();
+      if (!flagMap.has(key)) flagMap.set(key, e.reason);
+    }
+    if (flagMap.size === 0) return [];
+
+    const explorations = await ctx.db
+      .query("explorations")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .collect();
+
+    const matchingExplorations = new Map<
+      string,
+      { module_name: string; reason: "changed" | "removed" }
+    >();
+    for (const expl of explorations) {
+      const scenarios = expl.proposed_scenarios ?? [];
+      for (const scenario of scenarios) {
+        if (!scenario.kb_module) continue;
+        const key = scenario.kb_module.trim().toLowerCase();
+        const reason = flagMap.get(key);
+        if (reason) {
+          const existing = matchingExplorations.get(expl._id);
+          if (!existing) {
+            matchingExplorations.set(expl._id, {
+              module_name: scenario.kb_module,
+              reason,
+            });
+          }
+          break;
+        }
+      }
+    }
+    if (matchingExplorations.size === 0) return [];
+
+    const allSuites = await ctx.db
+      .query("suites")
+      .withIndex("by_project_id", (q) => q.eq("project_id", args.project_id))
+      .collect();
+
+    const matchingSuites: Array<{
+      _id: Id<"suites">;
+      name: string;
+      match: { module_name: string; reason: "changed" | "removed" };
+    }> = [];
+    for (const suite of allSuites) {
+      if (!suite.exploration_id) continue;
+      const match = matchingExplorations.get(suite.exploration_id);
+      if (!match) continue;
+      matchingSuites.push({ _id: suite._id, name: suite.name, match });
+    }
+    if (matchingSuites.length === 0) return [];
+
+    const allTests = await ctx.db
+      .query("tests")
+      .withIndex("by_workspace_id", (q) => q.eq("workspace_id", owned.workspace._id))
+      .collect();
+
+    const testsBySuite = new Map<Id<"suites">, typeof allTests>();
+    for (const test of allTests) {
+      const list = testsBySuite.get(test.suite_id);
+      if (list) {
+        list.push(test);
+      } else {
+        testsBySuite.set(test.suite_id, [test]);
+      }
+    }
+
+    const results = new Map<string, StaleTestResult>();
+    for (const suite of matchingSuites) {
+      const suiteTests = testsBySuite.get(suite._id);
+      if (!suiteTests) continue;
+      for (const test of suiteTests) {
+        if (results.has(test._id)) continue;
+        results.set(test._id, {
+          _id: test._id,
+          name: test.name,
+          suite_id: suite._id,
+          suite_name: suite.name,
+          module_name: suite.match.module_name,
+          reason: suite.match.reason,
+        });
+      }
+    }
+
+    return Array.from(results.values());
   },
 });
 

@@ -155,6 +155,10 @@ export const resyncKnowledgeBase = action({
       progress_message: "Starting re-sync...",
     });
 
+    await ctx.runMutation(internal.knowledge.internal._snapshotModulesForResync, {
+      knowledge_base_id: existingKb._id,
+    });
+
     await ctx.runMutation(internal.knowledge.internal._deleteModulesByKb, {
       knowledge_base_id: existingKb._id,
     });

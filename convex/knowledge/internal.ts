@@ -5,6 +5,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { MAX_EMBEDDING_CHUNKS, RD_ERROR_MESSAGE_MAX_LENGTH, DRIFT_ERROR_MESSAGE_MAX_LENGTH } from "../lib/constraints";
 import { driftItemValidator, rdSectionValidator } from "../lib/validation";
+import { computeModuleFingerprint, diffModuleSnapshots } from "./moduleDiff";
 
 export const _patchProjectRepo = internalMutation({
   args: {
@@ -316,19 +317,59 @@ export const _handleIngestionComplete = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
-    if (args.result.kind !== "failed") return;
+    if (args.result.kind === "canceled") {
+      await ctx.db.patch(args.context.knowledge_base_id, {
+        previous_module_fingerprints: undefined,
+      });
+      return;
+    }
+
+    if (args.result.kind === "failed") {
+      const kb = await ctx.db.get(args.context.knowledge_base_id);
+      if (!kb) return;
+      if (kb.status !== "building") return;
+
+      await ctx.db.patch(args.context.knowledge_base_id, {
+        status: "error",
+        error_message: args.result.error || "Ingestion workflow failed",
+        progress_message: undefined,
+        previous_module_fingerprints: undefined,
+      });
+      await ctx.db.patch(args.context.project_id, {
+        kb_status: "error",
+      });
+      return;
+    }
 
     const kb = await ctx.db.get(args.context.knowledge_base_id);
     if (!kb) return;
-    if (kb.status !== "building") return;
+    if (!kb.previous_module_fingerprints) return;
 
+    const modules = await ctx.db
+      .query("kb_modules")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.context.knowledge_base_id),
+      )
+      .collect();
+    const nextFingerprints = modules.map((m) => ({
+      name: m.name,
+      fingerprint: computeModuleFingerprint({
+        name: m.name,
+        description: m.description ?? null,
+        files: m.files ?? [],
+        apis: m.apis ?? null,
+        data_models: m.data_models ?? null,
+        user_flows: m.user_flows ?? null,
+        dependencies: m.dependencies ?? [],
+      }),
+    }));
+    const diff = diffModuleSnapshots(
+      kb.previous_module_fingerprints,
+      nextFingerprints,
+    );
     await ctx.db.patch(args.context.knowledge_base_id, {
-      status: "error",
-      error_message: args.result.error || "Ingestion workflow failed",
-      progress_message: undefined,
-    });
-    await ctx.db.patch(args.context.project_id, {
-      kb_status: "error",
+      module_diff: { ...diff, computed_at: Date.now() },
+      previous_module_fingerprints: undefined,
     });
   },
 });
@@ -434,6 +475,37 @@ export const _resetKbForResync = internalMutation({
       progress_message: undefined,
       bmad_detected: undefined,
       bmad_parsed_at: undefined,
+    });
+  },
+});
+
+export const _snapshotModulesForResync = internalMutation({
+  args: {
+    knowledge_base_id: v.id("knowledge_bases"),
+  },
+  handler: async (ctx, args) => {
+    const kb = await ctx.db.get(args.knowledge_base_id);
+    if (!kb) return;
+    const modules = await ctx.db
+      .query("kb_modules")
+      .withIndex("by_knowledge_base_id", (q) =>
+        q.eq("knowledge_base_id", args.knowledge_base_id),
+      )
+      .collect();
+    const fingerprints = modules.map((m) => ({
+      name: m.name,
+      fingerprint: computeModuleFingerprint({
+        name: m.name,
+        description: m.description ?? null,
+        files: m.files ?? [],
+        apis: m.apis ?? null,
+        data_models: m.data_models ?? null,
+        user_flows: m.user_flows ?? null,
+        dependencies: m.dependencies ?? [],
+      }),
+    }));
+    await ctx.db.patch(args.knowledge_base_id, {
+      previous_module_fingerprints: fingerprints,
     });
   },
 });

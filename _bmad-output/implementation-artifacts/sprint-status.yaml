@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-13
-last_updated: 2026-06-17T18:00:00Z
+last_updated: 2026-06-18T10:45:00Z
 project: msi-test
 project_key: NOKEY
 tracking_system: file-system
@@ -80,5 +80,5 @@ development_status:
   5-2-read-baseline-rd-agent-tool: done
   5-3-context-enhanced-test-generation-prompts: done
   5-4-exploration-cross-references-kb-modules: done
-  5-5-drift-aware-test-regeneration-suggestions: backlog
+  5-5-drift-aware-test-regeneration-suggestions: done
   epic-5-retrospective: optional

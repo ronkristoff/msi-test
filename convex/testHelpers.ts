@@ -499,6 +499,64 @@ export async function seedExploration(
   });
 }
 
+export async function seedExplorationWithScenarios(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  scenarios: Array<{ kb_module: string; name: string }>,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("explorations", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      url: "https://example.com",
+      status: "analyzed",
+      proposed_scenarios: scenarios.map((s, i) => ({
+        name: s.name,
+        description: `Scenario ${i}`,
+        flow_summary: "flow",
+        area: "auth",
+        kb_module: s.kb_module,
+      })),
+    });
+  });
+}
+
+export async function seedSuiteWithExploration(
+  t: TestCtx,
+  workspaceId: string,
+  projectId: string,
+  explorationId: string,
+  suiteName: string,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("suites", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      project_id: projectId as Id<"projects">,
+      name: suiteName,
+      source_type: "url_exploration",
+      exploration_id: explorationId as Id<"explorations">,
+    });
+  });
+}
+
+export async function seedTestInSuite(
+  t: TestCtx,
+  workspaceId: string,
+  suiteId: string,
+  testName: string,
+) {
+  return t.run(async (ctx) => {
+    return ctx.db.insert("tests", {
+      workspace_id: workspaceId as Id<"workspaces">,
+      suite_id: suiteId as Id<"suites">,
+      name: testName,
+      source_type: "url_exploration",
+      status: "approved",
+    });
+  });
+}
+
 export async function seedRunWithTwoTests(t: TestCtx) {
   const workspaceId = await seedWorkspace(t);
   const projectId = await seedProject(t, workspaceId);

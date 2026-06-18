@@ -391,6 +391,22 @@ export default defineSchema({
     bmad_detected: v.optional(v.boolean()),
     bmad_parsed_at: v.optional(v.number()),
     last_synced_at: v.optional(v.number()),
+    previous_module_fingerprints: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          fingerprint: v.string(),
+        }),
+      ),
+    ),
+    module_diff: v.optional(
+      v.object({
+        added: v.array(v.string()),
+        removed: v.array(v.string()),
+        changed: v.array(v.string()),
+        computed_at: v.number(),
+      }),
+    ),
   })
     .index("by_workspace_id", ["workspace_id"])
     .index("by_project_id", ["project_id"]),

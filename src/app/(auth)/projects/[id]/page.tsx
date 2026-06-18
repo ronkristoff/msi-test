@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/format";
 import { useErrorLogger } from "@/lib/error-logger";
 import { SOURCE_TYPE_LABELS } from "@/lib/source-types";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import { StaleTestsBanner } from "./StaleTestsBanner";
 
 function ActionMenu({
   onAction,
@@ -270,6 +271,8 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
+
+            <StaleTestsBanner projectId={project._id} />
 
             {/* Suites section */}
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-[var(--elev-raised)]">
